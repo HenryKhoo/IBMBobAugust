@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Env
+.env
+
+# OS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+
+# Test / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Generated demo assets (kept out of source tree, dir tracked via .gitkeep)
+exports/*
+!exports/.gitkeep
+
+# scaffold transfer archive (safe to delete)
+_to_delete/
