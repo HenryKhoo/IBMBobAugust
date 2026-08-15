@@ -1,0 +1,1488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KAIROS-7 Operations Console — Demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0b0b0c;
+    --panel:#141416;
+    --panel-2:#1a1a1d;
+    --panel-3:#0f0f10;
+    --line:#2a2a2e;
+    --line-strong:#5a5a62;
+    --ink:#ececee;
+    --ink-dim:#a2a2a9;
+    --ink-faint:#6c6c73;
+    --invert-bg:#ececee;
+    --invert-ink:#0b0b0c;
+    --disp:'Space Grotesk', 'Segoe UI', sans-serif;
+    --mono:'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+    --radius:3px;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--disp);
+    font-size:14px;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  ::selection{background:var(--ink);color:var(--bg);}
+
+  :focus-visible{outline:2px solid var(--ink); outline-offset:2px;}
+
+  button{font-family:inherit;cursor:pointer;}
+  textarea, select, input{font-family:inherit;}
+
+  h1,h2,h3,p{margin:0;}
+
+  .mono{font-family:var(--mono);}
+
+  .label-eyebrow{
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--ink-faint);
+  }
+
+  /* ============ TOP BAR ============ */
+  .topbar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:24px;
+    padding:14px 22px;
+    border-bottom:1px solid var(--line);
+    background:var(--panel-3);
+    flex-wrap:wrap;
+  }
+  .brand{display:flex;align-items:center;gap:12px;}
+  .brand-mark{
+    width:34px;height:34px;
+    border:1px solid var(--line-strong);
+    display:flex;align-items:center;justify-content:center;
+    font-family:var(--mono);
+    font-weight:700;font-size:12px;
+    letter-spacing:0.02em;
+    flex-shrink:0;
+  }
+  .brand-text{display:flex;flex-direction:column;line-height:1.25;}
+  .brand-station{font-weight:600;font-size:15px;letter-spacing:0.02em;}
+  .brand-sub{font-family:var(--mono);font-size:10.5px;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-faint);}
+
+  .status-cluster{display:flex;align-items:center;gap:18px;flex-wrap:wrap;}
+  .met{display:flex;flex-direction:column;align-items:flex-end;line-height:1.2;}
+  .met-label{font-family:var(--mono);font-size:10px;letter-spacing:0.14em;color:var(--ink-faint);text-transform:uppercase;}
+  .met-value{font-family:var(--mono);font-size:16px;font-variant-numeric:tabular-nums;font-weight:600;}
+
+  .status-pill{
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    font-weight:700;
+    padding:7px 12px;
+    border:1px solid var(--line-strong);
+    white-space:nowrap;
+  }
+  .status-pill.level-nominal{border-color:var(--line-strong); color:var(--ink);}
+  .status-pill.level-caution{border:1px solid var(--ink); color:var(--ink); border-width:2px;}
+  .status-pill.level-critical{background:var(--invert-bg); color:var(--invert-ink); border-color:var(--invert-bg);}
+
+  /* ============ MODULE NAV ============ */
+  .module-nav{
+    display:flex;
+    border-bottom:1px solid var(--line);
+    background:var(--bg);
+    overflow-x:auto;
+  }
+  .module-btn{
+    background:transparent;
+    border:none;
+    border-right:1px solid var(--line);
+    color:var(--ink-dim);
+    padding:13px 20px;
+    display:flex;
+    align-items:baseline;
+    gap:9px;
+    white-space:nowrap;
+  }
+  .module-btn .mod-num{font-family:var(--mono);font-size:11px;color:var(--ink-faint);}
+  .module-btn .mod-name{font-family:var(--mono);font-size:12px;letter-spacing:0.08em;text-transform:uppercase;}
+  .module-btn:hover{color:var(--ink);}
+  .module-btn.active{background:var(--invert-bg);color:var(--invert-ink);}
+  .module-btn.active .mod-num{color:var(--invert-ink);opacity:0.55;}
+
+  /* ============ LAYOUT ============ */
+  main{max-width:1320px;margin:0 auto;padding:26px 22px 60px;}
+  .tab-panel{display:none;}
+  .tab-panel.active{display:block; animation:fade .18s ease-out;}
+  @media (prefers-reduced-motion:reduce){ .tab-panel.active{animation:none;} }
+  @keyframes fade{from{opacity:0;}to{opacity:1;}}
+
+  .module-head{margin-bottom:20px;}
+  .module-title{font-size:21px;font-weight:600;letter-spacing:-0.01em;margin-top:6px;}
+  .module-desc{color:var(--ink-dim);font-size:13px;margin-top:6px;max-width:640px;}
+
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--line);
+  }
+  .panel-head{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:12px 16px;
+    border-bottom:1px solid var(--line);
+    gap:12px;flex-wrap:wrap;
+  }
+  .panel-head h3{font-size:12px;letter-spacing:0.1em;text-transform:uppercase;font-family:var(--mono);font-weight:600;color:var(--ink-dim);}
+
+  .btn{
+    background:transparent;
+    border:1px solid var(--line-strong);
+    color:var(--ink);
+    padding:8px 14px;
+    font-size:12px;
+    letter-spacing:0.05em;
+    text-transform:uppercase;
+    font-family:var(--mono);
+  }
+  .btn:hover{background:var(--panel-2);}
+  .btn.primary{background:var(--invert-bg);color:var(--invert-ink);border-color:var(--invert-bg);font-weight:700;}
+  .btn.primary:hover{opacity:0.85;}
+  .btn:disabled{opacity:0.35;cursor:not-allowed;}
+  .btn.small{padding:6px 10px;font-size:11px;}
+
+  /* ============ TAB 1 : CRISIS TIMELINE ============ */
+  .root-cause-banner{
+    border:1px solid var(--line-strong);
+    padding:16px 18px;
+    margin-bottom:18px;
+    display:flex;
+    gap:14px;
+    align-items:flex-start;
+  }
+  .root-cause-banner.active{background:var(--invert-bg);color:var(--invert-ink);border-color:var(--invert-bg);}
+  .root-cause-banner .rc-tag{font-family:var(--mono);font-size:10.5px;letter-spacing:0.12em;text-transform:uppercase;flex-shrink:0;padding-top:2px;opacity:0.65;}
+  .root-cause-banner .rc-text{font-size:16px;font-weight:600;line-height:1.4;}
+  .root-cause-banner.active .rc-text{font-weight:700;}
+
+  .t1-grid{
+    display:grid;
+    grid-template-columns:1.05fr 0.95fr;
+    gap:16px;
+  }
+  @media (max-width:880px){ .t1-grid{grid-template-columns:1fr;} }
+
+  .feed-controls{display:flex;gap:8px;}
+  .feed-list{
+    height:460px;
+    overflow-y:auto;
+    padding:0;
+    display:flex;
+    flex-direction:column-reverse;
+  }
+  .feed-empty{
+    padding:40px 20px;
+    text-align:center;
+    color:var(--ink-faint);
+    font-family:var(--mono);
+    font-size:12px;
+    letter-spacing:0.06em;
+  }
+  .feed-entry{
+    display:flex;
+    gap:12px;
+    padding:10px 16px;
+    border-bottom:1px solid var(--line);
+    border-left:3px solid var(--line);
+  }
+  .feed-entry.sev-info{border-left-color:var(--line);}
+  .feed-entry.sev-warning{border-left-color:var(--ink-dim);}
+  .feed-entry.sev-critical{border-left-color:var(--ink);background:var(--panel-2);}
+  .feed-sev{
+    font-family:var(--mono);font-size:10px;letter-spacing:0.1em;
+    width:64px;flex-shrink:0;padding-top:2px;text-transform:uppercase;color:var(--ink-faint);
+  }
+  .feed-entry.sev-warning .feed-sev{color:var(--ink-dim);font-weight:600;}
+  .feed-entry.sev-critical .feed-sev{color:var(--ink);font-weight:700;}
+  .feed-body{flex:1;min-width:0;}
+  .feed-meta{font-family:var(--mono);font-size:10.5px;color:var(--ink-faint);margin-bottom:2px;letter-spacing:0.04em;}
+  .feed-msg{font-size:13px;color:var(--ink);}
+  .feed-entry.sev-info .feed-msg{color:var(--ink-dim);}
+
+  .checklist-status{font-family:var(--mono);font-size:11px;color:var(--ink-faint);letter-spacing:0.06em;}
+  .checklist{list-style:none;margin:0;padding:0;}
+  .check-item{
+    display:flex;
+    gap:12px;
+    padding:13px 16px;
+    border-bottom:1px solid var(--line);
+    align-items:flex-start;
+  }
+  .check-item.current{background:var(--panel-2);border-left:3px solid var(--ink);}
+  .check-item.done{opacity:0.5;}
+  .check-item.pending{opacity:0.35;}
+  .check-box{
+    width:18px;height:18px;flex-shrink:0;
+    border:1px solid var(--line-strong);
+    display:flex;align-items:center;justify-content:center;
+    font-family:var(--mono);font-size:12px;
+    margin-top:1px;
+    background:transparent;
+  }
+  .check-item.done .check-box{background:var(--invert-bg);color:var(--invert-ink);border-color:var(--invert-bg);}
+  .check-num{font-family:var(--mono);font-size:11px;color:var(--ink-faint);margin-right:8px;}
+  .check-text{font-size:13.5px;}
+  .check-item.done .check-text{text-decoration:line-through;}
+  .proc-ref{
+    padding:10px 16px;
+    font-family:var(--mono);
+    font-size:10.5px;
+    color:var(--ink-faint);
+    border-top:1px solid var(--line);
+    letter-spacing:0.03em;
+  }
+  .checklist-empty{padding:40px 20px;text-align:center;color:var(--ink-faint);font-family:var(--mono);font-size:12px;}
+
+  /* ============ TAB 2 : TELEMETRY TRANSLATOR ============ */
+  .t2-toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;}
+  .t2-timestamp{font-family:var(--mono);font-size:11.5px;color:var(--ink-faint);}
+  .t2-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(280px,1fr));
+    gap:14px;
+  }
+  .sector-card{background:var(--panel);border:1px solid var(--line);display:flex;flex-direction:column;}
+  .sector-head{padding:14px 16px 10px;border-bottom:1px solid var(--line);}
+  .sector-name{font-size:14.5px;font-weight:600;margin-bottom:8px;}
+  .sector-status{
+    display:inline-block;
+    font-family:var(--mono);font-size:10.5px;letter-spacing:0.1em;text-transform:uppercase;font-weight:700;
+    padding:4px 9px;border:1px solid var(--line-strong);
+  }
+  .sector-status.nominal{border-width:1px;color:var(--ink-dim);font-weight:500;}
+  .sector-status.degrading{border-width:2px;color:var(--ink);}
+  .sector-status.critical{background:var(--invert-bg);color:var(--invert-ink);border-color:var(--invert-bg);}
+  .sector-summary{padding:14px 16px;font-size:13.5px;color:var(--ink);flex:1;line-height:1.55;}
+  .sector-raw{border-top:1px solid var(--line);padding:0;}
+  .sector-raw summary{
+    cursor:pointer;
+    padding:9px 16px;
+    font-family:var(--mono);
+    font-size:10.5px;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    color:var(--ink-faint);
+    list-style:none;
+  }
+  .sector-raw summary::-webkit-details-marker{display:none;}
+  .sector-raw summary:before{content:'+ ';}
+  .sector-raw[open] summary:before{content:'– ';}
+  .raw-line{
+    padding:0 16px 12px;
+    font-family:var(--mono);
+    font-size:11.5px;
+    color:var(--ink-dim);
+    white-space:pre-wrap;
+  }
+
+  /* ============ TAB 3 : MEDICAL TRIAGE ============ */
+  .t3-grid{display:grid;grid-template-columns:340px 1fr;gap:16px;}
+  @media (max-width:900px){ .t3-grid{grid-template-columns:1fr;} }
+
+  .crew-list{display:flex;flex-direction:column;gap:10px;}
+  .crew-card{
+    background:var(--panel);border:1px solid var(--line);
+    padding:13px 14px;
+    cursor:pointer;
+  }
+  .crew-card.selected{border-color:var(--ink);background:var(--panel-2);}
+  .crew-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;}
+  .crew-name{font-weight:600;font-size:13.5px;}
+  .crew-role{font-family:var(--mono);font-size:10px;color:var(--ink-faint);letter-spacing:0.06em;text-transform:uppercase;}
+  .biometric-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:3px 0;}
+  .biometric-label{font-family:var(--mono);font-size:10.5px;color:var(--ink-faint);width:56px;flex-shrink:0;}
+  .biometric-spark{flex:1;}
+  .biometric-value{font-family:var(--mono);font-size:11px;color:var(--ink-dim);width:64px;text-align:right;flex-shrink:0;}
+  .biometric-value.flag{color:var(--ink);font-weight:700;}
+  .allergy-note{
+    margin-top:9px;padding-top:9px;border-top:1px solid var(--line);
+    font-family:var(--mono);font-size:10.5px;color:var(--ink-dim);line-height:1.5;
+  }
+
+  .intake-terminal{display:flex;flex-direction:column;}
+  .intake-body{padding:16px;}
+  .intake-row{margin-bottom:12px;}
+  .intake-row label{display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:6px;}
+  .intake-select{
+    width:100%;background:var(--panel-3);border:1px solid var(--line-strong);color:var(--ink);
+    padding:9px 10px;font-size:13px;
+  }
+  .intake-textarea{
+    width:100%;min-height:90px;background:var(--panel-3);border:1px solid var(--line-strong);color:var(--ink);
+    padding:10px;font-size:13px;resize:vertical;line-height:1.5;
+  }
+  .intake-examples{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;}
+  .intake-actions{display:flex;justify-content:flex-end;margin-top:4px;}
+
+  .triage-output{border-top:1px solid var(--line);padding:16px;}
+  .triage-placeholder{color:var(--ink-faint);font-family:var(--mono);font-size:12px;}
+  .triage-header{font-family:var(--mono);font-size:10.5px;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:10px;}
+  .triage-lead{
+    border:1px solid var(--ink-strong, var(--line-strong));
+    background:var(--invert-bg);color:var(--invert-ink);
+    padding:12px 14px;font-weight:700;font-size:14px;margin-bottom:12px;
+  }
+  .triage-alert{
+    border:2px solid var(--ink);
+    padding:10px 14px;margin-bottom:12px;
+    font-size:13px;
+  }
+  .triage-alert .ta-tag{font-family:var(--mono);font-size:10px;letter-spacing:0.1em;color:var(--ink-faint);display:block;margin-bottom:4px;}
+  .triage-steps{margin:0;padding-left:0;list-style:none;}
+  .triage-steps li{
+    display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:13.5px;
+  }
+  .triage-steps li:last-child{border-bottom:none;}
+  .triage-steps .ts-num{font-family:var(--mono);color:var(--ink-faint);flex-shrink:0;}
+
+  /* ============ TAB 4 : SUPPLY & RATIONING ============ */
+  .t4-top-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(260px,1fr));
+    gap:14px;
+    margin-bottom:16px;
+  }
+  .resource-card{background:var(--panel);border:1px solid var(--line);padding:14px 16px;}
+  .resource-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;}
+  .resource-name{font-weight:600;font-size:13.5px;}
+  .resource-chart-wrap svg{width:100%;height:auto;display:block;}
+  .resource-caption{font-size:12px;color:var(--ink-dim);margin-top:8px;line-height:1.5;}
+
+  .sim-panel{background:var(--panel);border:1px solid var(--line);}
+  .sim-body{padding:18px 18px 20px;}
+  .sim-question{
+    font-family:var(--mono);
+    font-size:12.5px;
+    color:var(--ink-dim);
+    border-left:2px solid var(--line-strong);
+    padding-left:12px;
+    margin-bottom:16px;
+    line-height:1.6;
+  }
+  .sim-controls{display:flex;gap:24px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px;}
+  .sim-control{display:flex;flex-direction:column;gap:6px;min-width:220px;flex:1;}
+  .sim-control label{font-family:var(--mono);font-size:10.5px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);}
+  .sim-slider-value{font-family:var(--mono);font-size:12px;color:var(--ink);}
+  input[type="range"]{
+    -webkit-appearance:none;appearance:none;
+    width:100%;height:2px;background:var(--line-strong);
+  }
+  input[type="range"]::-webkit-slider-thumb{
+    -webkit-appearance:none;appearance:none;
+    width:14px;height:14px;background:var(--ink);border-radius:0;cursor:pointer;
+  }
+  input[type="range"]::-moz-range-thumb{
+    width:14px;height:14px;background:var(--ink);border:none;border-radius:0;cursor:pointer;
+  }
+  .sim-metrics{display:flex;gap:22px;flex-wrap:wrap;margin-bottom:16px;}
+  .sim-metric{border:1px solid var(--line);padding:10px 14px;min-width:140px;}
+  .sim-metric-label{font-family:var(--mono);font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:4px;}
+  .sim-metric-value{font-family:var(--mono);font-size:19px;font-weight:600;}
+
+  .sim-output{border-top:1px solid var(--line);margin-top:4px;padding-top:16px;}
+  .sim-output-placeholder{color:var(--ink-faint);font-family:var(--mono);font-size:12px;}
+  .sim-output-lead{font-weight:700;font-size:14.5px;margin-bottom:10px;line-height:1.5;}
+  .sim-output-detail{font-size:13px;color:var(--ink-dim);line-height:1.6;}
+
+  .chart-legend{display:flex;gap:16px;margin-top:10px;flex-wrap:wrap;}
+  .legend-item{display:flex;align-items:center;gap:7px;font-family:var(--mono);font-size:10.5px;color:var(--ink-dim);}
+  .legend-swatch{width:16px;height:2px;background:var(--ink-dim);}
+  .legend-swatch.dashed{background:none;border-top:2px dashed var(--ink-dim);}
+  .legend-swatch.solid-strong{background:var(--ink);}
+
+  /* ============ FOOTER ============ */
+  .foot-note{
+    max-width:1320px;margin:0 auto;padding:16px 22px 40px;
+    font-family:var(--mono);font-size:10.5px;color:var(--ink-faint);letter-spacing:0.04em;
+    border-top:1px solid var(--line);
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-mark">K7</div>
+    <div class="brand-text">
+      <span class="brand-station">KAIROS-7 · DEEP-TRANSIT HABITAT</span>
+      <span class="brand-sub">Independent life support &amp; operations console</span>
+    </div>
+  </div>
+  <div class="status-cluster">
+    <div class="met">
+      <span class="met-label">Mission Elapsed Time</span>
+      <span class="met-value mono" id="met-clock">214:06:12:00</span>
+    </div>
+    <div class="status-pill level-nominal" id="global-status">System Nominal</div>
+  </div>
+</header>
+
+<nav class="module-nav" role="tablist" aria-label="Console modules">
+  <button class="module-btn active" data-tab="1" role="tab" aria-selected="true">
+    <span class="mod-num">01</span><span class="mod-name">Crisis Timeline</span>
+  </button>
+  <button class="module-btn" data-tab="2" role="tab" aria-selected="false">
+    <span class="mod-num">02</span><span class="mod-name">Telemetry Translator</span>
+  </button>
+  <button class="module-btn" data-tab="3" role="tab" aria-selected="false">
+    <span class="mod-num">03</span><span class="mod-name">Medical Triage</span>
+  </button>
+  <button class="module-btn" data-tab="4" role="tab" aria-selected="false">
+    <span class="mod-num">04</span><span class="mod-name">Supply &amp; Rationing</span>
+  </button>
+</nav>
+
+<main>
+
+  <!-- ============================================================ -->
+  <!-- TAB 1 — CRISIS TIMELINE & EMERGENCY PROCEDURE BUILDER          -->
+  <!-- ============================================================ -->
+  <section class="tab-panel active" id="tab-1">
+    <div class="module-head">
+      <span class="label-eyebrow">Module 01</span>
+      <h2 class="module-title">Crisis Timeline &amp; Emergency Procedure Builder</h2>
+      <p class="module-desc">Monitors the live telemetry feed, isolates the event that matters, and builds the matching emergency procedure step by step.</p>
+    </div>
+
+    <div class="root-cause-banner" id="root-cause-banner">
+      <span class="rc-tag">Root cause</span>
+      <span class="rc-text" id="root-cause-text">All systems nominal. No active event.</span>
+    </div>
+
+    <div class="t1-grid">
+      <div class="panel">
+        <div class="panel-head">
+          <h3>Telemetry &amp; event feed</h3>
+          <div class="feed-controls">
+            <button class="btn small" id="btn-inject">Inject emergency scenario</button>
+            <button class="btn small" id="btn-reset-feed">Reset</button>
+          </div>
+        </div>
+        <div class="feed-list" id="feed-list">
+          <div class="feed-empty">Standby — no active events. Press "Inject emergency scenario" to run the demo.</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h3>Emergency procedure</h3>
+          <span class="checklist-status" id="checklist-status">No active procedure</span>
+        </div>
+        <div id="checklist-wrap">
+          <div class="checklist-empty">A procedure will populate here once a root cause is confirmed.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- TAB 2 — PLAIN-LANGUAGE TELEMETRY & SYSTEM HEALTH TRANSLATOR    -->
+  <!-- ============================================================ -->
+  <section class="tab-panel" id="tab-2">
+    <div class="module-head">
+      <span class="label-eyebrow">Module 02</span>
+      <h2 class="module-title">Plain-Language Telemetry &amp; System Health Translator</h2>
+      <p class="module-desc">Turns raw sensor output from each life-support sector into a short, plain-language read on what it means and what to do.</p>
+    </div>
+
+    <div class="t2-toolbar">
+      <span class="t2-timestamp mono" id="t2-timestamp">Last diagnostic pass — MET 214:06:12:00</span>
+      <button class="btn small" id="btn-refresh-t2">Run new diagnostic pass</button>
+    </div>
+
+    <div class="t2-grid" id="t2-grid"></div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- TAB 3 — CREW MEDICAL & PSYCHOLOGICAL TRIAGE CONSOLE            -->
+  <!-- ============================================================ -->
+  <section class="tab-panel" id="tab-3">
+    <div class="module-head">
+      <span class="label-eyebrow">Module 03</span>
+      <h2 class="module-title">Crew Medical &amp; Psychological Triage Console</h2>
+      <p class="module-desc">Cross-references crew biometrics with a plain-English symptom report to produce an immediate, file-aware triage protocol.</p>
+    </div>
+
+    <div class="t3-grid">
+      <div class="panel">
+        <div class="panel-head"><h3>Crew roster &amp; biometrics</h3></div>
+        <div class="intake-body">
+          <div class="crew-list" id="crew-list"></div>
+        </div>
+      </div>
+
+      <div class="panel intake-terminal">
+        <div class="panel-head"><h3>Medical intake terminal</h3></div>
+        <div class="intake-body">
+          <div class="intake-row">
+            <label for="intake-crew">Crew member on file</label>
+            <select class="intake-select" id="intake-crew"></select>
+          </div>
+          <div class="intake-row">
+            <label for="intake-text">Symptom report (plain English)</label>
+            <textarea class="intake-textarea" id="intake-text" placeholder="Describe what you observe — injury, symptoms, behavior, timing..."></textarea>
+            <div class="intake-examples">
+              <button class="btn small" id="ex-1">Example: laceration + confusion</button>
+              <button class="btn small" id="ex-2">Example: dizziness + chest tightness</button>
+            </div>
+          </div>
+          <div class="intake-actions">
+            <button class="btn primary" id="btn-run-triage">Run triage analysis</button>
+          </div>
+        </div>
+        <div class="triage-output" id="triage-output">
+          <p class="triage-placeholder">No analysis run yet. Select a crew member, describe the symptoms, and run the analysis.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- TAB 4 — SUPPLY CHAIN, RESOURCE SCARCITY & RATIONING PREDICTOR  -->
+  <!-- ============================================================ -->
+  <section class="tab-panel" id="tab-4">
+    <div class="module-head">
+      <span class="label-eyebrow">Module 04</span>
+      <h2 class="module-title">Supply Chain, Resource Scarcity &amp; Rationing Predictor</h2>
+      <p class="module-desc">Projects consumption forward against the next resupply date and models the trade-offs of a rationing strategy.</p>
+    </div>
+
+    <div class="t4-top-grid" id="t4-resource-grid"></div>
+
+    <div class="sim-panel">
+      <div class="panel-head">
+        <h3>Rationing simulation — hydroponics crop failure</h3>
+        <div class="feed-controls">
+          <button class="btn small" id="btn-trigger-crop-failure">Trigger crop failure</button>
+          <button class="btn small" id="btn-reset-supply">Reset</button>
+        </div>
+      </div>
+      <div class="sim-body">
+        <p class="sim-question" id="sim-question">Hydroponics bay nominal. Trigger a crop failure to run the rationing scenario.</p>
+
+        <div class="sim-controls">
+          <div class="sim-control">
+            <label for="sim-days">Days until resupply arrival — <span class="sim-slider-value" id="sim-days-value">45</span></label>
+            <input type="range" id="sim-days" min="20" max="90" step="1" value="45" disabled>
+          </div>
+          <div class="sim-control">
+            <label for="sim-ration">Daily ration per person — <span class="sim-slider-value" id="sim-ration-value">2,500</span> kcal</label>
+            <input type="range" id="sim-ration" min="1200" max="2500" step="10" value="2500" disabled>
+          </div>
+          <button class="btn small" id="btn-auto-ration" disabled>Auto-set optimal ration</button>
+          <button class="btn primary" id="btn-run-sim" disabled>Run simulation</button>
+        </div>
+
+        <div class="sim-metrics">
+          <div class="sim-metric">
+            <div class="sim-metric-label">Food energy on hand</div>
+            <div class="sim-metric-value mono" id="metric-stock">1,650,000 kcal</div>
+          </div>
+          <div class="sim-metric">
+            <div class="sim-metric-label">Current ration</div>
+            <div class="sim-metric-value mono" id="metric-calories">— kcal</div>
+          </div>
+          <div class="sim-metric">
+            <div class="sim-metric-label">Projected buffer at resupply</div>
+            <div class="sim-metric-value mono" id="metric-buffer">—</div>
+          </div>
+          <div class="sim-metric">
+            <div class="sim-metric-label">Modeled survival probability</div>
+            <div class="sim-metric-value mono" id="metric-survival">—</div>
+          </div>
+        </div>
+
+        <div class="resource-chart-wrap" id="food-chart-wrap"></div>
+        <div class="chart-legend">
+          <div class="legend-item"><span class="legend-swatch dashed"></span> Reference: standard-rate consumption, no rationing (2,500 kcal/person/day)</div>
+          <div class="legend-item"><span class="legend-swatch solid-strong"></span> Live projection at the current ration and resupply date</div>
+        </div>
+
+        <div class="sim-output" id="sim-output">
+          <p class="sim-output-placeholder">Trigger the hydroponics crop failure to begin the rationing simulation.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<p class="foot-note">Demo console — all telemetry, biometrics, and generated analysis on this page are simulated for demonstration purposes only.</p>
+
+<script>
+(function(){
+
+  /* ============================================================ */
+  /* SHARED — module nav + MET clock + global status                */
+  /* ============================================================ */
+
+  var globalStatusEl = document.getElementById('global-status');
+
+  function setGlobalStatus(level, text){
+    globalStatusEl.className = 'status-pill level-' + level;
+    globalStatusEl.textContent = text;
+  }
+
+  // Each module reports its own worst condition here. The header pill always
+  // shows the worst condition across all four — not just whichever tab is open.
+  var LEVEL_RANK = { nominal:0, caution:1, critical:2 };
+  var moduleAlerts = {
+    t1: { level:'nominal', label:'Crisis Timeline nominal' },
+    t2: { level:'nominal', label:'Telemetry nominal' },
+    t3: { level:'nominal', label:'Medical nominal' },
+    t4: { level:'nominal', label:'Supply nominal' }
+  };
+
+  function setModuleAlert(key, level, label){
+    moduleAlerts[key] = { level:level, label:label };
+    recomputeGlobalStatus();
+  }
+
+  function recomputeGlobalStatus(){
+    var worst = 'nominal';
+    Object.keys(moduleAlerts).forEach(function(k){
+      if(LEVEL_RANK[moduleAlerts[k].level] > LEVEL_RANK[worst]) worst = moduleAlerts[k].level;
+    });
+    if(worst === 'nominal'){
+      setGlobalStatus('nominal', 'System Nominal');
+      return;
+    }
+    var labels = Object.keys(moduleAlerts)
+      .filter(function(k){ return moduleAlerts[k].level === worst; })
+      .map(function(k){ return moduleAlerts[k].label; });
+    setGlobalStatus(worst, labels.join(' · '));
+  }
+
+  var tabButtons = document.querySelectorAll('.module-btn');
+  var tabPanels = document.querySelectorAll('.tab-panel');
+  tabButtons.forEach(function(btn){
+    btn.addEventListener('click', function(){
+      tabButtons.forEach(function(b){ b.classList.remove('active'); b.setAttribute('aria-selected','false'); });
+      tabPanels.forEach(function(p){ p.classList.remove('active'); });
+      btn.classList.add('active');
+      btn.setAttribute('aria-selected','true');
+      document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    });
+  });
+
+  // Mission elapsed time clock — ticks up in real time from a fixed start.
+  var metEl = document.getElementById('met-clock');
+  var metSeconds = (214*86400) + (6*3600) + (12*60) + 0;
+  function pad(n, len){ n = String(n); while(n.length < (len||2)) n = '0' + n; return n; }
+  function renderMet(){
+    var d = Math.floor(metSeconds/86400);
+    var h = Math.floor((metSeconds%86400)/3600);
+    var m = Math.floor((metSeconds%3600)/60);
+    var s = Math.floor(metSeconds%60);
+    metEl.textContent = pad(d,3) + ':' + pad(h) + ':' + pad(m) + ':' + pad(s);
+  }
+  renderMet();
+  setInterval(function(){ metSeconds += 1; renderMet(); }, 1000);
+
+  /* ============================================================ */
+  /* SPARKLINE HELPER (grayscale, no fill)                          */
+  /* ============================================================ */
+  function sparkline(values, w, h){
+    w = w || 110; h = h || 26;
+    var min = Math.min.apply(null, values), max = Math.max.apply(null, values);
+    var range = (max - min) || 1;
+    var step = w / (values.length - 1);
+    var pts = values.map(function(v, i){
+      var x = i * step;
+      var y = h - ((v - min) / range) * (h - 4) - 2;
+      return x.toFixed(1) + ',' + y.toFixed(1);
+    }).join(' ');
+    var lastX = (values.length - 1) * step;
+    var lastY = h - ((values[values.length-1] - min) / range) * (h - 4) - 2;
+    return '<svg viewBox="0 0 ' + w + ' ' + h + '" width="' + w + '" height="' + h + '" preserveAspectRatio="none">' +
+      '<polyline points="' + pts + '" fill="none" stroke="var(--ink-dim)" stroke-width="1.4" />' +
+      '<circle cx="' + lastX.toFixed(1) + '" cy="' + lastY.toFixed(1) + '" r="1.8" fill="var(--ink)" />' +
+      '</svg>';
+  }
+
+  /* ============================================================ */
+  /* TAB 1 — CRISIS TIMELINE & EMERGENCY PROCEDURE BUILDER          */
+  /* ============================================================ */
+
+  var feedList = document.getElementById('feed-list');
+  var rcBanner = document.getElementById('root-cause-banner');
+  var rcText = document.getElementById('root-cause-text');
+  var checklistWrap = document.getElementById('checklist-wrap');
+  var checklistStatus = document.getElementById('checklist-status');
+  var btnInject = document.getElementById('btn-inject');
+  var btnResetFeed = document.getElementById('btn-reset-feed');
+
+  var scenarioEvents = [
+    { t:'214:06:12:04', sev:'info',     src:'ECLSS',  msg:'Cabin pressure sensor delta +0.02 psi/min.' },
+    { t:'214:06:12:09', sev:'info',     src:'STRUCT', msg:'Node 3 strain gauges nominal.' },
+    { t:'214:06:12:15', sev:'warning',  src:'ECLSS',  msg:'Cabin pressure trending downward — 14.2 psi.' },
+    { t:'214:06:12:19', sev:'info',     src:'THERM',  msg:'Node 3 external skin temperature -12C.' },
+    { t:'214:06:12:24', sev:'warning',  src:'ECLSS',  msg:'Pressure rate of change exceeds nominal band.' },
+    { t:'214:06:12:29', sev:'critical', src:'ECLSS',  msg:'Cabin pressure 12.8 psi and falling — possible breach.' },
+    { t:'214:06:12:31', sev:'critical', src:'STRUCT', msg:'Acoustic sensor detects leak signature — Node 3 starboard panel.' },
+    { t:'214:06:12:34', sev:'info',     src:'COMMS',  msg:'Telemetry downlink nominal.' }
+  ];
+
+  var procedureSteps = [
+    'Don emergency oxygen mask immediately.',
+    'Instruct all crew to move to Node 2 and seal the hatch behind you.',
+    'Close manual isolation valve 4B to Node 3.',
+    'Confirm the Node 3 hatch seal indicator reads LOCKED.',
+    'Report status and cabin pressure to Mission Control.',
+    'Monitor Node 2 pressure — do not remove mask until it stabilizes above 13.5 psi.'
+  ];
+
+  var scenarioTimer = null;
+  var checklistState = [];
+  var procedureActive = false;
+
+  function renderFeedEntry(ev){
+    var el = document.createElement('div');
+    el.className = 'feed-entry sev-' + ev.sev;
+    el.innerHTML =
+      '<div class="feed-sev mono">' + ev.sev + '</div>' +
+      '<div class="feed-body">' +
+        '<div class="feed-meta">MET ' + ev.t + ' &middot; ' + ev.src + '</div>' +
+        '<div class="feed-msg">' + ev.msg + '</div>' +
+      '</div>';
+    feedList.appendChild(el);
+    feedList.scrollTop = feedList.scrollHeight;
+  }
+
+  function renderChecklist(){
+    var firstPendingFound = false;
+    var html = '<ul class="checklist">';
+    procedureSteps.forEach(function(step, i){
+      var state = checklistState[i] ? 'done' : 'pending';
+      if(!checklistState[i] && !firstPendingFound){ state = 'current'; firstPendingFound = true; }
+      html += '<li class="check-item ' + state + '">' +
+        '<button class="check-box" data-idx="' + i + '" aria-label="Mark step ' + (i+1) + ' complete">' + (checklistState[i] ? '&#10003;' : '') + '</button>' +
+        '<span class="check-text"><span class="check-num">Step ' + (i+1) + '.</span>' + step + '</span>' +
+        '</li>';
+    });
+    html += '</ul><div class="proc-ref" id="proc-ref">Ref: Emergency Decompression Procedure, EMER-PROC 4.2.1 (simulated excerpt)</div>';
+    checklistWrap.innerHTML = html;
+    checklistWrap.querySelectorAll('.check-box').forEach(function(box){
+      box.addEventListener('click', function(){
+        var idx = Number(box.dataset.idx);
+        checklistState[idx] = !checklistState[idx];
+        renderChecklist();
+        updateChecklistStatus();
+        updateProcedureResolutionState();
+      });
+    });
+  }
+
+  function updateChecklistStatus(){
+    var done = checklistState.filter(Boolean).length;
+    var total = procedureSteps.length;
+    if(total === 0){ checklistStatus.textContent = 'No active procedure'; return; }
+    checklistStatus.textContent = done === total ? 'Procedure complete — ' + total + '/' + total : done + ' of ' + total + ' steps complete';
+  }
+
+  // Reacts to checklist progress: confirms resolution once every step is checked,
+  // and reverts to the active-breach state if a step gets unchecked again.
+  function updateProcedureResolutionState(){
+    if(!procedureActive) return;
+    var total = procedureSteps.length;
+    var done = checklistState.filter(Boolean).length;
+    var procRef = document.getElementById('proc-ref');
+    if(done === total && total > 0){
+      rcBanner.classList.remove('active');
+      document.querySelector('#root-cause-banner .rc-tag').textContent = 'Status';
+      rcText.textContent = 'Procedure complete — Node 3 isolated and sealed. Cabin pressure stabilized in Node 2 at MET ' + metEl.textContent + '.';
+      if(procRef){ procRef.textContent = 'Emergency Decompression Procedure closed out — all ' + total + ' steps confirmed at MET ' + metEl.textContent + '.'; }
+      setModuleAlert('t1', 'nominal', 'Node 3 Secured');
+    } else {
+      rcBanner.classList.add('active');
+      document.querySelector('#root-cause-banner .rc-tag').textContent = 'Root cause';
+      rcText.textContent = 'Root cause: hull breach at Node 3 starboard panel — rapid cabin depressurization in progress.';
+      if(procRef){ procRef.textContent = 'Ref: Emergency Decompression Procedure, EMER-PROC 4.2.1 (simulated excerpt)'; }
+      setModuleAlert('t1', 'critical', 'Node 3 Breach');
+    }
+  }
+
+  function resetFeed(){
+    clearTimeout(scenarioTimer);
+    feedList.innerHTML = '<div class="feed-empty">Standby — no active events. Press "Inject emergency scenario" to run the demo.</div>';
+    procedureActive = false;
+    rcBanner.classList.remove('active');
+    document.querySelector('#root-cause-banner .rc-tag').textContent = 'Root cause';
+    rcText.textContent = 'All systems nominal. No active event.';
+    checklistState = [];
+    checklistWrap.innerHTML = '<div class="checklist-empty">A procedure will populate here once a root cause is confirmed.</div>';
+    checklistStatus.textContent = 'No active procedure';
+    setModuleAlert('t1', 'nominal', 'Crisis Timeline nominal');
+    btnInject.disabled = false;
+  }
+
+  function injectScenario(){
+    feedList.innerHTML = '';
+    checklistState = new Array(procedureSteps.length).fill(false);
+    procedureActive = false;
+    btnInject.disabled = true;
+    setModuleAlert('t1', 'caution', 'Node 3 Anomaly In Progress');
+    scenarioEvents.forEach(function(ev, i){
+      scenarioTimer = setTimeout(function(){
+        renderFeedEntry(ev);
+        if(ev.sev === 'warning' && i === 2){
+          rcText.textContent = 'Cabin pressure loss detected in Node 3 — cause not yet isolated.';
+        }
+        if(ev.sev === 'critical' && ev.src === 'STRUCT'){
+          procedureActive = true;
+          rcBanner.classList.add('active');
+          rcText.textContent = 'Root cause: hull breach at Node 3 starboard panel — rapid cabin depressurization in progress.';
+          setModuleAlert('t1', 'critical', 'Node 3 Breach');
+          checklistStatus.textContent = 'Procedure ready — 0 of ' + procedureSteps.length + ' steps complete';
+          renderChecklist();
+        }
+      }, i * 850);
+    });
+  }
+
+  btnInject.addEventListener('click', injectScenario);
+  btnResetFeed.addEventListener('click', resetFeed);
+
+  /* ============================================================ */
+  /* TAB 2 — TELEMETRY TRANSLATOR                                   */
+  /* ============================================================ */
+
+  // Small numeric helpers for the diagnostic-pass jitter below.
+  function clampNum(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
+  function jitter(range){ return (Math.random() * 2 - 1) * range; }
+
+  // Backend base URL for The North Star API (see API.md — local dev only;
+  // this becomes the deployed backend origin once Railway hosting is set up).
+  var API_BASE_URL = 'http://localhost:8000';
+
+  // Calls POST /telemetry/interpret for one sector's current raw readings and
+  // writes the grounded response onto the sector object. sector.state is
+  // already exactly the flat { metricName: number } shape the endpoint
+  // expects (see TelemetryInterpretRequest in backend/app/schemas.py).
+  // Returns a promise so callers can wait for every sector's summary before
+  // re-rendering. Never rejects: a request failure or a 404 (no matching
+  // sector documentation ingested yet) falls back to a plain-language notice
+  // instead of leaving the card blank. confidence/source are stored for a
+  // later AI Insight Card and are not rendered yet.
+  function fetchSectorSummary(sector){
+    return fetch(API_BASE_URL + '/telemetry/interpret', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sector_id: sector.id, metrics: sector.state })
+    })
+      .then(function(res){
+        if(!res.ok){
+          throw new Error('telemetry interpret request failed: ' + res.status);
+        }
+        return res.json();
+      })
+      .then(function(data){
+        sector.summary = data.summary;
+        sector.confidence = data.confidence;
+        sector.source = data.source;
+      })
+      .catch(function(err){
+        console.error('telemetry interpret failed for sector "' + sector.id + '":', err);
+        sector.summary = sector.summary ||
+          'Unable to reach the telemetry interpreter for this sector right now. Raw readings are shown below.';
+        sector.confidence = null;
+        sector.source = null;
+      });
+  }
+
+  // Each sector tracks its own raw metric state and derives status + an
+  // annotated raw readout from it locally, then hands the raw state off to
+  // POST /telemetry/interpret for the plain-language summary — the
+  // deterministic hand-written summary text this used to build itself has
+  // been replaced by that grounded API call. tick() mutates the state
+  // (unless the pass isn't a jitter pass, e.g. the very first render),
+  // kicks off the interpret request, and returns the pending promise, so
+  // "Run new diagnostic pass" actually changes what's on screen once every
+  // sector's response lands.
+  var sectors = [
+    {
+      id:'oxygen', name:'Oxygen', state:{ eff:85, o2pp:158, humidity:34 },
+      tick:function(applyJitter){
+        if(applyJitter){
+          this.state.eff = clampNum(this.state.eff + jitter(4), 55, 100);
+          this.state.o2pp = clampNum(this.state.o2pp + jitter(3), 145, 172);
+          this.state.humidity = clampNum(this.state.humidity + jitter(3), 18, 42);
+        }
+        var eff = Math.round(this.state.eff);
+        var status = eff >= 90 ? 'nominal' : eff >= 70 ? 'degrading' : 'critical';
+        var raw = 'O2 partial pressure: ' + Math.round(this.state.o2pp) + ' mmHg (nominal 160-170)\nCO2 scrubber efficiency: ' + eff + '% (nominal ≥ 90%)\nScrubber bed humidity: ' + Math.round(this.state.humidity) + '% (nominal < 25%)';
+        this.status = status; this.raw = raw;
+        return fetchSectorSummary(this);
+      }
+    },
+    {
+      id:'water', name:'Water Recycler', state:{ rate:93.1, deltaP:2.1 },
+      tick:function(applyJitter){
+        if(applyJitter){
+          this.state.rate = clampNum(this.state.rate + jitter(2.5), 70, 98);
+          this.state.deltaP = clampNum(this.state.deltaP + jitter(0.4), 1.2, 4.5);
+        }
+        var rate = Math.round(this.state.rate * 10) / 10;
+        var status = rate >= 90 ? 'nominal' : rate >= 80 ? 'degrading' : 'critical';
+        var raw = 'Recovery rate: ' + rate + '% (nominal ≥ 90%)\nFilter delta-P: ' + this.state.deltaP.toFixed(1) + ' psi (nominal < 3.0)\nProduct water conductivity: 1.2 uS/cm (nominal < 2.0)';
+        this.status = status; this.raw = raw;
+        return fetchSectorSummary(this);
+      }
+    },
+    {
+      id:'power', name:'Power', state:{ temp:42, volt:22.4 },
+      tick:function(applyJitter){
+        if(applyJitter){
+          this.state.temp = clampNum(this.state.temp + jitter(1.6), 28, 46);
+          this.state.volt = clampNum(this.state.volt + jitter(0.3), 21, 25.5);
+        }
+        var temp = Math.round(this.state.temp * 10) / 10;
+        var volt = Math.round(this.state.volt * 10) / 10;
+        var tempStatus = temp <= 35 ? 'nominal' : temp <= 40 ? 'degrading' : 'critical';
+        var voltStatus = volt >= 24.5 ? 'nominal' : volt >= 23 ? 'degrading' : 'critical';
+        var rank = { nominal:0, degrading:1, critical:2 };
+        var status = rank[tempStatus] >= rank[voltStatus] ? tempStatus : voltStatus;
+        var raw = 'EPS Bus B voltage: ' + volt + 'V (nominal ≥ 24.5V)\nBus B temperature: ' + temp + 'C (nominal ≤ 35C)\nCharge cycle count: 1,204';
+        this.status = status; this.raw = raw;
+        return fetchSectorSummary(this);
+      }
+    },
+    {
+      id:'hull', name:'Hull Integrity', state:{ events:0 },
+      tick:function(applyJitter){
+        if(applyJitter){
+          var roll = Math.random();
+          this.state.events = roll < 0.75 ? 0 : roll < 0.94 ? 1 : roll < 0.99 ? 2 : 3;
+        }
+        var events = this.state.events;
+        var status = events === 0 ? 'nominal' : events <= 2 ? 'degrading' : 'critical';
+        var raw = 'Strain gauges: ' + (status === 'nominal' ? 'nominal, all panels' : 'elevated reading, 1 panel') + '\nMicrometeorite counter: ' + events + ' events / 24h (nominal 0)\nCabin pressure: 14.6 psi (nominal 14.2-14.9)';
+        this.status = status; this.raw = raw;
+        return fetchSectorSummary(this);
+      }
+    },
+    {
+      id:'nav', name:'Navigation', state:{ drift:0.4 },
+      tick:function(applyJitter){
+        if(applyJitter){
+          this.state.drift = clampNum(this.state.drift + jitter(0.1), 0.05, 0.9);
+        }
+        var drift = Math.round(this.state.drift * 100) / 100;
+        var status = drift <= 0.2 ? 'nominal' : drift <= 0.6 ? 'degrading' : 'critical';
+        var raw = 'Star tracker drift: ' + drift + ' deg/hr (nominal ≤ 0.2)\nGyro bias: ' + (status === 'nominal' ? 'stable' : 'increasing') + '\nTrajectory confidence: ' + (99 - Math.round(drift * 8)) + '%';
+        this.status = status; this.raw = raw;
+        return fetchSectorSummary(this);
+      }
+    }
+  ];
+
+  var t2Grid = document.getElementById('t2-grid');
+  var statusLabels = { nominal:'Nominal', degrading:'Degrading', critical:'Critical' };
+  var diagnosticPassCount = 0;
+  var t2PassInFlight = 0; // guards against a stale pass's responses landing after a newer pass started
+
+  function renderSectors(){
+    t2Grid.innerHTML = sectors.map(function(s){
+      return '<div class="sector-card">' +
+        '<div class="sector-head">' +
+          '<div class="sector-name">' + s.name + '</div>' +
+          '<span class="sector-status ' + s.status + '">' + statusLabels[s.status] + '</span>' +
+        '</div>' +
+        '<div class="sector-summary">' + s.summary + '</div>' +
+        '<details class="sector-raw"><summary>Raw telemetry</summary><div class="raw-line">' + s.raw + '</div></details>' +
+      '</div>';
+    }).join('');
+  }
+  function updateT2Alert(){
+    var criticals = sectors.filter(function(s){ return s.status === 'critical'; });
+    var degrading = sectors.filter(function(s){ return s.status === 'degrading'; });
+    if(criticals.length){
+      setModuleAlert('t2', 'critical', criticals.map(function(s){ return s.name; }).join(' · ') + ' Critical');
+    } else if(degrading.length){
+      setModuleAlert('t2', 'caution', degrading.map(function(s){ return s.name; }).join(' · ') + ' Degrading');
+    } else {
+      setModuleAlert('t2', 'nominal', 'Telemetry nominal');
+    }
+  }
+
+  function runDiagnosticPass(applyJitter){
+    diagnosticPassCount += 1;
+    var passId = diagnosticPassCount;
+    t2PassInFlight = passId;
+    var pending = sectors.map(function(s){ return s.tick(applyJitter); });
+    Promise.all(pending).then(function(){
+      if(t2PassInFlight !== passId){ return; } // a newer pass already landed — drop this stale one
+      renderSectors();
+      updateT2Alert();
+      document.getElementById('t2-timestamp').textContent = 'Last diagnostic pass — MET ' + metEl.textContent + ' · pass #' + passId;
+    });
+  }
+
+  runDiagnosticPass(false); // initial pass — establishes the baseline reading, no jitter
+
+  document.getElementById('btn-refresh-t2').addEventListener('click', function(){
+    runDiagnosticPass(true);
+  });
+
+  /* ============================================================ */
+  /* TAB 3 — CREW MEDICAL & PSYCHOLOGICAL TRIAGE CONSOLE            */
+  /* ============================================================ */
+
+  var crew = [
+    { id:'okafor', name:'R. Okafor', role:'Commander', hr:[74,76,79,81,83,85,86], sleep:'6.2h', sleepFlag:true, cortisol:'Elevated', cortisolFlag:true, allergy:'No known drug allergies on file.' },
+    { id:'petrova', name:'L. Petrova', role:'Systems Engineer', hr:[64,65,63,66,65,64,65], sleep:'7.4h', sleepFlag:false, cortisol:'Nominal', cortisolFlag:false, allergy:'No known drug allergies on file.' },
+    { id:'suarez', name:'M. Suarez', role:'Botanist', hr:[70,71,69,72,71,70,71], sleep:'7.0h', sleepFlag:false, cortisol:'Nominal', cortisolFlag:false, allergy:'No known drug allergies on file.' },
+    { id:'kim', name:'J. Kim', role:'Systems Specialist', hr:[92,97,101,105,108,110,112], sleep:'4.8h', sleepFlag:true, cortisol:'High', cortisolFlag:true, allergy:'Allergy on file: penicillin-class compounds (Kit A). Reaction history: anaphylaxis.' }
+  ];
+
+  var crewList = document.getElementById('crew-list');
+  var intakeCrewSelect = document.getElementById('intake-crew');
+  var selectedCrewId = crew[0].id;
+
+  function renderCrew(){
+    crewList.innerHTML = crew.map(function(c){
+      return '<div class="crew-card' + (c.id === selectedCrewId ? ' selected' : '') + '" data-id="' + c.id + '">' +
+        '<div class="crew-top"><span class="crew-name">' + c.name + '</span><span class="crew-role">' + c.role + '</span></div>' +
+        '<div class="biometric-row"><span class="biometric-label">Heart rate</span><span class="biometric-spark">' + sparkline(c.hr) + '</span><span class="biometric-value' + (c.hr[c.hr.length-1] > 95 ? ' flag' : '') + '">' + c.hr[c.hr.length-1] + ' bpm</span></div>' +
+        '<div class="biometric-row"><span class="biometric-label">Sleep</span><span class="biometric-spark"></span><span class="biometric-value' + (c.sleepFlag ? ' flag' : '') + '">' + c.sleep + '/night</span></div>' +
+        '<div class="biometric-row"><span class="biometric-label">Cortisol</span><span class="biometric-spark"></span><span class="biometric-value' + (c.cortisolFlag ? ' flag' : '') + '">' + c.cortisol + '</span></div>' +
+        '<div class="allergy-note">' + c.allergy + '</div>' +
+      '</div>';
+    }).join('');
+    crewList.querySelectorAll('.crew-card').forEach(function(card){
+      card.addEventListener('click', function(){
+        selectedCrewId = card.dataset.id;
+        intakeCrewSelect.value = selectedCrewId;
+        renderCrew();
+      });
+    });
+  }
+  renderCrew();
+
+  intakeCrewSelect.innerHTML = crew.map(function(c){ return '<option value="' + c.id + '">' + c.name + ' — ' + c.role + '</option>'; }).join('');
+  intakeCrewSelect.value = selectedCrewId;
+  intakeCrewSelect.addEventListener('change', function(){
+    selectedCrewId = intakeCrewSelect.value;
+    renderCrew();
+  });
+
+  var intakeText = document.getElementById('intake-text');
+  document.getElementById('ex-1').addEventListener('click', function(){
+    intakeCrewSelect.value = 'kim'; selectedCrewId = 'kim'; renderCrew();
+    intakeText.value = 'Crew member has a deep laceration on the forearm, severe swelling, and is showing signs of confusion.';
+  });
+  document.getElementById('ex-2').addEventListener('click', function(){
+    intakeCrewSelect.value = 'okafor'; selectedCrewId = 'okafor'; renderCrew();
+    intakeText.value = 'Crew member reports dizziness on standing, mild chest tightness, and has been sleeping poorly for several nights.';
+  });
+
+  var triageOutput = document.getElementById('triage-output');
+  var currentTriage = null; // { crew, headHtml, steps:[...], state:[...], activeLevel, activeLabel, resolvedLabel }
+
+  function renderTriageBody(){
+    if(!currentTriage) return;
+    var total = currentTriage.steps.length;
+    var done = currentTriage.state.filter(Boolean).length;
+    var complete = total > 0 && done === total;
+
+    var html = currentTriage.headHtml;
+    html += '<div class="triage-header" style="margin-top:12px;">' + (complete ? 'Protocol status — complete' : done + ' of ' + total + ' steps confirmed') + '</div>';
+    html += '<ul class="checklist">';
+    currentTriage.steps.forEach(function(step, i){
+      var st = currentTriage.state[i] ? 'done' : 'pending';
+      html += '<li class="check-item ' + st + '">' +
+        '<button class="check-box" data-idx="' + i + '" aria-label="Confirm step ' + (i+1) + ' administered">' + (currentTriage.state[i] ? '&#10003;' : '') + '</button>' +
+        '<span class="check-text"><span class="check-num">' + (i+1) + '.</span>' + step + '</span>' +
+        '</li>';
+    });
+    html += '</ul>';
+    if(complete){
+      html += '<div class="proc-ref">Protocol closed out for ' + currentTriage.crew.name + ' at MET ' + metEl.textContent + '. All steps confirmed administered.</div>';
+    }
+    triageOutput.innerHTML = html;
+
+    triageOutput.querySelectorAll('.check-box').forEach(function(box){
+      box.addEventListener('click', function(){
+        var idx = Number(box.dataset.idx);
+        currentTriage.state[idx] = !currentTriage.state[idx];
+        renderTriageBody();
+        var d = currentTriage.state.filter(Boolean).length;
+        if(d === currentTriage.steps.length){
+          setModuleAlert('t3', 'nominal', currentTriage.crew.name + ' — Treatment Complete');
+        } else {
+          setModuleAlert('t3', currentTriage.activeLevel, currentTriage.crew.name + ' — ' + currentTriage.activeLabel);
+        }
+      });
+    });
+  }
+
+  function runTriage(){
+    var text = intakeText.value.toLowerCase();
+    var c = crew.filter(function(x){ return x.id === selectedCrewId; })[0];
+    currentTriage = null;
+
+    if(text.indexOf('laceration') !== -1 || text.indexOf('swelling') !== -1 || text.indexOf('confusion') !== -1){
+      var headHtml = '<div class="triage-header">Triage protocol — MET ' + metEl.textContent + ' — ' + c.name + '</div>' +
+        '<div class="triage-lead">Stage 2 wound infection paired with mild shock. Treat as time-critical.</div>';
+      if(c.allergy.indexOf('penicillin') !== -1){
+        headHtml += '<div class="triage-alert"><span class="ta-tag">Allergy alert — cross-checked against crew file</span>Do NOT use Kit A. ' + c.name + ' has a documented penicillin-class allergy with an anaphylaxis history. Use Kit B instead.</div>';
+      }
+      currentTriage = {
+        crew:c, headHtml:headHtml,
+        steps:[
+          'Inject 2ml of Antibiotic X from Kit B.',
+          'Irrigate and pack the wound; apply a pressure dressing.',
+          'Elevate the affected limb and monitor for worsening confusion.',
+          'Recheck heart rate and mental status every 15 minutes.',
+          'Escalate to the ground-based flight surgeon if confusion persists past 30 minutes.'
+        ],
+        state:[false,false,false,false,false],
+        activeLevel:'critical', activeLabel:'Stage 2 Infection'
+      };
+      setModuleAlert('t3', 'critical', c.name + ' — Stage 2 Infection');
+      renderTriageBody();
+    } else if(text.indexOf('dizz') !== -1 || text.indexOf('chest') !== -1 || text.indexOf('breath') !== -1){
+      var headHtml2 = '<div class="triage-header">Triage protocol — MET ' + metEl.textContent + ' — ' + c.name + '</div>' +
+        '<div class="triage-lead">Findings consistent with orthostatic intolerance, likely compounded by sleep deprivation and elevated cortisol on file.</div>';
+      currentTriage = {
+        crew:c, headHtml:headHtml2,
+        steps:[
+          'Move to a seated or reclined position immediately.',
+          'Administer oral fluids with electrolytes.',
+          'Suspend duty and exercise schedule for the next 24 hours.',
+          'Recheck heart rate and blood pressure in 30 minutes.',
+          'Escalate to the ground-based flight surgeon if chest tightness returns.'
+        ],
+        state:[false,false,false,false,false],
+        activeLevel:'caution', activeLabel:'Orthostatic Intolerance'
+      };
+      setModuleAlert('t3', 'caution', c.name + ' — Orthostatic Intolerance');
+      renderTriageBody();
+    } else if(text.trim().length === 0){
+      triageOutput.innerHTML = '<p class="triage-placeholder">Enter a symptom report before running the analysis.</p>';
+    } else {
+      triageOutput.innerHTML = '<div class="triage-header">Triage protocol — MET ' + metEl.textContent + ' — ' + c.name + '</div>' +
+        '<div class="triage-alert"><span class="ta-tag">Insufficient information</span>Provide vital signs, symptom onset, and affected body region for a confident protocol. Try one of the example reports for a full demo output.</div>';
+      setModuleAlert('t3', 'caution', c.name + ' — Triage Pending');
+    }
+  }
+
+  document.getElementById('btn-run-triage').addEventListener('click', runTriage);
+
+  /* ============================================================ */
+  /* TAB 4 — SUPPLY CHAIN, RESOURCE SCARCITY & RATIONING PREDICTOR  */
+  /* ============================================================ */
+
+  var months = ['Now','+1','+2','+3','+4','+5','+6','+7','+8','+9','+10','+11'];
+
+  function lineChartSVG(id, series, opts){
+    opts = opts || {};
+    var w = 520, h = 150, padL = 30, padR = 10, padT = 10, padB = 22;
+    var innerW = w - padL - padR, innerH = h - padT - padB;
+    var maxVal = opts.maxVal || 100;
+    function xAt(i){ return padL + (i/(months.length-1)) * innerW; }
+    function yAt(v){ return padT + innerH - (Math.max(v,0)/maxVal) * innerH; }
+
+    var grid = '';
+    for(var g=0; g<=4; g++){
+      var gy = padT + (g/4)*innerH;
+      grid += '<line x1="' + padL + '" y1="' + gy.toFixed(1) + '" x2="' + (w-padR) + '" y2="' + gy.toFixed(1) + '" stroke="var(--line)" stroke-width="1" />';
+    }
+    var xlabels = '';
+    months.forEach(function(m,i){
+      if(i % 2 === 0){
+        xlabels += '<text x="' + xAt(i).toFixed(1) + '" y="' + (h-6) + '" font-family="var(--mono)" font-size="8.5" fill="var(--ink-faint)" text-anchor="middle">' + m + '</text>';
+      }
+    });
+
+    var paths = series.map(function(s){
+      var pts = s.data.map(function(v,i){ return xAt(i).toFixed(1) + ',' + yAt(v).toFixed(1); }).join(' ');
+      var dash = s.dashed ? ' stroke-dasharray="5,4"' : '';
+      var strokeW = s.strong ? '2.2' : '1.6';
+      return '<polyline points="' + pts + '" fill="none" stroke="var(--ink' + (s.strong ? ')' : '-dim)') + '" stroke-width="' + strokeW + '"' + dash + ' />';
+    }).join('');
+
+    var marker = '';
+    if(opts.markerIndex !== undefined){
+      var mx = xAt(opts.markerIndex);
+      marker = '<line x1="' + mx.toFixed(1) + '" y1="' + padT + '" x2="' + mx.toFixed(1) + '" y2="' + (padT+innerH) + '" stroke="var(--ink-strong,var(--line-strong))" stroke-width="1" stroke-dasharray="2,3" />' +
+        '<text x="' + mx.toFixed(1) + '" y="' + (padT-2) + '" font-family="var(--mono)" font-size="8.5" fill="var(--ink-faint)" text-anchor="middle">Resupply</text>';
+    }
+
+    return '<svg viewBox="0 0 ' + w + ' ' + h + '" width="' + w + '" height="' + h + '">' + grid + marker + paths + xlabels + '</svg>';
+  }
+
+  // Side resources (water, medicine, spare parts) — each tracks a monthly consumption
+  // rate and derives a days-remaining figure and chart from it, so the cards carry real
+  // information instead of a static decorative line. Water and spare parts also react
+  // to the crop-failure scenario below, since both are plausibly affected by it.
+  function computeCurve(monthlyLossPct){
+    return months.map(function(m,i){ return Math.max(0, 100 - monthlyLossPct * i); });
+  }
+  function daysRemainingFromLoss(monthlyLossPct){
+    if(monthlyLossPct <= 0) return Infinity;
+    return Math.round((100 / monthlyLossPct) * 30);
+  }
+  function formatDaysRemaining(days){
+    return isFinite(days) ? days.toLocaleString() + ' days at current draw' : 'No measurable draw';
+  }
+
+  var sideResources = [
+    { id:'water', name:'Water', baseLoss:0.55, extraLoss:0, normalNote:'Recycling loop tracking normal usage.', elevatedNote:'Recalculated — hydroponics failure has increased load on the water recycler.' },
+    { id:'medicine', name:'Medicine', baseLoss:0.4545, extraLoss:0, normalNote:'Consumption tracking normal usage rates.', elevatedNote:'Consumption elevated.' },
+    { id:'spareParts', name:'Spare Parts', baseLoss:2.0, extraLoss:0, normalNote:'Filter cartridge stock is the tightest line item; adequate at current draw.', elevatedNote:'Recalculated — emergency repair activity has increased the draw on spares.' }
+  ];
+
+  var t4Grid = document.getElementById('t4-resource-grid');
+
+  function renderSideResources(){
+    t4Grid.innerHTML = sideResources.map(function(r){
+      var totalLoss = r.baseLoss + r.extraLoss;
+      var days = daysRemainingFromLoss(totalLoss);
+      var status = r.extraLoss > 0 ? (days < 400 ? 'critical' : 'degrading') : 'nominal';
+      var statusLabel = status === 'critical' ? 'Critical' : status === 'degrading' ? 'Degrading' : 'Nominal';
+      return '<div class="resource-card">' +
+        '<div class="resource-head"><span class="resource-name">' + r.name + '</span><span class="sector-status ' + status + '">' + statusLabel + '</span></div>' +
+        '<div class="resource-chart-wrap" id="side-chart-' + r.id + '"></div>' +
+        '<p class="resource-caption">' + formatDaysRemaining(days) + '. ' + (r.extraLoss > 0 ? r.elevatedNote : r.normalNote) + '</p>' +
+      '</div>';
+    }).join('');
+    sideResources.forEach(function(r){
+      var totalLoss = r.baseLoss + r.extraLoss;
+      document.getElementById('side-chart-' + r.id).innerHTML = lineChartSVG('side' + r.id, [{ data: computeCurve(totalLoss) }], { maxVal:100 });
+    });
+  }
+  renderSideResources();
+
+  // Food chart + rationing simulator.
+  var foodChartWrap = document.getElementById('food-chart-wrap');
+  var cropFailureTriggered = false;
+  var foodEnergyNominal = 1650000;     // kcal on hand with hydroponics operating normally
+  var foodEnergyPostFailure = 320000;  // kcal remaining once the crop failure hits — well under the ~450,000 an unrationed crew burns in 45 days, so the default view shows a real deficit
+  var totalFoodEnergy = foodEnergyNominal;
+  var crewSize = 4;
+  var standardDailyKcal = 2500;
+
+  var simDaysInput = document.getElementById('sim-days');
+  var simDaysValue = document.getElementById('sim-days-value');
+  var simRationInput = document.getElementById('sim-ration');
+  var simRationValue = document.getElementById('sim-ration-value');
+  var metricStock = document.getElementById('metric-stock');
+  var metricCalories = document.getElementById('metric-calories');
+  var metricBuffer = document.getElementById('metric-buffer');
+  var metricSurvival = document.getElementById('metric-survival');
+  var simOutput = document.getElementById('sim-output');
+  var simQuestionEl = document.getElementById('sim-question');
+  var btnTriggerCrop = document.getElementById('btn-trigger-crop-failure');
+  var btnResetSupply = document.getElementById('btn-reset-supply');
+  var btnRunSim = document.getElementById('btn-run-sim');
+  var btnAutoRation = document.getElementById('btn-auto-ration');
+
+  metricStock.textContent = totalFoodEnergy.toLocaleString() + ' kcal';
+
+  function nominalFoodCurve(){
+    // Hydroponics operating normally — mild, expected decline, same shape as the other resource lines.
+    return [100,99,99,98,98,97,97,96,96,95,95,94];
+  }
+
+  function drawFoodChartNominal(daysUntilResupply){
+    var markerIndex = Math.min(months.length-1, Math.round(daysUntilResupply/30));
+    var series = [{ data: nominalFoodCurve() }];
+    foodChartWrap.innerHTML = lineChartSVG('food', series, { maxVal:100, markerIndex: markerIndex });
+  }
+
+  function unmitigatedCurve(){
+    // Reference line: crew keeps eating at the standard rate regardless of ration choice.
+    var daysToZero = totalFoodEnergy / (standardDailyKcal * crewSize);
+    var monthsToZero = daysToZero / 30;
+    return months.map(function(m,i){
+      var pct = 100 - (i / monthsToZero) * 100;
+      return Math.max(pct, 0);
+    });
+  }
+
+  // Computed directly from stock arithmetic, so a ration that's too high for the
+  // chosen resupply window will visibly hit zero before the resupply marker —
+  // and a conservative ration will visibly end with a surplus.
+  function rationedCurve(rationKcal, daysUntilResupply){
+    var dailyBurn = rationKcal * crewSize;
+    var monthsUntilResupply = daysUntilResupply / 30;
+    return months.map(function(m,i){
+      if(i <= monthsUntilResupply){
+        var daysElapsed = i * 30;
+        var pct = ((totalFoodEnergy - dailyBurn * daysElapsed) / totalFoodEnergy) * 100;
+        return Math.max(pct, 0);
+      }
+      return 100; // resupply arrives, stock is restored
+    });
+  }
+
+  function computeSurvivalProbability(rationKcal, bufferKcal, dailyBurn){
+    var base = rationKcal >= 2000 ? 99 : rationKcal >= 1800 ? 95 : rationKcal >= 1500 ? 85 : rationKcal >= 1200 ? 65 : 40;
+    if(bufferKcal >= 0) return base;
+    // Running out before resupply overrides the ration tier — but scales with how
+    // early the stock-out hits rather than dropping straight to a flat floor.
+    var shortfallDays = dailyBurn > 0 ? Math.ceil(Math.abs(bufferKcal) / dailyBurn) : 1;
+    return Math.max(5, Math.min(60, base - shortfallDays * 4));
+  }
+
+  function formatBuffer(bufferKcal, dailyBurn){
+    var rounded = Math.round(bufferKcal).toLocaleString();
+    if(bufferKcal >= 0){
+      var spareDays = dailyBurn > 0 ? Math.floor(bufferKcal / dailyBurn) : 0;
+      return '+' + rounded + ' kcal (~' + spareDays + ' days spare)';
+    }
+    var shortDays = dailyBurn > 0 ? Math.ceil(Math.abs(bufferKcal) / dailyBurn) : 0;
+    return rounded + ' kcal (stock-out ~' + shortDays + ' days early)';
+  }
+
+  function drawFoodChart(rationKcal, daysUntilResupply){
+    var markerIndex = Math.min(months.length-1, Math.round(daysUntilResupply/30));
+    var series = [
+      { data: unmitigatedCurve(), dashed:true },
+      { data: rationedCurve(rationKcal, daysUntilResupply), strong:true }
+    ];
+    foodChartWrap.innerHTML = lineChartSVG('food', series, { maxVal:100, markerIndex: markerIndex });
+  }
+
+  // Live preview: recalculates on every slider move, for both sliders, so the
+  // chart and every metric visibly respond as soon as you touch a control —
+  // "Run simulation" below only locks in the written strategy and the alert state.
+  function recomputeSimMetrics(){
+    var days = Number(simDaysInput.value);
+    var ration = Number(simRationInput.value);
+    simDaysValue.textContent = days;
+    simRationValue.textContent = ration.toLocaleString();
+    if(!cropFailureTriggered){
+      drawFoodChartNominal(days);
+      return;
+    }
+    var dailyBurn = ration * crewSize;
+    var bufferKcal = totalFoodEnergy - dailyBurn * days;
+    metricCalories.textContent = ration.toLocaleString() + ' kcal';
+    metricBuffer.textContent = formatBuffer(bufferKcal, dailyBurn);
+    metricSurvival.textContent = computeSurvivalProbability(ration, bufferKcal, dailyBurn) + '%';
+    drawFoodChart(ration, days);
+  }
+
+  simDaysInput.addEventListener('input', recomputeSimMetrics);
+  simRationInput.addEventListener('input', recomputeSimMetrics);
+
+  btnAutoRation.addEventListener('click', function(){
+    if(!cropFailureTriggered) return;
+    var days = Number(simDaysInput.value);
+    var optimal = totalFoodEnergy / (days * crewSize);
+    // Round down so the suggested ration leaves a small surplus rather than an
+    // immediate rounding-induced deficit.
+    optimal = Math.max(1200, Math.min(2500, Math.floor(optimal / 10) * 10));
+    simRationInput.value = optimal;
+    recomputeSimMetrics();
+  });
+
+  btnRunSim.addEventListener('click', function(){
+    if(!cropFailureTriggered) return;
+    var days = Number(simDaysInput.value);
+    var ration = Number(simRationInput.value);
+    var dailyBurn = ration * crewSize;
+    var bufferKcal = totalFoodEnergy - dailyBurn * days;
+    var survival = computeSurvivalProbability(ration, bufferKcal, dailyBurn);
+
+    if(bufferKcal < 0){
+      simOutput.innerHTML =
+        '<p class="sim-output-lead">At ' + ration.toLocaleString() + ' calories per person, stock runs out roughly ' + Math.ceil(Math.abs(bufferKcal)/dailyBurn) + ' days before the resupply vehicle arrives.</p>' +
+        '<p class="sim-output-detail">This ration is too high for a ' + days + '-day window. Lower the daily ration or use "Auto-set optimal ration" to find the highest ration that still lasts until resupply.</p>';
+      setModuleAlert('t4', 'critical', 'Food Supply Shortfall Risk');
+    } else {
+      simOutput.innerHTML =
+        '<p class="sim-output-lead">Hold daily caloric intake to ' + ration.toLocaleString() + ' calories per person for the next ' + days + ' days.</p>' +
+        '<p class="sim-output-detail">Suspend high-exertion spacewalks and heavy maintenance tasks to minimize metabolic burn. Prioritize protein and micronutrient rations over caloric bulk. This plan leaves a projected surplus of ' + Math.round(bufferKcal).toLocaleString() + ' kcal at resupply and models a ' + survival + '% probability of maintaining crew health and function until the resupply vehicle arrives.</p>';
+      setModuleAlert('t4', survival < 70 ? 'critical' : 'caution', survival < 70 ? 'Food Supply Shortfall Risk' : 'Rationing Active — Resupply Pending');
+    }
+
+    // Suspending EVAs and heavy maintenance (per the plan above) measurably reduces
+    // the draw on spare parts versus the unmitigated crop-failure spike.
+    sideResources[2].extraLoss = 1.0;
+    renderSideResources();
+  });
+
+  function triggerCropFailure(){
+    if(cropFailureTriggered) return;
+    cropFailureTriggered = true;
+    totalFoodEnergy = foodEnergyPostFailure;
+    metricStock.textContent = totalFoodEnergy.toLocaleString() + ' kcal';
+    simQuestionEl.textContent = '"How do we stretch our remaining food supplies until the next Earth resupply rocket arrives?"';
+    simDaysInput.disabled = false;
+    simRationInput.disabled = false;
+    simRationInput.value = 2500; // starts at the unmitigated rate so the deficit is visible immediately
+    btnRunSim.disabled = false;
+    btnAutoRation.disabled = false;
+    btnTriggerCrop.disabled = true;
+    btnTriggerCrop.textContent = 'Crop failure active';
+    simOutput.innerHTML = '<p class="sim-output-placeholder">Crop failure confirmed — hydroponics yield lost. Adjust the ration slider or press "Auto-set optimal ration," then run the simulation.</p>';
+    setModuleAlert('t4', 'critical', 'Hydroponics Crop Failure');
+
+    // Water recycling absorbs extra load with hydroponics offline; spare-parts draw
+    // spikes from emergency repair activity — both recalculate immediately.
+    sideResources[0].extraLoss = 0.35;
+    sideResources[2].extraLoss = 3.5;
+    renderSideResources();
+
+    recomputeSimMetrics();
+  }
+
+  function resetSupply(){
+    cropFailureTriggered = false;
+    totalFoodEnergy = foodEnergyNominal;
+    metricStock.textContent = totalFoodEnergy.toLocaleString() + ' kcal';
+    metricCalories.textContent = '— kcal';
+    metricBuffer.textContent = '—';
+    metricSurvival.textContent = '—';
+    simQuestionEl.textContent = 'Hydroponics bay nominal. Trigger a crop failure to run the rationing scenario.';
+    simDaysInput.disabled = true;
+    simRationInput.disabled = true;
+    simRationInput.value = 2500;
+    simRationValue.textContent = '2,500';
+    btnRunSim.disabled = true;
+    btnAutoRation.disabled = true;
+    btnTriggerCrop.disabled = false;
+    btnTriggerCrop.textContent = 'Trigger crop failure';
+    simOutput.innerHTML = '<p class="sim-output-placeholder">Trigger the hydroponics crop failure to begin the rationing simulation.</p>';
+    setModuleAlert('t4', 'nominal', 'Supply nominal');
+
+    sideResources[0].extraLoss = 0;
+    sideResources[2].extraLoss = 0;
+    renderSideResources();
+
+    recomputeSimMetrics();
+  }
+
+  btnTriggerCrop.addEventListener('click', triggerCropFailure);
+  btnResetSupply.addEventListener('click', resetSupply);
+
+  recomputeSimMetrics();
+
+})();
+</script>
+
+</body>
+</html>
