@@ -9,7 +9,7 @@ import os
 
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(override=True)
 
 
 class Settings:
@@ -23,7 +23,22 @@ class Settings:
     # IBM watsonx.ai
     WATSONX_API_KEY: str = os.getenv("WATSONX_API_KEY", "")
     WATSONX_PROJECT_ID: str = os.getenv("WATSONX_PROJECT_ID", "")
-    WATSONX_URL: str = os.getenv("WATSONX_URL", "https://us-south.ml.cloud.ibm.com")
+    WATSONX_URL: str = os.getenv("WATSONX_URL", "https://eu-de.ml.cloud.ibm.com")
+
+    # Granite embedding model, used for ingestion/retrieval (see services/watsonx.py)
+    WATSONX_EMBEDDING_MODEL_ID: str = os.getenv(
+        "WATSONX_EMBEDDING_MODEL_ID", "ibm/granite-embedding-278m-multilingual"
+    )
+    # Granite instruct model, used for grounded generation in each module
+    WATSONX_INSTRUCT_MODEL_ID: str = os.getenv(
+        "WATSONX_INSTRUCT_MODEL_ID", "ibm/granite-4-h-small"
+    )
+    # Failover instruct model, used automatically if the primary instruct
+    # model errors (see services/watsonx.py's use of .with_fallbacks()).
+    # Leave empty to disable failover.
+    WATSONX_INSTRUCT_MODEL_FALLBACK_ID: str = os.getenv(
+        "WATSONX_INSTRUCT_MODEL_FALLBACK_ID", "meta-llama/llama-3-3-70b-instruct"
+    )
 
     # Pinecone
     PINECONE_API_KEY: str = os.getenv("PINECONE_API_KEY", "")
