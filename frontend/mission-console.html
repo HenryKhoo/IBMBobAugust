@@ -2290,6 +2290,53 @@
     });
   }
  
+  // Calls POST /triage with the selected crew member's id and the plain-English
+  // symptom report (see TriageRequest/TriageResponse in backend/app/schemas.py).
+  // runTriage below always renders a hand-authored fallback synchronously first
+  // — same immediate-then-grounded sequencing fetchCrisisAnalysis and
+  // fetchSectorSummary already use for Modules 01 and 02. On success this
+  // replaces that fallback with the grounded triage lead, the extracted
+  // instruction steps, and the deterministic allergy cross-check the API
+  // computed from the retrieved crew file and protocol (source citing both
+  // documents, per API.md). Severity here is inferred locally from whether
+  // allergy_check flags a conflict, since the API has no dedicated severity
+  // field. On failure (network error, or a 404 when no crew file / matching
+  // protocol has been ingested) the fallback already on screen is left in
+  // place rather than blanked.
+  function fetchTriageAnalysis(c, symptomReport){
+    return fetch(API_BASE_URL + '/triage', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ crew_member_id: c.id, symptom_report: symptomReport })
+    })
+      .then(function(res){
+        if(!res.ok){
+          throw new Error('triage request failed: ' + res.status);
+        }
+        return res.json();
+      })
+      .then(function(data){
+        var conflict = data.allergy_check.indexOf('CONFLICT') === 0;
+        var level = conflict ? 'critical' : 'caution';
+        var label = conflict ? 'Allergy Conflict Flagged' : 'Triage Protocol Active';
+        var headHtml = '<div class="triage-header">Triage protocol — MET ' + metEl.textContent + ' — ' + c.name + '</div>' +
+          '<div class="triage-lead">' + data.triage_lead + '</div>' +
+          '<div class="triage-alert"><span class="ta-tag">Allergy cross-check — crew file vs. protocol</span>' + data.allergy_check + '</div>';
+        currentTriage = {
+          crew:c, headHtml:headHtml,
+          steps:data.instructions,
+          state:new Array(data.instructions.length).fill(false),
+          activeLevel:level, activeLabel:label
+        };
+        setModuleAlert('t3', level, c.name + ' — ' + label);
+        logIncident('T3', conflict ? 'critical' : 'info', 'Grounded triage protocol retrieved for ' + c.name + ' (confidence ' + data.confidence + '). Source: ' + data.source);
+        renderTriageBody();
+      })
+      .catch(function(err){
+        console.error('triage request failed:', err);
+      });
+  }
+
   function runTriage(){
     var text = intakeText.value.toLowerCase();
     var c = crew.filter(function(x){ return x.id === selectedCrewId; })[0];
@@ -2339,11 +2386,18 @@
       renderTriageBody();
     } else if(text.trim().length === 0){
       triageOutput.innerHTML = '<p class="triage-placeholder">Enter a symptom report before running the analysis.</p>';
+      return;
     } else {
       triageOutput.innerHTML = '<div class="triage-header">Triage protocol — MET ' + metEl.textContent + ' — ' + c.name + '</div>' +
         '<div class="triage-alert"><span class="ta-tag">Insufficient information</span>Provide vital signs, symptom onset, and affected body region for a confident protocol. Try one of the example reports for a full demo output.</div>';
       setModuleAlert('t3', 'caution', c.name + ' — Triage Pending');
     }
+
+    // Kick off the grounded /triage call against the raw (non-lowercased)
+    // symptom report text. On success it replaces whichever hand-authored
+    // fallback branch above just rendered with the grounded response; on
+    // failure it leaves that fallback in place.
+    fetchTriageAnalysis(c, intakeText.value);
   }
  
   document.getElementById('btn-run-triage').addEventListener('click', runTriage);
