@@ -4,7 +4,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.schemas import HealthResponse
+from app.schemas import HealthResponse, IngestRequest, IngestResponse
+from app.services.ingestion import ingest_and_upsert
 
 app = FastAPI(title=settings.APP_NAME)
 
@@ -24,3 +25,10 @@ app.add_middleware(
 def health() -> HealthResponse:
     """Report service status and which backend mode is active."""
     return HealthResponse(status="ok", backend=settings.BACKEND_MODE)
+
+
+@app.post("/ingest", response_model=IngestResponse)
+def ingest(request: IngestRequest) -> IngestResponse:
+    """Chunk, embed with Granite, and upsert mission documents into Zilliz."""
+    chunks_ingested = ingest_and_upsert(request.documents)
+    return IngestResponse(chunks_ingested=chunks_ingested)
