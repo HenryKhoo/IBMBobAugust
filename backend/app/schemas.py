@@ -64,10 +64,14 @@ class TelemetryInterpretRequest(BaseModel):
 class TelemetryInterpretResponse(BaseModel):
     """Response body for POST /telemetry/interpret.
 
-    `confidence` is left unset (`None`) until confidence scoring is added
-    (dev plan Aug 19, Task 2) — the dev plan explicitly rules out a
-    fabricated placeholder number in the meantime ("do not use random
-    numbers to fake a confidence score").
+    `confidence` is derived from retrieval strength and distance from the
+    nominal band the readings are checked against (see
+    `app.services.telemetry._combine_confidence`), never a random or
+    fabricated placeholder number. It stays optional (`float | None`)
+    rather than a required `float`: a future retrieval implementation that
+    can't produce a relevance score should be able to omit it honestly
+    instead of forcing a number, the same reasoning that left it `None`
+    before confidence scoring existed at all.
     """
 
     summary: str
