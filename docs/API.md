@@ -98,8 +98,12 @@ documentation and returns a plain language read on sector status.
 
 ### POST /crisis/analyze
 
-Takes the live event feed for Module 01. Retrieves the matching emergency
-procedure and returns a root cause with ordered response steps.
+Takes the live event feed for Module 01. The feed can span more than one
+concurrent failure point — events are grouped by `sector`, and one
+procedure match is retrieved per distinct sector (capped at 4 per
+request), rather than a single blended match for the whole feed. Returns
+one synthesized root cause statement grounded across every matched
+procedure, plus the merged, ordered response steps.
 
 **Request**
 ```json
@@ -115,9 +119,30 @@ procedure and returns a root cause with ordered response steps.
 {
   "root_cause": "string",
   "steps": ["string"],
-  "source": "string"
+  "step_counts": [0],
+  "sources": ["string"],
+  "contributing_causes": ["string"]
 }
 ```
+
+`sources` carries one citation line per matched procedure document. For a
+feed with a single failure point (the default demo scenario), this is
+always a length-1 list — the same shape as before this endpoint supported
+compound scenarios, just pluralized. `step_counts` gives, in the same
+order as `sources`, how many of the concatenated `steps` came from each
+matched sector — `steps` itself stays one flat, continuously-ordered list
+so step-index-based UI state (which steps are checked off, out-of-order
+detection) doesn't need to change shape for a compound response.
+`contributing_causes` pairs each source with the sector it was retrieved
+for (`"{sector}: {source line}"`), a deterministic label rather than model
+output, so a caller can group or label a compound checklist by which
+failure point each step and citation came from.
+
+A sector in the feed that matches no procedure documentation is dropped
+rather than failing the whole request — this endpoint 404s only if *no*
+sector in the feed matched anything at all, so a compound feed where only
+some of the concurrent failures have ingested procedure docs still
+returns a grounded (if partial) response for the ones that do.
 
 ### POST /triage
 

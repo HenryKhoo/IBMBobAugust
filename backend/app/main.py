@@ -173,10 +173,14 @@ def telemetry_interpret(
 
 @app.post("/crisis/analyze", response_model=CrisisAnalyzeResponse)
 def crisis_analyze(request: CrisisAnalyzeRequest) -> CrisisAnalyzeResponse:
-    """Retrieve the matching emergency procedure and return a grounded root cause.
+    """Retrieve the matching emergency procedure(s) and return a grounded root cause.
 
-    404s if no procedure documentation matches this event feed, rather than
-    returning an ungrounded root cause.
+    The event feed can span more than one concurrent failure point (see
+    `app.services.crisis.analyze_crisis`); each distinct `sector` present
+    in `request.events` gets its own retrieval attempt. 404s only if none
+    of them matched any procedure documentation, rather than returning an
+    ungrounded root cause — a feed where only some sectors matched still
+    returns a 200 grounded in whichever ones did.
     """
     try:
         return analyze_crisis(request.events)

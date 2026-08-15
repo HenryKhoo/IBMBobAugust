@@ -4,6 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.schemas import CrisisEvent
 from app.services import crisis
 from tests.conftest import _FakeDocument, _FakeInstructModel, _FakeMessage
 
@@ -15,17 +16,31 @@ client = TestClient(app)
 class _FakeVectorStore:
     """Records the query/kwargs it was called with and returns fixed hits.
 
-    `hits` is a list of `Document`-like objects, matching what
-    `similarity_search` returns (no relevance score — `/crisis/analyze`
-    has no `confidence` field in `API.md`, unlike `/telemetry/interpret`).
+    `hits` is either a flat list of `Document`-like hits (returned for
+    every call, the original single-cause behavior) or a dict of
+    `{sector: hits}` for tests exercising a compound feed where different
+    sectors must retrieve different procedure chunks — matched against the
+    `"{sector} sector event: ..."` query shape `crisis._build_retrieval_query`
+    builds per sector group. A sector with no dict entry, or an empty list,
+    returns no hits (see `test_analyze_crisis_raises_when_nothing_is_retrieved`
+    and the multi-sector partial-match test below).
+
+    No relevance score is recorded on hits — `similarity_search` is what
+    `/crisis/analyze` calls, matching `crisis.py` (`/crisis/analyze` has no
+    `confidence` field in `API.md`, unlike `/telemetry/interpret`).
     """
 
-    def __init__(self, hits: list[_FakeDocument]):
+    def __init__(self, hits):
         self.hits = hits
         self.calls: list[dict] = []
 
     def similarity_search(self, query, **kwargs):
         self.calls.append({"query": query, **kwargs})
+        if isinstance(self.hits, dict):
+            for sector, sector_hits in self.hits.items():
+                if query.startswith(f"{sector} sector event:"):
+                    return sector_hits
+            return []
         return self.hits
 
 
@@ -74,15 +89,46 @@ EVENTS_PAYLOAD = [
     },
 ]
 
+# A second, distinct procedure document used by the compound-scenario tests
+# below, standing in for a concurrent ECLSS/life-support failure alongside
+# the hull breach above.
+SECOND_PROCEDURE_TEXT = (
+    "1. Don emergency oxygen mask.\n"
+    "2. Switch to backup CO2 scrubber canisters.\n"
+    "3. Report cabin CO2 ppm to mission control.\n"
+)
+SECOND_PROCEDURE_METADATA = {
+    "doc_id": "eclss-failure-01",
+    "doc_type": "procedure",
+    "chunk_index": 0,
+    "doc_text": SECOND_PROCEDURE_TEXT,
+}
+SECOND_EXPECTED_STEPS = [
+    "Don emergency oxygen mask.",
+    "Switch to backup CO2 scrubber canisters.",
+    "Report cabin CO2 ppm to mission control.",
+]
+
+COMPOUND_EVENTS = [
+    CrisisEvent(
+        timestamp="T+00:14",
+        sector="sector-4",
+        description="Hull sensor grid flags a breach near frame 12.",
+    ),
+    CrisisEvent(
+        timestamp="T+00:16",
+        sector="eclss",
+        description="Cabin CO2 climbing past nominal band.",
+    ),
+]
+
 
 @pytest.fixture
 def fake_hit() -> _FakeDocument:
     return _FakeDocument(PROCEDURE_TEXT, dict(PROCEDURE_METADATA))
 
 
-def _events():
-    from app.schemas import CrisisEvent
-
+def _events() -> list[CrisisEvent]:
     return [CrisisEvent(**event) for event in EVENTS_PAYLOAD]
 
 
@@ -96,7 +142,11 @@ def test_analyze_crisis_returns_grounded_root_cause_and_steps(monkeypatch, fake_
 
     assert response.root_cause == STUBBED_ROOT_CAUSE
     assert response.steps == EXPECTED_STEPS
-    assert response.source == "procedure:hull-breach-sector-4#chunk0"
+    assert response.step_counts == [len(EXPECTED_STEPS)]
+    assert response.sources == ["procedure:hull-breach-sector-4#chunk0"]
+    assert response.contributing_causes == [
+        "sector-4: procedure:hull-breach-sector-4#chunk0"
+    ]
 
     # retrieval was filtered to procedure chunks, and the prompt handed to
     # the instruct model is grounded in the retrieved chunk's text.
@@ -205,10 +255,20 @@ def test_endpoint_happy_path_matches_api_contract_shape(monkeypatch, fake_hit):
 
     assert response.status_code == 200
     body = response.json()
-    assert set(body.keys()) == {"root_cause", "steps", "source"}
+    assert set(body.keys()) == {
+        "root_cause",
+        "steps",
+        "step_counts",
+        "sources",
+        "contributing_causes",
+    }
     assert body["root_cause"] == STUBBED_ROOT_CAUSE
     assert body["steps"] == EXPECTED_STEPS
-    assert body["source"] == "procedure:hull-breach-sector-4#chunk0"
+    assert body["step_counts"] == [len(EXPECTED_STEPS)]
+    assert body["sources"] == ["procedure:hull-breach-sector-4#chunk0"]
+    assert body["contributing_causes"] == [
+        "sector-4: procedure:hull-breach-sector-4#chunk0"
+    ]
 
 
 @pytest.mark.parametrize(
@@ -226,3 +286,83 @@ def test_endpoint_happy_path_matches_api_contract_shape(monkeypatch, fake_hit):
 def test_endpoint_rejects_invalid_requests(payload):
     response = client.post("/crisis/analyze", json=payload)
     assert response.status_code == 422
+
+
+# --- Compound scenario: more than one concurrent failure point -----------
+
+
+def test_analyze_crisis_synthesizes_across_multiple_matched_sectors(monkeypatch):
+    """A feed spanning two distinct sectors (e.g. Module 01's hull breach
+    and ECLSS failure injected together) should retrieve and ground on
+    both matching procedure documents, not just whichever one a single
+    blended query happened to favor.
+    """
+    hull_hit = _FakeDocument(PROCEDURE_TEXT, dict(PROCEDURE_METADATA))
+    eclss_hit = _FakeDocument(SECOND_PROCEDURE_TEXT, dict(SECOND_PROCEDURE_METADATA))
+    fake_store = _FakeVectorStore({"sector-4": [hull_hit], "eclss": [eclss_hit]})
+    fake_model = _FakeInstructModel(STUBBED_ROOT_CAUSE)
+    monkeypatch.setattr(crisis, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(crisis, "get_instruct_model", lambda: fake_model)
+
+    response = crisis.analyze_crisis(COMPOUND_EVENTS)
+
+    assert response.steps == EXPECTED_STEPS + SECOND_EXPECTED_STEPS
+    assert response.step_counts == [len(EXPECTED_STEPS), len(SECOND_EXPECTED_STEPS)]
+    assert response.sources == [
+        "procedure:hull-breach-sector-4#chunk0",
+        "procedure:eclss-failure-01#chunk0",
+    ]
+    assert response.contributing_causes == [
+        "sector-4: procedure:hull-breach-sector-4#chunk0",
+        "eclss: procedure:eclss-failure-01#chunk0",
+    ]
+    # both matched excerpts were handed to the model in the same synthesis call
+    assert PROCEDURE_TEXT in fake_model.invoked_with[0]
+    assert SECOND_PROCEDURE_TEXT in fake_model.invoked_with[0]
+    assert len(fake_model.invoked_with) == 1
+
+
+def test_analyze_crisis_grounds_partially_when_only_some_sectors_match(monkeypatch):
+    """One sector in a compound feed matching nothing shouldn't 404 the
+    whole request — the response should still be grounded in whichever
+    sector(s) did match, per the module docstring's partial-match rule.
+    """
+    hull_hit = _FakeDocument(PROCEDURE_TEXT, dict(PROCEDURE_METADATA))
+    fake_store = _FakeVectorStore({"sector-4": [hull_hit]})  # "eclss" matches nothing
+    fake_model = _FakeInstructModel(STUBBED_ROOT_CAUSE)
+    monkeypatch.setattr(crisis, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(crisis, "get_instruct_model", lambda: fake_model)
+
+    response = crisis.analyze_crisis(COMPOUND_EVENTS)
+
+    assert response.steps == EXPECTED_STEPS
+    assert response.step_counts == [len(EXPECTED_STEPS)]
+    assert response.sources == ["procedure:hull-breach-sector-4#chunk0"]
+
+
+def test_analyze_crisis_caps_sector_grouping_at_max(monkeypatch):
+    """More distinct sectors than `crisis._MAX_SECTORS` in one feed should
+    only trigger that many retrieval calls, bounding prompt size/cost —
+    see the module docstring's "Compound scenarios" section.
+    """
+    fake_store = _FakeVectorStore([])  # nothing matches; we only inspect calls made
+    fake_model = _FakeInstructModel(STUBBED_ROOT_CAUSE)
+    monkeypatch.setattr(crisis, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(crisis, "get_instruct_model", lambda: fake_model)
+
+    events = [
+        CrisisEvent(
+            timestamp=f"T+00:{i:02d}",
+            sector=f"sector-{i}",
+            description=f"Anomaly detected in sector {i}.",
+        )
+        for i in range(crisis._MAX_SECTORS + 2)
+    ]
+
+    with pytest.raises(LookupError):
+        crisis.analyze_crisis(events)
+
+    queried_sectors = {
+        call["query"].split(" sector event:")[0] for call in fake_store.calls
+    }
+    assert len(queried_sectors) == crisis._MAX_SECTORS

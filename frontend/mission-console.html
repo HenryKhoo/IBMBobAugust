@@ -182,7 +182,19 @@
   }
   @media (max-width:880px){ .t1-grid{grid-template-columns:1fr;} }
  
-  .feed-controls{display:flex;gap:8px;}
+  .feed-controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+  .scenario-select{
+    background:var(--panel-3);border:1px solid var(--line-strong);color:var(--ink);
+    font-family:var(--mono);font-size:11px;letter-spacing:0.02em;
+    padding:5px 6px;min-width:210px;max-width:260px;
+  }
+  .scenario-select option{padding:3px 4px;}
+  .rc-body{flex:1;min-width:0;}
+  .rc-complexity{
+    font-family:var(--mono);font-size:10.5px;letter-spacing:0.08em;text-transform:uppercase;
+    opacity:0.7;display:none;margin-top:4px;
+  }
+  .rc-complexity.visible{display:block;}
   .feed-list{
     height:460px;
     overflow-y:auto;
@@ -221,6 +233,12 @@
  
   .checklist-status{font-family:var(--mono);font-size:11px;color:var(--ink-faint);letter-spacing:0.06em;}
   .checklist{list-style:none;margin:0;padding:0;}
+  .check-group-label{
+    padding:9px 16px 5px;
+    font-family:var(--mono);font-size:10px;letter-spacing:0.08em;text-transform:uppercase;
+    color:var(--ink-faint);border-top:1px solid var(--line);
+  }
+  .check-group-label:first-child{border-top:none;}
   .check-item{
     display:flex;
     gap:12px;
@@ -634,20 +652,30 @@
 
     <div class="root-cause-banner" id="root-cause-banner">
       <span class="rc-tag">Root cause</span>
-      <span class="rc-text" id="root-cause-text">All systems nominal. No active event.</span>
+      <div class="rc-body">
+        <span class="rc-text" id="root-cause-text">All systems nominal. No active event.</span>
+        <span class="rc-complexity" id="rc-complexity"></span>
+      </div>
     </div>
- 
+
     <div class="t1-grid">
       <div class="panel">
         <div class="panel-head">
           <h3>Telemetry &amp; event feed</h3>
           <div class="feed-controls">
+            <select class="scenario-select" id="scenario-select" multiple size="3" aria-label="Failure points to inject — select one or more" title="Hold Cmd/Ctrl (or Shift for a range) to select more than one failure point">
+              <option value="hull" selected>Hull breach — Node 3 starboard panel</option>
+              <option value="oxygen">ECLSS — CO2 scrubber failure</option>
+              <option value="water">Thermal — coolant loop rupture</option>
+              <option value="power">Power — Bus B fault</option>
+              <option value="nav">Nav/Comms — sensor drift + downlink loss</option>
+            </select>
             <button class="btn small" id="btn-inject">Inject emergency scenario</button>
             <button class="btn small" id="btn-reset-feed">Reset</button>
           </div>
         </div>
         <div class="feed-list" id="feed-list">
-          <div class="feed-empty">Standby — no active events. Press "Inject emergency scenario" to run the demo.</div>
+          <div class="feed-empty">Standby — no active events. Select one or more failure points above and press "Inject emergency scenario" to run the demo.</div>
         </div>
       </div>
  
@@ -1541,12 +1569,14 @@
   var feedList = document.getElementById('feed-list');
   var rcBanner = document.getElementById('root-cause-banner');
   var rcText = document.getElementById('root-cause-text');
+  var rcComplexity = document.getElementById('rc-complexity');
   var checklistWrap = document.getElementById('checklist-wrap');
   var checklistStatus = document.getElementById('checklist-status');
   var btnInject = document.getElementById('btn-inject');
   var btnResetFeed = document.getElementById('btn-reset-feed');
   var btnGenerateAar = document.getElementById('btn-generate-aar');
   var aarOutput = document.getElementById('aar-output');
+  var scenarioSelect = document.getElementById('scenario-select');
 
   // Toggles the hull-breach marker on the habitat schematic (Node 3 starboard
   // panel). Driven by this module's scenario state, independent of Module 02's
@@ -1555,17 +1585,169 @@
     Schematic3D.setBreach(active);
   }
 
-  var scenarioEvents = [
-    { t:'214:06:12:04', sev:'info',     src:'ECLSS',  msg:'Cabin pressure sensor delta +0.02 psi/min.' },
-    { t:'214:06:12:09', sev:'info',     src:'STRUCT', msg:'Node 3 strain gauges nominal.' },
-    { t:'214:06:12:15', sev:'warning',  src:'ECLSS',  msg:'Cabin pressure trending downward — 14.2 psi.' },
-    { t:'214:06:12:19', sev:'info',     src:'THERM',  msg:'Node 3 external skin temperature -12C.' },
-    { t:'214:06:12:24', sev:'warning',  src:'ECLSS',  msg:'Pressure rate of change exceeds nominal band.' },
-    { t:'214:06:12:29', sev:'critical', src:'ECLSS',  msg:'Cabin pressure 12.8 psi and falling — possible breach.' },
-    { t:'214:06:12:31', sev:'critical', src:'STRUCT', msg:'Acoustic sensor detects leak signature — Node 3 starboard panel.' },
-    { t:'214:06:12:34', sev:'info',     src:'COMMS',  msg:'Telemetry downlink nominal.' }
-  ];
- 
+  // Failure points the "Inject emergency scenario" control can trigger, one
+  // or more at once (see #scenario-select — a native multi-select). Each
+  // entry is a self-contained event script for one concurrent failure:
+  // `events[].delay` is milliseconds from the moment injection starts, so
+  // selecting more than one scenario interleaves their events by delay
+  // instead of playing them one scenario at a time (see buildInjectionPlan).
+  // `criticalIndex` marks which event in *this scenario's own* events array
+  // is the one that isolates its root cause — generalizing the single
+  // hardcoded `ev.sev === 'critical' && ev.src === 'STRUCT'` check the
+  // original single-scenario version used, which only ever worked because
+  // exactly one scenario, with exactly one critical event, could ever be
+  // injected. `interimIndex`/`interimText` are optional: a provisional
+  // "cause not yet isolated" line shown when that event fires, as long as
+  // this scenario (or a faster one, in a compound feed) hasn't already
+  // isolated a cause. `zone` is the habitat schematic zone id this failure
+  // lights up (see `Schematic3D`'s `zoneState`); `usesBreachMarker` opts
+  // into the dedicated pulsing hull-breach marker/shock-ring visual instead
+  // of (in addition to) the plain zone status color, since that marker is
+  // specific to a structural hull breach.
+  var scenarioLibrary = {
+    hull: {
+      id: 'hull',
+      label: 'Hull breach — Node 3 starboard panel',
+      alertLabel: 'Node 3 Breach',
+      securedLabel: 'Node 3 Secured',
+      zone: 'hull',
+      usesBreachMarker: true,
+      rootCause: 'Root cause: hull breach at Node 3 starboard panel — rapid cabin depressurization in progress.',
+      interimIndex: 2,
+      interimText: 'Cabin pressure loss detected in Node 3 — cause not yet isolated.',
+      criticalIndex: 6,
+      events: [
+        { delay:0,    sev:'info',     src:'ECLSS',  msg:'Cabin pressure sensor delta +0.02 psi/min.' },
+        { delay:850,  sev:'info',     src:'STRUCT', msg:'Node 3 strain gauges nominal.' },
+        { delay:1700, sev:'warning',  src:'ECLSS',  msg:'Cabin pressure trending downward — 14.2 psi.' },
+        { delay:2550, sev:'info',     src:'THERM',  msg:'Node 3 external skin temperature -12C.' },
+        { delay:3400, sev:'warning',  src:'ECLSS',  msg:'Pressure rate of change exceeds nominal band.' },
+        { delay:4250, sev:'critical', src:'ECLSS',  msg:'Cabin pressure 12.8 psi and falling — possible breach.' },
+        { delay:5100, sev:'critical', src:'STRUCT', msg:'Acoustic sensor detects leak signature — Node 3 starboard panel.' },
+        { delay:5950, sev:'info',     src:'COMMS',  msg:'Telemetry downlink nominal.' }
+      ]
+    },
+    oxygen: {
+      id: 'oxygen',
+      label: 'ECLSS — CO2 scrubber failure',
+      alertLabel: 'Scrubber Offline',
+      securedLabel: 'Scrubber Secured',
+      zone: 'oxygen',
+      rootCause: 'Root cause: primary CO2 scrubber failure — cabin CO2 rising toward the crew symptom threshold.',
+      interimIndex: 2,
+      interimText: 'Cabin CO2 rising in the ECLSS loop — cause not yet isolated.',
+      criticalIndex: 5,
+      events: [
+        { delay:0,    sev:'info',     src:'ECLSS', msg:'CO2 scrubber duty cycle nominal.' },
+        { delay:900,  sev:'info',     src:'ECLSS', msg:'Cabin CO2 partial pressure steady at 0.3 kPa.' },
+        { delay:1900, sev:'warning',  src:'ECLSS', msg:'Cabin CO2 partial pressure climbing — 0.6 kPa.' },
+        { delay:2700, sev:'info',     src:'THERM', msg:'Scrubber bed temperature +4C above baseline.' },
+        { delay:3600, sev:'warning',  src:'ECLSS', msg:'CO2 partial pressure 0.9 kPa — approaching crew symptom threshold.' },
+        { delay:4500, sev:'critical', src:'ECLSS', msg:'Primary CO2 scrubber offline — bed saturated, no regeneration cycle detected.' }
+      ]
+    },
+    water: {
+      id: 'water',
+      label: 'Thermal — coolant loop rupture',
+      alertLabel: 'Coolant Loop Breach',
+      securedLabel: 'Coolant Loop Secured',
+      zone: 'water',
+      rootCause: 'Root cause: coolant loop rupture at radiator bank 2 — active leak, thermal load shifting to the remaining loop.',
+      interimIndex: 2,
+      interimText: 'Coolant loop pressure dropping — cause not yet isolated.',
+      criticalIndex: 5,
+      events: [
+        { delay:0,    sev:'info',     src:'THERM',  msg:'Coolant loop pressure nominal — 410 kPa.' },
+        { delay:800,  sev:'info',     src:'THERM',  msg:'Radiator panel temperature differential steady.' },
+        { delay:1700, sev:'warning',  src:'THERM',  msg:'Coolant loop pressure dropping — 380 kPa.' },
+        { delay:2600, sev:'info',     src:'STRUCT', msg:'Node 3 aft strain gauges nominal.' },
+        { delay:3500, sev:'warning',  src:'THERM',  msg:'Coolant loop pressure 340 kPa — leak signature suspected.' },
+        { delay:4400, sev:'critical', src:'THERM',  msg:'Coolant loop rupture confirmed — pressure 290 kPa and falling, radiator bank 2 offline.' }
+      ]
+    },
+    power: {
+      id: 'power',
+      label: 'Power — Bus B fault',
+      alertLabel: 'Bus B Offline',
+      securedLabel: 'Bus B Secured',
+      zone: 'power',
+      rootCause: 'Root cause: short circuit on Bus B — solar array B offline, habitat running on reserve cells.',
+      interimIndex: 2,
+      interimText: 'Bus B voltage sagging — cause not yet isolated.',
+      criticalIndex: 5,
+      events: [
+        { delay:0,    sev:'info',     src:'PWR',   msg:'Bus B load nominal — 22.4V.' },
+        { delay:850,  sev:'info',     src:'PWR',   msg:'Solar array B tracking nominal.' },
+        { delay:1750, sev:'warning',  src:'PWR',   msg:'Bus B voltage sagging — 20.1V.' },
+        { delay:2650, sev:'info',     src:'THERM', msg:'Bus B power regulator temperature +6C.' },
+        { delay:3550, sev:'warning',  src:'PWR',   msg:'Bus B voltage 18.6V — load shedding threshold approaching.' },
+        { delay:4450, sev:'critical', src:'PWR',   msg:'Bus B short circuit detected — array B offline, drawing on reserve cells.' }
+      ]
+    },
+    nav: {
+      id: 'nav',
+      label: 'Nav/Comms — sensor drift + downlink loss',
+      alertLabel: 'Guidance Degraded',
+      securedLabel: 'Guidance Secured',
+      zone: 'nav',
+      rootCause: 'Root cause: star tracker lock loss combined with downlink failure — attitude drift uncorrected and no ground contact confirmed.',
+      interimIndex: 2,
+      interimText: 'Attitude drift increasing — cause not yet isolated.',
+      criticalIndex: 5,
+      events: [
+        { delay:0,    sev:'info',     src:'NAV',   msg:'Attitude drift within nominal band — 0.4 deg/hr.' },
+        { delay:900,  sev:'info',     src:'COMMS', msg:'Telemetry downlink nominal.' },
+        { delay:1900, sev:'warning',  src:'NAV',   msg:'Attitude drift increasing — 1.1 deg/hr.' },
+        { delay:2800, sev:'warning',  src:'COMMS', msg:'Downlink signal-to-noise degrading.' },
+        { delay:3700, sev:'warning',  src:'NAV',   msg:'Star tracker losing lock intermittently.' },
+        { delay:4600, sev:'critical', src:'COMMS', msg:'Downlink lost — telemetry buffering onboard, no confirmed ground contact.' }
+      ]
+    }
+  };
+
+  // Builds the merged, delay-sorted event timeline for one or more selected
+  // scenario ids. Each merged event carries its source scenario's id (used
+  // as the CrisisEvent `sector` sent to /crisis/analyze — see
+  // fetchCrisisAnalysis — so the backend groups/retrieves one procedure
+  // match per selected failure point, not per raw `src` tag, since two
+  // different failures can share a flavor tag like ECLSS/THERM) plus
+  // whether this is its scenario's critical/interim marker event. Falls
+  // back to the hull scenario alone if nothing is selected, so the default
+  // demo behavior is unchanged with no selection made.
+  function buildInjectionPlan(selectedIds){
+    var ids = selectedIds.length ? selectedIds : ['hull'];
+    var merged = [];
+    ids.forEach(function(id){
+      var scenario = scenarioLibrary[id];
+      if(!scenario) return;
+      scenario.events.forEach(function(ev, idx){
+        merged.push({
+          scenarioId: id,
+          delay: ev.delay,
+          sev: ev.sev,
+          src: ev.src,
+          msg: ev.msg,
+          isCritical: idx === scenario.criticalIndex,
+          isInterim: idx === scenario.interimIndex,
+          interimText: scenario.interimText
+        });
+      });
+    });
+    merged.sort(function(a, b){ return a.delay - b.delay; });
+    return merged;
+  }
+
+  // Cosmetic MET timestamp for a feed entry, offset from the live mission
+  // clock (metSeconds/pad, declared above) by a scenario event's delay.
+  // Purely flavor text for the feed list — logIncident (used for the
+  // after-action report) stamps every entry with the real live clock
+  // independently of this.
+  function scenarioMetString(delayMs){
+    var s = Math.floor(metSeconds + delayMs / 1000);
+    var d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+    return d + ':' + pad(h) + ':' + pad(m) + ':' + pad(sec);
+  }
+
   var defaultProcedureSteps = [
     'Don emergency oxygen mask immediately.',
     'Instruct all crew to move to Node 2 and seal the hatch behind you.',
@@ -1589,11 +1771,25 @@
   // fetchSectorSummary uses for Module 02.
   var procedureSteps = defaultProcedureSteps.slice();
   var crisisProcRef = defaultProcRef;
+  // Parallel to procedureSteps: how many of its steps came from each
+  // matched procedure (see CrisisAnalyzeResponse.step_counts), and a
+  // matching label per group, so renderChecklist can insert a source
+  // header between groups once a compound response has more than one.
+  // Length-1 (a single, unlabeled group) in the hand-authored fallback
+  // and in every single-failure response, same as before this feature.
+  var procedureStepCounts = [defaultProcedureSteps.length];
+  var procedureCauseLabels = [];
 
-  var scenarioTimer = null;
+  // Which scenario(s) the current/last injection actually ran, so
+  // updateProcedureResolutionState and resetFeed know which schematic
+  // zones (and, for hull, the dedicated breach marker) to drive without
+  // needing injectScenario's local state.
+  var activeScenarioObjs = [];
+
+  var scenarioTimers = [];
   var checklistState = [];
   var procedureActive = false;
- 
+
   function renderFeedEntry(ev){
     var el = document.createElement('div');
     el.className = 'feed-entry sev-' + ev.sev;
@@ -1607,10 +1803,31 @@
     feedList.scrollTop = feedList.scrollHeight;
   }
  
+  // Step index -> group label, built from procedureStepCounts/
+  // procedureCauseLabels so renderChecklist can insert a source header
+  // right before the first step of each matched procedure. Only produces
+  // headers when there's more than one group (a compound response) — a
+  // single-group checklist (today's default, and every single-failure
+  // response) renders exactly as it did before this feature.
+  function checklistGroupStarts(){
+    var starts = {};
+    if(procedureStepCounts.length <= 1) return starts;
+    var idx = 0;
+    procedureStepCounts.forEach(function(count, groupIdx){
+      starts[idx] = procedureCauseLabels[groupIdx] || ('Matched procedure ' + (groupIdx + 1));
+      idx += count;
+    });
+    return starts;
+  }
+
   function renderChecklist(){
     var firstPendingFound = false;
+    var groupStarts = checklistGroupStarts();
     var html = '<ul class="checklist">';
     procedureSteps.forEach(function(step, i){
+      if(groupStarts.hasOwnProperty(i)){
+        html += '<li class="check-group-label">' + groupStarts[i] + '</li>';
+      }
       var state = checklistState[i] ? 'done' : 'pending';
       if(!checklistState[i] && !firstPendingFound){ state = 'current'; firstPendingFound = true; }
       html += '<li class="check-item ' + state + '">' +
@@ -1646,47 +1863,78 @@
     checklistStatus.textContent = done === total ? 'Procedure complete — ' + total + '/' + total : done + ' of ' + total + ' steps complete';
   }
  
+  // Sets every active scenario's schematic zone to the given status —
+  // 'critical' while the incident is open, 'nominal' once resolved. Hull
+  // additionally drives the dedicated pulsing breach marker (a separate
+  // visual from zone status color; see Schematic3D.setBreach), on top of
+  // (not instead of) its own zone status. Known limitation: Module 02's
+  // "Run new diagnostic pass" (updateSchematicZones) writes the same
+  // zoneState this drives, from its own independently-simulated sector
+  // status — running it while a non-hull scenario is active can overwrite
+  // that zone's critical highlight here. Hull's breach marker is immune
+  // to this since it's a separate flag/mesh, not zoneState.
+  function applyScenarioZoneStatus(status){
+    activeScenarioObjs.forEach(function(s){
+      if(s.usesBreachMarker){ setSchematicBreach(status === 'critical'); }
+      Schematic3D.setZoneStatus(s.zone, status);
+    });
+  }
+
   // Reacts to checklist progress: confirms resolution once every step is checked,
-  // and reverts to the active-breach state if a step gets unchecked again.
+  // and reverts to the active-incident state if a step gets unchecked again.
   function updateProcedureResolutionState(){
     if(!procedureActive) return;
     var total = procedureSteps.length;
     var done = checklistState.filter(Boolean).length;
     var procRef = document.getElementById('proc-ref');
+    var labels = activeScenarioObjs.map(function(s){ return s.label; });
     if(done === total && total > 0){
       incidentCompletionSeconds = metSeconds;
       rcBanner.classList.remove('active');
       document.querySelector('#root-cause-banner .rc-tag').textContent = 'Status';
-      rcText.textContent = 'Procedure complete — Node 3 isolated and sealed. Cabin pressure stabilized in Node 2 at MET ' + metEl.textContent + '.';
-      if(procRef){ procRef.textContent = 'Emergency Decompression Procedure closed out — all ' + total + ' steps confirmed at MET ' + metEl.textContent + '.'; }
-      setModuleAlert('t1', 'nominal', 'Node 3 Secured');
-      setSchematicBreach(false);
+      rcText.textContent = 'Procedure complete — ' + (labels.length ? labels.join('; ') : 'Node 3') + ' secured. Systems stabilized at MET ' + metEl.textContent + '.';
+      if(procRef){ procRef.textContent = 'Emergency procedure closed out — all ' + total + ' steps confirmed at MET ' + metEl.textContent + '.'; }
+      setModuleAlert('t1', 'nominal', activeScenarioObjs.length > 1 ? 'Systems Secured' : (activeScenarioObjs[0] ? activeScenarioObjs[0].securedLabel : 'Node 3 Secured'));
+      applyScenarioZoneStatus('nominal');
     } else {
       incidentCompletionSeconds = null;
       rcBanner.classList.add('active');
       document.querySelector('#root-cause-banner .rc-tag').textContent = 'Root cause';
       rcText.textContent = incidentRootCause;
       if(procRef){ procRef.textContent = crisisProcRef; }
-      setModuleAlert('t1', 'critical', 'Node 3 Breach');
-      setSchematicBreach(true);
+      setModuleAlert('t1', 'critical', activeScenarioObjs.length > 1 ? 'Multiple Systems Critical' : (activeScenarioObjs[0] ? activeScenarioObjs[0].alertLabel : 'Node 3 Breach'));
+      applyScenarioZoneStatus('critical');
     }
   }
- 
+
   function resetFeed(){
-    clearTimeout(scenarioTimer);
-    feedList.innerHTML = '<div class="feed-empty">Standby — no active events. Press "Inject emergency scenario" to run the demo.</div>';
+    scenarioTimers.forEach(function(timer){ clearTimeout(timer); });
+    scenarioTimers = [];
+    feedList.innerHTML = '<div class="feed-empty">Standby — no active events. Select one or more failure points above and press "Inject emergency scenario" to run the demo.</div>';
     procedureActive = false;
     rcBanner.classList.remove('active');
     document.querySelector('#root-cause-banner .rc-tag').textContent = 'Root cause';
     rcText.textContent = 'All systems nominal. No active event.';
+    rcComplexity.textContent = '';
+    rcComplexity.classList.remove('visible');
     checklistState = [];
     checklistWrap.innerHTML = '<div class="checklist-empty">A procedure will populate here once a root cause is confirmed.</div>';
     checklistStatus.textContent = 'No active procedure';
     procedureSteps = defaultProcedureSteps.slice();
+    procedureStepCounts = [defaultProcedureSteps.length];
+    procedureCauseLabels = [];
     crisisProcRef = defaultProcRef;
     setModuleAlert('t1', 'nominal', 'Crisis Timeline nominal');
+    // Reset every zone this feature can drive, not just hull's breach
+    // marker — a prior compound injection may have left oxygen/water/
+    // power/nav in the 'critical' state (see applyScenarioZoneStatus).
     setSchematicBreach(false);
+    Object.keys(scenarioLibrary).forEach(function(id){
+      Schematic3D.setZoneStatus(scenarioLibrary[id].zone, 'nominal');
+    });
+    activeScenarioObjs = [];
     btnInject.disabled = false;
+    scenarioSelect.disabled = false;
 
     incidentLog = [];
     incidentRootCause = '';
@@ -1696,24 +1944,30 @@
     btnGenerateAar.disabled = true;
   }
 
-  // Calls POST /crisis/analyze once the root cause is isolated, with the live
+  // Calls POST /crisis/analyze once a root cause is isolated, with the live
   // event feed logged so far (see CrisisEvent/CrisisAnalyzeRequest in
-  // backend/app/schemas.py — this module's ev.t/ev.src/ev.msg map to the wire
-  // shape's timestamp/sector/description). On success, replaces the
-  // hand-authored root cause, procedure checklist, and citation line
-  // injectScenario just rendered synchronously with the grounded ones the API
-  // retrieved, and resets checklist progress against the new step list. On
-  // failure (network error, or a 404 when no procedure documentation matches
-  // this event feed) leaves the hand-authored fallback already on screen in
-  // place — the same degrade-gracefully pattern fetchSectorSummary uses for
-  // Module 02.
+  // backend/app/schemas.py). `sector` is sent as each event's *scenario* id
+  // (e.g. 'hull', 'oxygen'), not its cosmetic `src` tag — several scenarios
+  // reuse the same flavor tags (ECLSS/THERM/...), and the backend groups
+  // events by `sector` to retrieve one procedure match per distinct failure
+  // point (see app.services.crisis.analyze_crisis), so the id that actually
+  // distinguishes concurrent failures has to travel in that field. On
+  // success, replaces the hand-authored root cause, procedure checklist,
+  // and citation line injectScenario rendered synchronously with the
+  // grounded ones the API retrieved — now possibly spanning more than one
+  // matched procedure (see CrisisAnalyzeResponse.sources/step_counts/
+  // contributing_causes) — and resets checklist progress against the new
+  // step list. On failure (network error, or a 404 when no procedure
+  // documentation matches any sector in this feed) leaves the hand-authored
+  // fallback already on screen in place — the same degrade-gracefully
+  // pattern fetchSectorSummary uses for Module 02.
   function fetchCrisisAnalysis(events){
     return fetch(API_BASE_URL + '/crisis/analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         events: events.map(function(ev){
-          return { timestamp: ev.t, sector: ev.src, description: ev.msg };
+          return { timestamp: ev.t, sector: ev.scenarioId, description: ev.msg };
         })
       })
     })
@@ -1725,9 +1979,17 @@
       })
       .then(function(data){
         procedureSteps = data.steps;
-        crisisProcRef = 'Grounded in: ' + data.source;
+        procedureStepCounts = data.step_counts && data.step_counts.length ? data.step_counts : [procedureSteps.length];
+        procedureCauseLabels = data.contributing_causes || [];
+        crisisProcRef = data.sources && data.sources.length > 1
+          ? 'Grounded in ' + data.sources.length + ' matched procedures: ' + data.sources.join('; ')
+          : 'Grounded in: ' + (data.sources ? data.sources[0] : '');
         incidentRootCause = 'Root cause: ' + data.root_cause;
         rcText.textContent = incidentRootCause;
+        if(data.contributing_causes && data.contributing_causes.length > 1){
+          rcComplexity.textContent = 'Compound emergency — grounded across ' + data.contributing_causes.length + ' matched procedures (' + data.contributing_causes.join(' · ') + ')';
+          rcComplexity.classList.add('visible');
+        }
         checklistState = new Array(procedureSteps.length).fill(false);
         stepCompletionOrder = [];
         checklistStatus.textContent = 'Procedure ready — 0 of ' + procedureSteps.length + ' steps complete';
@@ -1739,13 +2001,23 @@
   }
 
   function injectScenario(){
+    var selectedIds = Array.prototype.map.call(scenarioSelect.selectedOptions, function(o){ return o.value; });
+    var plan = buildInjectionPlan(selectedIds); // falls back to ['hull'] if nothing selected
+    var runningIds = selectedIds.length ? selectedIds : ['hull'];
+    activeScenarioObjs = runningIds.map(function(id){ return scenarioLibrary[id]; }).filter(Boolean);
+
     feedList.innerHTML = '';
     procedureSteps = defaultProcedureSteps.slice();
+    procedureStepCounts = [defaultProcedureSteps.length];
+    procedureCauseLabels = [];
     crisisProcRef = defaultProcRef;
     checklistState = new Array(procedureSteps.length).fill(false);
     procedureActive = false;
     btnInject.disabled = true;
-    setModuleAlert('t1', 'caution', 'Node 3 Anomaly In Progress');
+    scenarioSelect.disabled = true;
+    rcComplexity.textContent = '';
+    rcComplexity.classList.remove('visible');
+    setModuleAlert('t1', 'caution', activeScenarioObjs.length > 1 ? 'Multiple Anomalies In Progress' : 'Node 3 Anomaly In Progress');
 
     incidentLog = [];
     incidentRootCause = '';
@@ -1754,30 +2026,70 @@
     aarOutput.innerHTML = '<div class="checklist-empty">Incident in progress — the report can be generated at any time from the log so far, or after the procedure is complete for a final response time.</div>';
     btnGenerateAar.disabled = true;
 
-    scenarioEvents.forEach(function(ev, i){
-      scenarioTimer = setTimeout(function(){
-        renderFeedEntry(ev);
+    scenarioTimers = [];
+    var eventsSoFar = [];
+    var triggeredScenarios = {}; // scenarioId -> true once its critical event has fired
+    var analysisTimer = null;
+
+    // Fires once no further critical event from a concurrently-selected
+    // scenario has arrived for 400ms — long enough for near-simultaneous
+    // failures to all register before the compound feed is sent to
+    // /crisis/analyze as a single call, instead of one call per failure.
+    function onRootCauseWindowClosed(){
+      procedureActive = true;
+      rcBanner.classList.add('active');
+      var triggeredObjs = Object.keys(triggeredScenarios)
+        .map(function(id){ return scenarioLibrary[id]; })
+        .filter(Boolean);
+
+      // Provisional statement shown while the grounded /crisis/analyze call
+      // is in flight — built from the scenario library's own hand-authored
+      // root-cause text for each failure that fired, the same fallback the
+      // single-scenario version showed synchronously before its API
+      // response landed, just joined across however many triggered here.
+      var pendingText = triggeredObjs.length > 1
+        ? 'Root cause: multiple concurrent failures — ' + triggeredObjs.map(function(s){ return s.rootCause.replace(/^Root cause: /, ''); }).join(' Also: ')
+        : (triggeredObjs[0] ? triggeredObjs[0].rootCause : 'Root cause isolated — analyzing…');
+      rcText.textContent = pendingText;
+      incidentRootCause = pendingText;
+
+      if(triggeredObjs.length > 1){
+        rcComplexity.textContent = 'Compound emergency — ' + triggeredObjs.length + ' concurrent failure points (' + triggeredObjs.map(function(s){ return s.label; }).join(', ') + ')';
+        rcComplexity.classList.add('visible');
+      }
+
+      applyScenarioZoneStatus('critical');
+      setModuleAlert('t1', 'critical', triggeredObjs.length > 1 ? 'Multiple Systems Critical' : (triggeredObjs[0] ? triggeredObjs[0].alertLabel : 'Node 3 Breach'));
+      checklistStatus.textContent = 'Procedure ready — 0 of ' + procedureSteps.length + ' steps complete';
+      renderChecklist();
+      logIncident('T1', 'critical', 'Root cause isolated: ' + pendingText);
+
+      // Kick off the grounded /crisis/analyze call against the live event
+      // feed logged so far. On success this replaces the hand-authored
+      // root cause, checklist, and citation line above with the grounded
+      // ones the API retrieved; on failure it leaves them as they are.
+      fetchCrisisAnalysis(eventsSoFar.slice());
+    }
+
+    plan.forEach(function(ev){
+      var timer = setTimeout(function(){
+        var displayEv = { t: scenarioMetString(ev.delay), sev: ev.sev, src: ev.src, msg: ev.msg };
+        renderFeedEntry(displayEv);
+        eventsSoFar.push({ scenarioId: ev.scenarioId, t: displayEv.t, msg: ev.msg });
         logIncident('T1', ev.sev, ev.src + ': ' + ev.msg);
-        if(ev.sev === 'warning' && i === 2){
-          rcText.textContent = 'Cabin pressure loss detected in Node 3 — cause not yet isolated.';
+
+        if(ev.isInterim && !triggeredScenarios[ev.scenarioId] && !procedureActive){
+          rcText.textContent = ev.interimText;
         }
-        if(ev.sev === 'critical' && ev.src === 'STRUCT'){
-          procedureActive = true;
-          rcBanner.classList.add('active');
-          rcText.textContent = 'Root cause: hull breach at Node 3 starboard panel — rapid cabin depressurization in progress.';
-          incidentRootCause = rcText.textContent;
-          setModuleAlert('t1', 'critical', 'Node 3 Breach');
-          setSchematicBreach(true);
-          checklistStatus.textContent = 'Procedure ready — 0 of ' + procedureSteps.length + ' steps complete';
-          renderChecklist();
-          logIncident('T1', 'critical', 'Root cause isolated: ' + rcText.textContent);
-          // Kick off the grounded /crisis/analyze call against the live event
-          // feed logged so far. On success this replaces the hand-authored
-          // root cause, checklist, and citation line above with the grounded
-          // ones the API retrieved; on failure it leaves them as they are.
-          fetchCrisisAnalysis(scenarioEvents.slice(0, i + 1));
+
+        if(ev.isCritical && !triggeredScenarios[ev.scenarioId]){
+          triggeredScenarios[ev.scenarioId] = true;
+          clearTimeout(analysisTimer);
+          analysisTimer = setTimeout(onRootCauseWindowClosed, 400);
+          scenarioTimers.push(analysisTimer);
         }
-      }, i * 850);
+      }, ev.delay);
+      scenarioTimers.push(timer);
     });
   }
 
@@ -1846,8 +2158,10 @@
     } else {
       recs.push('Procedure is not yet complete — regenerate this report once every checklist step is confirmed for a final response-time figure.');
     }
-    if(t1Criticals.length > 1){
-      recs.push(t1Criticals.length + ' critical alarms fired before root cause was isolated — evaluate whether an earlier correlation between the ECLSS and STRUCT feeds could isolate the cause on fewer alarms.');
+    if(activeScenarioObjs.length > 1){
+      recs.push(t1Criticals.length + ' critical alarms fired across ' + activeScenarioObjs.length + ' concurrent failure points (' + activeScenarioObjs.map(function(s){ return s.label; }).join(', ') + ') — review whether crew attention was split effectively across all of them.');
+    } else if(t1Criticals.length > 1){
+      recs.push(t1Criticals.length + ' critical alarms fired before root cause was isolated — evaluate whether an earlier correlation between the contributing feeds could isolate the cause on fewer alarms.');
     }
 
     var recsHtml = recs.map(function(r, i){
