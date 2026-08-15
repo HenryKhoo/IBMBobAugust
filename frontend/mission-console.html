@@ -1818,10 +1818,51 @@
   function clampNum(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
   function jitter(range){ return (Math.random() * 2 - 1) * range; }
  
+  // Backend base URL for The North Star API (see API.md — local dev only; this
+  // becomes the deployed backend origin once Railway hosting is set up).
+  var API_BASE_URL = 'http://localhost:8000';
+
+  // Calls POST /telemetry/interpret for one sector's current raw readings.
+  // sector.state is already the flat { metricName: number } shape the endpoint
+  // expects (see TelemetryInterpretRequest in backend/app/schemas.py). On success,
+  // replaces the hand-authored local summary with the grounded one from the API
+  // and records confidence + source for the AI Insight Card. On failure (network
+  // error, or a 404 when no sector documentation has been ingested for this
+  // sector id yet) leaves whatever summary tick() already computed locally in
+  // place rather than blanking the card, and sets confidence/source to null so
+  // the AI Insight Card knows not to render an unearned badge. Returns a promise
+  // so callers can wait for every sector's response before re-rendering.
+  function fetchSectorSummary(sector){
+    return fetch(API_BASE_URL + '/telemetry/interpret', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sector_id: sector.id, metrics: sector.state })
+    })
+      .then(function(res){
+        if(!res.ok){
+          throw new Error('telemetry interpret request failed: ' + res.status);
+        }
+        return res.json();
+      })
+      .then(function(data){
+        sector.summary = data.summary;
+        sector.confidence = data.confidence;
+        sector.source = data.source;
+      })
+      .catch(function(err){
+        console.error('telemetry interpret failed for sector "' + sector.id + '":', err);
+        sector.confidence = null;
+        sector.source = null;
+      });
+  }
+
   // Each sector tracks its own raw metric state and derives status + plain-language
   // summary + annotated raw readout from it. tick() mutates the state (unless the
-  // pass isn't a jitter pass, e.g. the very first render) and returns fresh output,
-  // so "Run new diagnostic pass" actually changes what's on screen.
+  // pass isn't a jitter pass, e.g. the very first render), sets a hand-authored
+  // summary synchronously as an immediate/fallback value, kicks off the grounded
+  // /telemetry/interpret call, and returns that pending promise, so "Run new
+  // diagnostic pass" actually changes what's on screen once every sector's
+  // response lands.
   var sectors = [
     {
       id:'oxygen', name:'Oxygen', state:{ eff:85, o2pp:158, humidity:34 }, history:[89,88,87,86,85],
@@ -1848,6 +1889,7 @@
         this.gaugeHtml = '<div class="gauge-wrap"><div class="gauge-item">' + radialGauge(eff, 50, 100, 56) + '<span class="gauge-value"><span class="gv-num">' + eff + '%</span><span class="gv-label">Scrubber eff.</span></span></div></div>';
         this.history.push(eff);
         if(this.history.length > 10){ this.history.shift(); }
+        return fetchSectorSummary(this);
       }
     },
     {
@@ -1872,6 +1914,7 @@
         this.gaugeHtml = '<div class="gauge-wrap"><div class="gauge-item">' + radialGauge(rate, 65, 100, 56) + '<span class="gauge-value"><span class="gv-num">' + rate + '%</span><span class="gv-label">Recovery rate</span></span></div></div>';
         this.history.push(rate);
         if(this.history.length > 10){ this.history.shift(); }
+        return fetchSectorSummary(this);
       }
     },
     {
@@ -1904,6 +1947,7 @@
         '</div>';
         this.history.push(temp);
         if(this.history.length > 10){ this.history.shift(); }
+        return fetchSectorSummary(this);
       }
     },
     {
@@ -1928,6 +1972,7 @@
         this.gaugeHtml = '<div class="gauge-wrap"><div class="gauge-item">' + radialGauge(events, 0, 3, 56) + '<span class="gauge-value"><span class="gv-num">' + events + '</span><span class="gv-label">Impacts /24h</span></span></div></div>';
         this.history.push(events);
         if(this.history.length > 10){ this.history.shift(); }
+        return fetchSectorSummary(this);
       }
     },
     {
@@ -1952,6 +1997,7 @@
         this.gaugeHtml = '<div class="gauge-wrap"><div class="gauge-item">' + radialGauge(drift, 0, 0.9, 56) + '<span class="gauge-value"><span class="gv-num">' + drift + '</span><span class="gv-label">Drift deg/hr</span></span></div></div>';
         this.history.push(drift);
         if(this.history.length > 10){ this.history.shift(); }
+        return fetchSectorSummary(this);
       }
     },
     {
@@ -1983,6 +2029,7 @@
         this.gaugeHtml = '<div class="gauge-wrap"><div class="gauge-item">' + radialGauge(current, 0.9, 2.6, 56) + '<span class="gauge-value"><span class="gv-num">' + current + 'A</span><span class="gv-label">Pump current</span></span></div></div>';
         this.history.push(current);
         if(this.history.length > 10){ this.history.shift(); }
+        return fetchSectorSummary(this);
       }
     }
   ];
@@ -1990,6 +2037,15 @@
   var t2Grid = document.getElementById('t2-grid');
   var statusLabels = { nominal:'Nominal', degrading:'Degrading', critical:'Critical' };
   var diagnosticPassCount = 0;
+  var t2PassInFlight = 0; // guards against a stale pass's responses landing after a newer pass started
+
+  // Buckets the 0-1 confidence float from /telemetry/interpret into the same
+  // three-tier nominal/caution/critical vocabulary .status-pill already uses
+  // for sector status, so the AI Insight Card's confidence badge reuses that
+  // existing color logic instead of introducing a new scale.
+  function confidenceLevel(confidence){
+    return confidence >= 0.75 ? 'nominal' : confidence >= 0.5 ? 'caution' : 'critical';
+  }
 
   // Maps each Module 02 sector id to the group it drives on the habitat
   // schematic in Module 01, so the deck map's zones pulse/dim in lockstep
@@ -2013,7 +2069,12 @@
           '</div>' +
           '<span class="sector-status ' + s.status + '">' + statusLabels[s.status] + '</span>' +
         '</div>' +
-        '<div class="sector-summary">' + (s.gaugeHtml || '') + s.summary + '</div>' +
+        '<div class="sector-summary">' + (s.gaugeHtml || '') + s.summary +
+          (s.confidence != null ?
+            ' <span class="met-value status-pill level-' + confidenceLevel(s.confidence) + '">' +
+              Math.round(s.confidence * 100) + '%</span>' : '') +
+        '</div>' +
+        (s.source ? '<div class="proc-ref">Grounded in: ' + s.source + '</div>' : '') +
         '<details class="sector-raw"><summary>Raw telemetry</summary><div class="raw-line">' + s.raw + '</div></details>' +
       '</div>';
     }).join('');
@@ -2032,13 +2093,18 @@
  
   function runDiagnosticPass(applyJitter){
     diagnosticPassCount += 1;
-    sectors.forEach(function(s){ s.tick(applyJitter); });
-    renderSectors();
-    updateT2Alert();
+    var passId = diagnosticPassCount;
+    t2PassInFlight = passId;
+    var pending = sectors.map(function(s){ return s.tick(applyJitter); });
     updateSchematicZones();
-    document.getElementById('t2-timestamp').textContent = 'Last diagnostic pass — MET ' + metEl.textContent + ' \u00b7 pass #' + diagnosticPassCount;
+    Promise.all(pending).then(function(){
+      if(t2PassInFlight !== passId){ return; }
+      renderSectors();
+      updateT2Alert();
+      document.getElementById('t2-timestamp').textContent = 'Last diagnostic pass — MET ' + metEl.textContent + ' \u00b7 pass #' + diagnosticPassCount;
+    });
   }
- 
+
   runDiagnosticPass(false); // initial pass — establishes the baseline reading, no jitter
  
   document.getElementById('btn-refresh-t2').addEventListener('click', function(){
@@ -2853,9 +2919,16 @@
       var navSector = sectors.filter(function(s){ return s.id === 'nav'; })[0];
       if(navSector){
         navSector.state.drift = clampNum(navSector.state.drift + 0.35, 0.05, 0.9);
-        navSector.tick(false);
+        // tick() now returns a pending /telemetry/interpret fetch — render once
+        // immediately with the local status/summary, then again once the grounded
+        // confidence/source land, same two-phase pattern as runDiagnosticPass.
+        var navPromise = navSector.tick(false);
         renderSectors();
         updateT2Alert();
+        navPromise.then(function(){
+          renderSectors();
+          updateT2Alert();
+        });
       }
     } else {
       logSwAdvisory('info', 'Conditions returned to quiet baseline. No active watches or warnings.');
