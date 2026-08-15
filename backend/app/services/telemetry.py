@@ -29,7 +29,7 @@ import re
 from app.schemas import TelemetryInterpretResponse
 from app.services.extraction import SectorThreshold, extract_sector_thresholds
 from app.services.metric_aliases import METRIC_ALIASES
-from app.services.vector_store import get_vector_store
+from app.services.vector_store import get_vector_store, relevance_score_hits_or_empty
 from app.services.watsonx import get_instruct_model
 
 _PROMPT_TEMPLATE = """You are the telemetry translator for The North Star, a deep space \
@@ -192,8 +192,8 @@ def interpret_telemetry(
     the module docstring.
     """
     query = _build_retrieval_query(sector_id, metrics)
-    hits = get_vector_store().similarity_search_with_relevance_scores(
-        query, k=1, expr="doc_type == 'sector_spec'"
+    hits = relevance_score_hits_or_empty(
+        get_vector_store(), query, k=1, expr="doc_type == 'sector_spec'"
     )
     if not hits:
         raise LookupError(

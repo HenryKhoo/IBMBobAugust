@@ -56,7 +56,7 @@ import re
 
 from app.schemas import TriageResponse
 from app.services.extraction import extract_allergies, extract_procedure_steps
-from app.services.vector_store import get_vector_store
+from app.services.vector_store import get_vector_store, relevance_score_hits_or_empty
 from app.services.watsonx import get_instruct_model
 
 _PROMPT_TEMPLATE = """You are the medical triage assistant for The North Star, a deep \
@@ -213,8 +213,8 @@ def run_triage(crew_member_id: str, symptom_report: str) -> TriageResponse:
     allergies = extract_allergies(crew_file_text)
 
     protocol_query = _build_protocol_query(symptom_report)
-    protocol_hits = get_vector_store().similarity_search_with_relevance_scores(
-        protocol_query, k=1, expr="doc_type == 'procedure'"
+    protocol_hits = relevance_score_hits_or_empty(
+        get_vector_store(), protocol_query, k=1, expr="doc_type == 'procedure'"
     )
     if not protocol_hits:
         raise LookupError(

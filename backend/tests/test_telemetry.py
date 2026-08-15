@@ -29,6 +29,18 @@ class _FakeVectorStore:
         return self.hits
 
 
+class _FakeVectorStoreNoIndexYet:
+    """Mimics langchain-milvus before any `/ingest` call has ever created the
+    collection's index: `similarity_search_with_relevance_scores` raises
+    `ValueError` instead of returning `[]`. See
+    `app.services.vector_store.relevance_score_hits_or_empty`, which this
+    exercises through the real endpoint rather than mocking that wrapper away.
+    """
+
+    def similarity_search_with_relevance_scores(self, query, **kwargs):
+        raise ValueError("No index params provided. Could not determine relevance function.")
+
+
 SECTOR_SPEC_TEXT = (FIXTURES / "sample_sector_spec.txt").read_text()
 SECTOR_SPEC_METADATA = {
     "doc_id": "sector-2-spec",
@@ -115,6 +127,40 @@ def test_interpret_telemetry_raises_when_nothing_is_retrieved(monkeypatch):
     # no grounding chunk was found, so the model must never be asked to
     # generate an ungrounded guess.
     assert fake_model.invoked_with == []
+
+
+def test_interpret_telemetry_raises_lookup_error_not_value_error_before_first_ingest(
+    monkeypatch,
+):
+    # Regression test for the bug reported from production: before anything
+    # had ever been ingested, this endpoint crashed with an unhandled
+    # ValueError (surfaced to the browser as a CORS failure, since an
+    # uncaught exception's fallback response bypasses CORSMiddleware — see
+    # app.main's unhandled_exception_handler) instead of the clean 404 every
+    # other "nothing retrieved" case gets.
+    fake_store = _FakeVectorStoreNoIndexYet()
+    fake_model = _FakeInstructModel(STUBBED_SUMMARY)
+    monkeypatch.setattr(telemetry, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(telemetry, "get_instruct_model", lambda: fake_model)
+
+    with pytest.raises(LookupError):
+        telemetry.interpret_telemetry("oxygen", {"eff": 85})
+
+    assert fake_model.invoked_with == []
+
+
+def test_endpoint_returns_404_not_500_before_first_ingest(monkeypatch):
+    fake_store = _FakeVectorStoreNoIndexYet()
+    fake_model = _FakeInstructModel(STUBBED_SUMMARY)
+    monkeypatch.setattr(telemetry, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(telemetry, "get_instruct_model", lambda: fake_model)
+
+    response = client.post(
+        "/telemetry/interpret",
+        json={"sector_id": "oxygen", "metrics": {"eff": 85}},
+    )
+
+    assert response.status_code == 404
 
 
 def test_endpoint_returns_404_when_nothing_is_retrieved(monkeypatch):

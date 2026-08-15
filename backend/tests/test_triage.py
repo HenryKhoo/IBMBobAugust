@@ -349,6 +349,45 @@ def test_endpoint_returns_404_when_no_protocol_is_found(monkeypatch, fake_crew_h
     assert fake_model.invoked_with == []
 
 
+class _FakeVectorStoreNoIndexYetForProtocol:
+    """Mimics langchain-milvus before any `/ingest` call has ever created the
+    'procedure' collection's index: `similarity_search_with_relevance_scores`
+    raises `ValueError` instead of returning `[]`, the same way
+    `app.services.vector_store.relevance_score_hits_or_empty` was written to
+    handle (see its docstring for how this was reproduced against a real
+    production-like backend). The crew file lookup still uses plain
+    `similarity_search`, unaffected by this bug, so it returns normally.
+    """
+
+    def __init__(self, crew_hits: list):
+        self.crew_hits = crew_hits
+
+    def similarity_search(self, query, **kwargs):
+        return self.crew_hits
+
+    def similarity_search_with_relevance_scores(self, query, **kwargs):
+        raise ValueError("No index params provided. Could not determine relevance function.")
+
+
+def test_endpoint_returns_404_not_500_when_protocol_index_not_created_yet(
+    monkeypatch, fake_crew_hit
+):
+    # Regression test: before anything had ever been ingested, a crew file
+    # hit followed by a protocol lookup crashed with an unhandled
+    # ValueError, which the browser reported as a CORS failure rather than
+    # the intended 404 (see app.main's unhandled_exception_handler and
+    # app.services.vector_store.relevance_score_hits_or_empty).
+    fake_store = _FakeVectorStoreNoIndexYetForProtocol(crew_hits=[fake_crew_hit])
+    fake_model = _FakeInstructModel(STUBBED_TRIAGE_LEAD)
+    monkeypatch.setattr(triage, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(triage, "get_instruct_model", lambda: fake_model)
+
+    response = client.post("/triage", json=REQUEST_PAYLOAD)
+
+    assert response.status_code == 404
+    assert fake_model.invoked_with == []
+
+
 def test_endpoint_happy_path_matches_api_contract_shape(
     monkeypatch, fake_crew_hit, fake_protocol_hit
 ):

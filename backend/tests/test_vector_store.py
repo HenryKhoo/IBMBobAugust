@@ -59,3 +59,49 @@ def test_upsert_chunks_happy_path_embeds_and_upserts_via_the_store(monkeypatch):
     assert count == 2
     assert fake_store.calls[0]["texts"] == texts
     assert fake_store.calls[0]["metadatas"] == metadatas
+
+
+class _FakeStoreNoIndexYet:
+    """Mimics langchain-milvus's `similarity_search_with_relevance_scores` before any
+    ingestion has ever happened: it raises `ValueError("No index params provided.
+    Could not determine relevance function.")` instead of returning `[]`.
+
+    Reproduced against a real local Milvus instance (see the debugging notes on
+    `relevance_score_hits_or_empty`) — this is exactly what the deployed backend hit on
+    every `/telemetry/interpret` and `/triage` call before anything had been ingested.
+    """
+
+    def similarity_search_with_relevance_scores(self, query, **kwargs):
+        raise ValueError("No index params provided. Could not determine relevance function.")
+
+
+class _FakeStoreOtherValueError:
+    """A `ValueError` unrelated to the missing-index case should not be swallowed."""
+
+    def similarity_search_with_relevance_scores(self, query, **kwargs):
+        raise ValueError("some other problem entirely")
+
+
+def test_relevance_score_hits_or_empty_returns_empty_when_index_not_created_yet():
+    hits = vector_store.relevance_score_hits_or_empty(
+        _FakeStoreNoIndexYet(), "query text", k=1, expr="doc_type == 'sector_spec'"
+    )
+    assert hits == []
+
+
+def test_relevance_score_hits_or_empty_reraises_unrelated_value_errors():
+    with pytest.raises(ValueError, match="some other problem"):
+        vector_store.relevance_score_hits_or_empty(
+            _FakeStoreOtherValueError(), "query text", k=1, expr="doc_type == 'sector_spec'"
+        )
+
+
+def test_relevance_score_hits_or_empty_passes_through_real_hits():
+    fake_store = _FakeZillizStore(ids=[])  # unused here, just needs the right method
+    fake_store.similarity_search_with_relevance_scores = lambda query, **kwargs: [
+        ("doc", 0.9)
+    ]
+    hits = vector_store.relevance_score_hits_or_empty(
+        fake_store, "query text", k=1, expr="doc_type == 'sector_spec'"
+    )
+    assert hits == [("doc", 0.9)]
