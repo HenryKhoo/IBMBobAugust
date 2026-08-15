@@ -1,0 +1,20 @@
+TREATMENT PROTOCOL: STAGE 2 WOUND INFECTION WITH MILD SHOCK
+
+Overview
+A deep laceration with progressing swelling and confusion indicates a Stage 2
+wound infection paired with mild shock. Treat as time-critical.
+
+Treatment Sequence
+1. Inject 2ml of Antibiotic X from Kit B.
+2. Irrigate and pack the wound; apply a pressure dressing.
+3. Elevate the affected limb and monitor for worsening confusion.
+1.2 milliliters of antiseptic solution were used during irrigation, per the medic's log.
+4. Recheck heart rate and mental status every 15 minutes.
+
+Escalation
+Step 1: Escalate to the ground-based flight surgeon if confusion persists past 30 minutes.
+Step 2: Document the treatment in the crew member's medical file.
+
+Follow-Up Checks
+- Confirm vitals return to baseline before clearing the crew member for duty.
+- Log the incident in the mission log for post-event review.

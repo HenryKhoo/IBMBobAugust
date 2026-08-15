@@ -12,10 +12,13 @@ from app.schemas import (
     IngestResponse,
     TelemetryInterpretRequest,
     TelemetryInterpretResponse,
+    TriageRequest,
+    TriageResponse,
 )
 from app.services.crisis import analyze_crisis
 from app.services.ingestion import ingest_and_upsert
 from app.services.telemetry import interpret_telemetry
+from app.services.triage import run_triage
 
 app = FastAPI(title=settings.APP_NAME)
 
@@ -68,5 +71,19 @@ def crisis_analyze(request: CrisisAnalyzeRequest) -> CrisisAnalyzeResponse:
     """
     try:
         return analyze_crisis(request.events)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post("/triage", response_model=TriageResponse)
+def triage(request: TriageRequest) -> TriageResponse:
+    """Retrieve the crew member's file and a matching protocol, and return a grounded lead.
+
+    404s if no crew file is found for `crew_member_id`, or if no protocol
+    documentation matches the symptom report, rather than returning an
+    ungrounded triage lead.
+    """
+    try:
+        return run_triage(request.crew_member_id, request.symptom_report)
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
