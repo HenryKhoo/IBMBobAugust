@@ -1576,10 +1576,13 @@
   ];
   var defaultProcRef = 'Ref: Emergency Decompression Procedure, EMER-PROC 4.2.1 (simulated excerpt)';
 
-  // Backend base URL for The North Star API (see API.md — local dev only; this
-  // becomes the deployed backend origin once Railway hosting is set up).
+  // Backend base URL for The North Star API (see API.md and RAILWAY.md).
   // Shared by Module 01's /crisis/analyze call below and Module 02's
   // /telemetry/interpret call further down.
+  // TODO(post-deploy): once the backend service is live on Railway, replace
+  // this with its public URL (Railway dashboard -> backend service ->
+  // Settings -> Networking -> Public Networking), then redeploy the
+  // frontend service so this change ships.
   var API_BASE_URL = 'http://localhost:8000';
 
   // procedureSteps and crisisProcRef start out as the hand-authored fallback

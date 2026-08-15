@@ -26,3 +26,6 @@ exports/*
 
 # scaffold transfer archive (safe to delete)
 _to_delete/
+
+# Local deploy notes (not tracked)
+RAILWAY.md
