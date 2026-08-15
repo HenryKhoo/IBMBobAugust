@@ -10,9 +10,8 @@ together whenever the contract changes.
 
 ## Endpoints
 
-This version of the contract covers the six core endpoints. The optional
-Module 05 semantic search endpoint (`POST /query`) is added later and
-documented once it exists.
+This version of the contract covers all seven endpoints, including the
+Module 05 semantic search endpoint (`POST /query`).
 
 ### GET /health
 
@@ -145,10 +144,42 @@ Returns a rationing narrative and a survival probability.
 }
 ```
 
+### POST /query
+
+Optional Module 05. Takes a natural language question for the mission log
+search widget. Searches the full embedded mission document corpus in
+Zilliz — no document-type filter, unlike the other five endpoints above —
+and returns the best-matching passages with source references. Unlike
+every other endpoint here, this one does no generation: the retrieved
+passages are the answer, so an empty `results` list is a valid response
+rather than a 404.
+
+**Request**
+```json
+{
+  "question": "string",
+  "top_k": 5
+}
+```
+
+`top_k` is optional (default `5`, max `20`).
+
+**Response**
+```json
+{
+  "results": [
+    { "text": "string", "source": "string", "relevance": 0.0 }
+  ]
+}
+```
+
 ## Conventions
 
 Every response is grounded in retrieved documents, never a hand-written
 guess. Confidence values are derived from real signals, such as retrieval
 strength or distance from a nominal band, not random numbers. Every
 endpoint that generates a claim carries a source reference line back to the
-document it came from.
+document it came from. `POST /query` is the one exception to "generates a
+claim": it returns retrieved passages verbatim rather than generating
+anything, so its `relevance` field is a retrieval strength score, not a
+generation confidence score.

@@ -1,11 +1,10 @@
 """Base Pydantic schemas shared across the API.
 
-Endpoint-specific request/response models for the four module endpoints
-(telemetry, crisis, triage, rationing) and the optional query endpoint are
-added alongside their respective endpoints per the day-by-day build plan.
-This module also holds the POST /ingest schemas, since ingestion is shared
-infrastructure feeding every module's retrieval step rather than a single
-module's endpoint.
+Endpoint-specific request/response models for the five module endpoints
+(telemetry, crisis, triage, rationing, query) are added alongside their
+respective endpoints per the day-by-day build plan. This module also holds
+the POST /ingest schemas, since ingestion is shared infrastructure feeding
+every module's retrieval step rather than a single module's endpoint.
 """
 
 from enum import Enum
@@ -232,3 +231,51 @@ class RationingSimulateResponse(BaseModel):
     narrative: str
     survival_probability: float
     source: str
+
+
+class QueryRequest(BaseModel):
+    """Request body for POST /query.
+
+    `top_k` caps how many passages `app.services.query.run_query` returns.
+    Bounded (`ge=1, le=20`) rather than left an unconstrained int: this
+    endpoint has no downstream generation step to keep a runaway value in
+    check the way the other four endpoints' single-chunk retrieval
+    implicitly does, so the bound is enforced here instead.
+    """
+
+    question: str = Field(min_length=1)
+    top_k: int = Field(default=5, ge=1, le=20)
+
+
+class QueryResult(BaseModel):
+    """One retrieved passage in a POST /query response.
+
+    `relevance` is the raw retrieval relevance score for this passage
+    alone (see `app.services.query._relevance`), clamped to `[0, 1]` the
+    same way `app.services.telemetry._retrieval_strength` clamps its
+    input. Unlike `TelemetryInterpretResponse.confidence`/
+    `TriageResponse.confidence`, it is never combined with a second
+    signal — /query does no generation and has no nominal band or
+    allergy list to check a passage against, so retrieval strength is the
+    whole story here, not a component of it.
+    """
+
+    text: str
+    source: str
+    relevance: float
+
+
+class QueryResponse(BaseModel):
+    """Response body for POST /query.
+
+    `results` is ordered most-relevant-first, exactly as
+    `similarity_search_with_relevance_scores` returns it — see
+    `app.services.query.run_query`. An empty list is a valid response (a
+    question that matches nothing in the corpus), not an error: /query has
+    no generated claim that would otherwise go ungrounded, unlike the
+    other four endpoints, which raise `LookupError` on empty retrieval
+    rather than let the model generate from nothing (see e.g.
+    `app.services.crisis.analyze_crisis`).
+    """
+
+    results: list[QueryResult]

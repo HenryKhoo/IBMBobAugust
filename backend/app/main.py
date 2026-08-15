@@ -10,6 +10,8 @@ from app.schemas import (
     HealthResponse,
     IngestRequest,
     IngestResponse,
+    QueryRequest,
+    QueryResponse,
     RationingSimulateRequest,
     RationingSimulateResponse,
     TelemetryInterpretRequest,
@@ -19,6 +21,7 @@ from app.schemas import (
 )
 from app.services.crisis import analyze_crisis
 from app.services.ingestion import ingest_and_upsert
+from app.services.query import run_query
 from app.services.rationing import simulate_rationing
 from app.services.telemetry import interpret_telemetry
 from app.services.triage import run_triage
@@ -105,3 +108,15 @@ def rationing_simulate(request: RationingSimulateRequest) -> RationingSimulateRe
         )
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post("/query", response_model=QueryResponse)
+def query(request: QueryRequest) -> QueryResponse:
+    """Search the embedded mission log corpus and return matching passages.
+
+    Retrieval only, no generation step — so unlike every other endpoint
+    above, there is no LookupError/404 case here. A question that matches
+    nothing in the corpus is a valid, empty result set rather than an
+    error; see `app.services.query` for why.
+    """
+    return run_query(request.question, request.top_k)
