@@ -1069,31 +1069,6 @@
 
     var zoneState = { hull:'nominal', nav:'nominal', oxygen:'nominal', water:'nominal', power:'nominal' };
 
-    // ---- breach marker — Node 3 starboard panel (aft engine spine), hidden unless active ----
-    // Core ring + X, plus three staggered shockwave rings that expand outward
-    // and fade, so an active breach reads instantly even mid-rotation.
-    var breachGroup = new THREE.Group();
-    var breachMat = new THREE.MeshBasicMaterial({ color:COLOR.breach, wireframe:true, transparent:true, opacity:0 });
-    var ring = new THREE.Mesh(new THREE.TorusGeometry(0.4, 0.05, 8, 20), breachMat);
-    var xMark1 = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.05, 0.05), breachMat);
-    xMark1.rotation.z = Math.PI/4;
-    var xMark2 = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.05, 0.05), breachMat);
-    xMark2.rotation.z = -Math.PI/4;
-    breachGroup.add(ring, xMark1, xMark2);
-    var shockRings = [];
-    for(var sr = 0; sr < 3; sr++){
-      var srMat = new THREE.MeshBasicMaterial({ color:COLOR.breach, wireframe:true, transparent:true, opacity:0 });
-      var srMesh = new THREE.Mesh(new THREE.TorusGeometry(0.4, 0.02, 6, 24), srMat);
-      breachGroup.add(srMesh);
-      shockRings.push({ mesh:srMesh, mat:srMat, phase: sr/3 });
-    }
-    // orient marker to face outward from the hull surface normal
-    breachGroup.position.set(3.25, -0.35, 0.5);
-    breachGroup.lookAt(3.25 + 0, -0.35 * 2, 0.5 * 2);
-    breachGroup.scale.setScalar(0.01);
-    shipGroup.add(breachGroup);
-    var breachActive = false;
-
     // ---- zone labels — canvas-texture sprites, always camera-facing ----
     var ZONE_INFO = {
       hull:   { name:'Hull / Structure',  anchor:[-1.05, 1.55, 1.3] },
@@ -1131,10 +1106,50 @@
       shipGroup.add(spr);
       labelSprites[id] = spr;
     });
-    var breachLabel = makeLabel('Hull breach · N3 starboard', '#ff3b30');
-    breachLabel.position.set(3.4, -1.1, 1.3);
-    breachLabel.material.opacity = 0;
-    shipGroup.add(breachLabel);
+
+    // ---- breach markers — one per zone, each hidden unless that zone's
+    // failure is active. Each marker is a ring + X plus three staggered
+    // shockwave rings that expand outward and fade, so an active breach
+    // reads instantly even mid-rotation. Positioned/oriented near that
+    // zone's own geometry, so selecting N concurrent failure points lights
+    // up N distinct red signals on the model at once (previously this was a
+    // single marker hardcoded to the hull/Node-3 scenario only).
+    var BREACH_ANCHOR = {
+      hull:   { pos:[3.25, -0.35, 0.5],  look:[3.25, -0.7, 1.0], label:'Hull breach · N3 starboard' },
+      oxygen: { pos:[0.3, 1.05, -1.15],  look:[0.3, 2.5, -2.6],  label:'O₂ / ECLSS failure' },
+      water:  { pos:[0.3, -1.05, 1.15],  look:[0.3, -2.5, 2.6],  label:'H₂O loop failure' },
+      power:  { pos:[4.9, 0.55, 1.65],   look:[4.9, 1.6, 3.3],   label:'Power · Bus B fault' },
+      nav:    { pos:[-3.0, 2.05, 0.32],  look:[-3.0, 4.5, 0.7],  label:'Nav/Comms failure' }
+    };
+    var breachMarkers = {};
+    Object.keys(BREACH_ANCHOR).forEach(function(id){
+      var a = BREACH_ANCHOR[id];
+      var group = new THREE.Group();
+      var mat = new THREE.MeshBasicMaterial({ color:COLOR.breach, wireframe:true, transparent:true, opacity:0 });
+      var ring = new THREE.Mesh(new THREE.TorusGeometry(0.4, 0.05, 8, 20), mat);
+      var xMark1 = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.05, 0.05), mat);
+      xMark1.rotation.z = Math.PI/4;
+      var xMark2 = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.05, 0.05), mat);
+      xMark2.rotation.z = -Math.PI/4;
+      group.add(ring, xMark1, xMark2);
+      var shockRings = [];
+      for(var sr = 0; sr < 3; sr++){
+        var srMat = new THREE.MeshBasicMaterial({ color:COLOR.breach, wireframe:true, transparent:true, opacity:0 });
+        var srMesh = new THREE.Mesh(new THREE.TorusGeometry(0.4, 0.02, 6, 24), srMat);
+        group.add(srMesh);
+        shockRings.push({ mesh:srMesh, mat:srMat, phase: sr/3 });
+      }
+      // orient marker to face outward from that zone's surface normal
+      group.position.set(a.pos[0], a.pos[1], a.pos[2]);
+      group.lookAt(a.look[0], a.look[1], a.look[2]);
+      group.scale.setScalar(0.01);
+      shipGroup.add(group);
+      var label = makeLabel(a.label, '#ff3b30');
+      label.position.set(a.pos[0], a.pos[1] - 0.75, a.pos[2]);
+      label.material.opacity = 0;
+      shipGroup.add(label);
+      breachMarkers[id] = { mat:mat, shockRings:shockRings, group:group, label:label, active:false };
+    });
 
     // ---- hover + click picking ----
     var STATUS_LABEL = { nominal:'Nominal', degrading:'Degrading', critical:'Critical' };
@@ -1159,9 +1174,10 @@
         readoutEl.innerHTML = 'No zone selected — click a zone on the model to inspect it';
         return;
       }
+      var selectedBreach = breachMarkers[selectedZone];
       readoutEl.innerHTML = '<span class="ro-name">' + ZONE_INFO[selectedZone].name + '</span>' +
         ' <span class="ro-status">· ' + STATUS_LABEL[zoneState[selectedZone]] + '</span>' +
-        (breachActive && selectedZone === 'hull' ? ' <span class="ro-status">· breach marker active</span>' : '');
+        (selectedBreach && selectedBreach.active ? ' <span class="ro-status">· breach marker active</span>' : '');
     }
     renderer.domElement.addEventListener('pointermove', function(ev){
       hoveredZone = zoneAtPointer(ev);
@@ -1256,27 +1272,30 @@
         }
       });
 
-      if(breachActive){
-        var bp = reducedMotion ? 1 : (Math.sin(t * (2*Math.PI/0.85)) * 0.5 + 0.5);
-        breachMat.opacity = 0.55 + bp * 0.45;
-        breachGroup.scale.setScalar(1);
-        breachLabel.material.opacity = 0.9;
-        shockRings.forEach(function(r){
-          if(reducedMotion){
-            r.mesh.scale.setScalar(1.6);
-            r.mat.opacity = 0.25;
-            return;
-          }
-          var phase = (t * 0.55 + r.phase) % 1;
-          r.mesh.scale.setScalar(1 + phase * 2.2);
-          r.mat.opacity = (1 - phase) * 0.5;
-        });
-      } else {
-        breachMat.opacity = 0;
-        breachGroup.scale.setScalar(0.01);
-        breachLabel.material.opacity = 0;
-        shockRings.forEach(function(r){ r.mat.opacity = 0; });
-      }
+      Object.keys(breachMarkers).forEach(function(id){
+        var bm = breachMarkers[id];
+        if(bm.active){
+          var bp = reducedMotion ? 1 : (Math.sin(t * (2*Math.PI/0.85)) * 0.5 + 0.5);
+          bm.mat.opacity = 0.55 + bp * 0.45;
+          bm.group.scale.setScalar(1);
+          bm.label.material.opacity = 0.9;
+          bm.shockRings.forEach(function(r){
+            if(reducedMotion){
+              r.mesh.scale.setScalar(1.6);
+              r.mat.opacity = 0.25;
+              return;
+            }
+            var phase = (t * 0.55 + r.phase) % 1;
+            r.mesh.scale.setScalar(1 + phase * 2.2);
+            r.mat.opacity = (1 - phase) * 0.5;
+          });
+        } else {
+          bm.mat.opacity = 0;
+          bm.group.scale.setScalar(0.01);
+          bm.label.material.opacity = 0;
+          bm.shockRings.forEach(function(r){ r.mat.opacity = 0; });
+        }
+      });
 
       // pause auto-rotation while the operator is inspecting a zone
       controls.autoRotate = !reducedMotion && !hoveredZone && !selectedZone;
@@ -1292,9 +1311,11 @@
           if(id === selectedZone) refreshReadout();
         }
       },
-      setBreach: function(active){
-        breachActive = !!active;
-        refreshReadout();
+      setBreach: function(id, active){
+        if(breachMarkers.hasOwnProperty(id)){
+          breachMarkers[id].active = !!active;
+          if(id === selectedZone) refreshReadout();
+        }
       }
     };
   })();
@@ -1578,11 +1599,13 @@
   var aarOutput = document.getElementById('aar-output');
   var scenarioSelect = document.getElementById('scenario-select');
 
-  // Toggles the hull-breach marker on the habitat schematic (Node 3 starboard
-  // panel). Driven by this module's scenario state, independent of Module 02's
-  // separately-simulated Hull Integrity sector.
-  function setSchematicBreach(active){
-    Schematic3D.setBreach(active);
+  // Toggles a given zone's red breach marker (ring + X + shockwaves) on the
+  // habitat schematic, positioned at that zone's own geometry. Driven by
+  // this module's scenario state, independent of Module 02's
+  // separately-simulated sector status. Every concurrent failure point gets
+  // its own marker, so injecting N scenarios lights up N markers at once.
+  function setSchematicBreach(zoneId, active){
+    Schematic3D.setBreach(zoneId, active);
   }
 
   // Failure points the "Inject emergency scenario" control can trigger, one
@@ -1600,10 +1623,10 @@
   // "cause not yet isolated" line shown when that event fires, as long as
   // this scenario (or a faster one, in a compound feed) hasn't already
   // isolated a cause. `zone` is the habitat schematic zone id this failure
-  // lights up (see `Schematic3D`'s `zoneState`); `usesBreachMarker` opts
-  // into the dedicated pulsing hull-breach marker/shock-ring visual instead
-  // of (in addition to) the plain zone status color, since that marker is
-  // specific to a structural hull breach.
+  // lights up — both the plain zone status color (see `Schematic3D`'s
+  // `zoneState`) and that zone's own dedicated pulsing breach marker/
+  // shock-ring visual (see `Schematic3D.setBreach`), so every concurrent
+  // failure point gets its own red signal on the model, not just hull.
   var scenarioLibrary = {
     hull: {
       id: 'hull',
@@ -1611,7 +1634,6 @@
       alertLabel: 'Node 3 Breach',
       securedLabel: 'Node 3 Secured',
       zone: 'hull',
-      usesBreachMarker: true,
       rootCause: 'Root cause: hull breach at Node 3 starboard panel — rapid cabin depressurization in progress.',
       interimIndex: 2,
       interimText: 'Cabin pressure loss detected in Node 3 — cause not yet isolated.',
@@ -1864,18 +1886,19 @@
   }
  
   // Sets every active scenario's schematic zone to the given status —
-  // 'critical' while the incident is open, 'nominal' once resolved. Hull
-  // additionally drives the dedicated pulsing breach marker (a separate
-  // visual from zone status color; see Schematic3D.setBreach), on top of
-  // (not instead of) its own zone status. Known limitation: Module 02's
-  // "Run new diagnostic pass" (updateSchematicZones) writes the same
-  // zoneState this drives, from its own independently-simulated sector
-  // status — running it while a non-hull scenario is active can overwrite
-  // that zone's critical highlight here. Hull's breach marker is immune
-  // to this since it's a separate flag/mesh, not zoneState.
+  // 'critical' while the incident is open, 'nominal' once resolved. Each
+  // scenario additionally drives its own dedicated pulsing breach marker (a
+  // separate visual from zone status color; see Schematic3D.setBreach), on
+  // top of (not instead of) its own zone status — so selecting N concurrent
+  // failure points shows N red markers on the model, one per zone. Known
+  // limitation: Module 02's "Run new diagnostic pass" (updateSchematicZones)
+  // writes the same zoneState this drives, from its own
+  // independently-simulated sector status — running it while a scenario is
+  // active can overwrite that zone's critical highlight here. Each breach
+  // marker is immune to this since it's a separate flag/mesh, not zoneState.
   function applyScenarioZoneStatus(status){
     activeScenarioObjs.forEach(function(s){
-      if(s.usesBreachMarker){ setSchematicBreach(status === 'critical'); }
+      setSchematicBreach(s.zone, status === 'critical');
       Schematic3D.setZoneStatus(s.zone, status);
     });
   }
@@ -1925,11 +1948,11 @@
     procedureCauseLabels = [];
     crisisProcRef = defaultProcRef;
     setModuleAlert('t1', 'nominal', 'Crisis Timeline nominal');
-    // Reset every zone this feature can drive, not just hull's breach
-    // marker — a prior compound injection may have left oxygen/water/
-    // power/nav in the 'critical' state (see applyScenarioZoneStatus).
-    setSchematicBreach(false);
+    // Reset every zone this feature can drive, not just one breach marker —
+    // a prior compound injection may have left several zones' markers and
+    // status at 'critical' at once (see applyScenarioZoneStatus).
     Object.keys(scenarioLibrary).forEach(function(id){
+      setSchematicBreach(scenarioLibrary[id].zone, false);
       Schematic3D.setZoneStatus(scenarioLibrary[id].zone, 'nominal');
     });
     activeScenarioObjs = [];
