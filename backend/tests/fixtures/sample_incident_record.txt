@@ -1,0 +1,11 @@
+INCIDENT RECORD — SECTOR 4 HULL BREACH
+
+On mission day 214, a micrometeorite impact caused a small hull breach in
+Sector 4 near the coolant manifold. The crew followed the standard isolation
+procedure, sealed the bulkhead, and vented the compartment before applying
+an emergency patch. No injuries were reported. The sector was repressurized
+and cleared for re-entry six hours later.
+
+Follow-up: hull sensor grid coverage in Sector 4 was found to have a blind
+spot near the coolant manifold; a sensor upgrade has been requested for the
+next resupply cycle.

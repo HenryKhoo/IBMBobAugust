@@ -1,0 +1,13 @@
+SECTOR SPEC: LIFE SUPPORT — SECTOR 2
+
+Nominal Operating Bands
+
+O2 saturation: 19.5-23.5%
+CO2 concentration: 0-0.5%
+Cabin pressure (kPa): 95-105
+Hull temperature: nominal band -40 to -10 C
+Humidity: 30-60%
+
+Notes
+Readings outside these bands should be cross-checked against the telemetry
+translator before triggering a crisis alert.

@@ -1,0 +1,14 @@
+CREW MEDICAL FILE
+
+Name: J. Alvarez
+Role: Systems Engineer
+Blood type: O negative
+
+Vitals (last recorded)
+Heart rate: 72-88 bpm
+Core temperature: 36.5-37.2 C
+
+Allergies: penicillin, shellfish and latex
+
+Notes
+No prior incidents on record. Cleared for EVA duty.

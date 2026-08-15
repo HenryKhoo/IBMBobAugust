@@ -1,0 +1,22 @@
+EMERGENCY PROCEDURE: HULL BREACH — SECTOR 4
+
+Overview
+A hull breach in Sector 4 requires immediate compartment isolation to prevent
+atmospheric loss to the rest of the station. Follow the steps below in order.
+
+Isolation Sequence
+1. Sound the compartment alarm and confirm all crew have evacuated Sector 4.
+2. Seal the primary bulkhead door between Sector 4 and Sector 3.
+3. Vent the compromised compartment to vacuum to stop the outflow.
+1.5 liters of coolant were vented before the seal fully engaged, per the flight recorder.
+4. Confirm hull pressure has stabilized at zero before proceeding.
+
+Patch Sequence
+Step 1: Retrieve the emergency patch kit from the Sector 3 locker.
+Step 2: Apply the patch to the breach point identified by the hull sensor grid.
+Step 3: Repressurize the compartment slowly and monitor for leaks.
+
+Follow-Up Checks
+- Confirm structural integrity readings return to nominal.
+- Log the incident in the mission log for post-event review.
+* Notify mission control once the sector is cleared for re-entry.

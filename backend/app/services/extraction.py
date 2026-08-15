@@ -28,8 +28,15 @@ from app.schemas import DocumentType, MissionDocument
 
 # Matches a numbered line ("1. Vent the compartment", "1) Vent..."), a
 # "Step N:" prefixed line, or a bulleted line ("- Vent..." / "* Vent...").
+#
+# The marker must be followed by at least one space before the step text
+# (\s+, not \s*): without that, a decimal number at the start of a prose
+# line (e.g. "1.5 liters of coolant were vented...") matches as step "5
+# liters of coolant were vented...", since \d+ greedily stops at "1" and
+# "." satisfies the [.)] marker. Requiring whitespace after the marker
+# rules that out while still matching every documented step style.
 _STEP_LINE = re.compile(
-    r"^\s*(?:(?P<num>\d+)[.)]|Step\s+(?P<step_num>\d+)\s*:|[-*])\s*(?P<text>\S.*)$",
+    r"^\s*(?:(?P<num>\d+)[.)]|Step\s+(?P<step_num>\d+)\s*:|[-*])\s+(?P<text>\S.*)$",
     re.IGNORECASE,
 )
 
@@ -72,8 +79,12 @@ class SectorThreshold:
 # Matches a "<metric>: <low>-<high><unit>" line, with an optional "nominal
 # band"/"nominal range" phrase before the numbers, e.g.
 # "O2 saturation: 19.5-23.5%" or "Hull temperature: nominal band -40 to -10 C".
+#
+# The metric name allows "()" so a unit noted in the name itself, e.g.
+# "Cabin pressure (kPa): 95-105", still matches — without it the line
+# didn't match at all, silently yielding zero thresholds for that metric.
 _THRESHOLD_LINE = re.compile(
-    r"^\s*(?P<metric>[A-Za-z][\w ./-]*?)\s*:\s*"
+    r"^\s*(?P<metric>[A-Za-z][\w ./()-]*?)\s*:\s*"
     r"(?:nominal\s*(?:band|range)?\s*:?\s*)?"
     r"(?P<low>-?\d+(?:\.\d+)?)\s*(?:-|to|–|—)\s*(?P<high>-?\d+(?:\.\d+)?)"
     r"\s*(?P<unit>[%A-Za-zµ°/]*)\s*$",
