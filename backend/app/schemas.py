@@ -13,10 +13,33 @@ from pydantic import BaseModel, Field
 
 
 class HealthResponse(BaseModel):
-    """Response body for GET /health."""
+    """Response body for GET /health.
+
+    `status` is `"ok"` only when every upstream this service needs to
+    answer a request is actually configured, and `"degraded"` otherwise —
+    it is not a fixed string. It previously reported `"ok"` unconditionally
+    alongside a `backend` field that echoed `BACKEND_MODE` straight back,
+    which meant a deployment missing its watsonx/Zilliz credentials
+    advertised itself as healthy while all five module endpoints raised
+    (see `app.main.health` for the full account).
+
+    `backend` names the provider actually serving requests. There is only
+    one — `"watsonx"` — so it is now derived rather than read from config:
+    `BACKEND_MODE=mock` was documented in `.env.example` and `RAILWAY.md`
+    as a credential-free mode, but no mock provider was ever implemented
+    (no `app/services/providers.py`, and `app.mock_data` holds no
+    fixtures), so nothing branched on it and reporting it was reporting a
+    mode that did not exist.
+
+    `missing_config` names the specific unset settings behind a
+    `"degraded"` status, so the answer to "why is the deployed console
+    falling back to hand-authored data?" is in the health response itself
+    rather than only in the container logs. Empty when `status` is `"ok"`.
+    """
 
     status: str
     backend: str
+    missing_config: list[str] = Field(default_factory=list)
 
 
 class DocumentType(str, Enum):

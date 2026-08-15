@@ -15,15 +15,42 @@ Module 05 semantic search endpoint (`POST /query`).
 
 ### GET /health
 
-Returns service status and which backend is active, `mock` or `watsonx`.
+Reports whether the service is actually able to serve requests.
 
-**Response**
+`status` is `"ok"` only when every upstream credential the five module
+endpoints need is configured, and `"degraded"` otherwise — with HTTP
+`503` and the specific unset settings named in `missing_config`. It is
+not a constant.
+
+**Response — healthy (HTTP 200)**
 ```json
 {
   "status": "ok",
-  "backend": "mock"
+  "backend": "watsonx",
+  "missing_config": []
 }
 ```
+
+**Response — misconfigured (HTTP 503)**
+```json
+{
+  "status": "degraded",
+  "backend": "watsonx",
+  "missing_config": ["ZILLIZ_URI", "ZILLIZ_TOKEN"]
+}
+```
+
+There is one backend, `watsonx`. An earlier version of this contract
+listed `mock` as the alternative, but no mock provider was ever
+implemented — `backend` echoed a `BACKEND_MODE` env var that nothing else
+read, so a deployment with no credentials returned `{"status": "ok",
+"backend": "mock"}` while all five module endpoints returned 500.
+`BACKEND_MODE` has been removed.
+
+This checks configuration completeness, not live upstream reachability —
+it does not round-trip to watsonx or Zilliz, so it stays cheap to poll.
+Credentials that are present but *invalid* still report `"ok"` here and
+fail at the endpoint.
 
 ### POST /ingest
 

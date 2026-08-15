@@ -2,7 +2,7 @@
 
 import logging
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -29,8 +29,16 @@ from app.services.query import run_query
 from app.services.rationing import simulate_rationing
 from app.services.telemetry import interpret_telemetry
 from app.services.triage import run_triage
+from app.services.vector_store import missing_credentials as zilliz_missing_credentials
+from app.services.watsonx import missing_credentials as watsonx_missing_credentials
 
 logger = logging.getLogger(__name__)
+
+# The single provider that actually serves requests. Reported by /health
+# instead of `settings.BACKEND_MODE`, which named a `mock` provider that was
+# documented but never implemented — see `health` and `app.schemas
+# .HealthResponse` for why echoing it back was the deployment bug.
+_ACTIVE_BACKEND = "watsonx"
 
 
 class _UnhandledExceptionToJSON(BaseHTTPMiddleware):
@@ -93,9 +101,52 @@ app.add_middleware(
 
 
 @app.get("/health", response_model=HealthResponse)
-def health() -> HealthResponse:
-    """Report service status and which backend mode is active."""
-    return HealthResponse(status="ok", backend=settings.BACKEND_MODE)
+def health(response: Response) -> HealthResponse:
+    """Report whether this service is actually able to serve requests.
+
+    Fixes a deployment bug found while testing the Railway deployment
+    end to end: this endpoint used to return `{"status": "ok", "backend":
+    settings.BACKEND_MODE}` unconditionally. `BACKEND_MODE` defaults to
+    `"mock"` (see `app.config`), and `.env.example`/`RAILWAY.md` both
+    documented `mock` as a way to run "without IBM watsonx/Zilliz" — but
+    no mock provider was ever built. Nothing anywhere branched on
+    `BACKEND_MODE`; this line was its only reader. So a service deployed
+    without credentials answered `/health` with `{"status": "ok",
+    "backend": "mock"}` — a perfectly healthy-looking response — while
+    every one of the five module endpoints raised `RuntimeError` from
+    `watsonx._require_credentials`/`vector_store._require_credentials` and
+    returned a 500. Reproduced locally: `/health` 200 `ok`/`mock`,
+    all five module endpoints 500, same process.
+
+    That combination is worse than a plain outage, because the frontend
+    degrades silently by design: every `fetch` in `mission-console.html`
+    catches its failure, logs to the console, and leaves the
+    hand-authored fallback text on screen (see `fetchSectorSummary`,
+    `fetchCrisisAnalysis`, `fetchTriageAnalysis`). A console with a dead
+    AI backend looks, to anyone but its developer, exactly like a working
+    one — and `/health`, the one thing you would check to tell the
+    difference, agreed that it was fine.
+
+    So status is now derived from the same credential checks a real
+    request runs (`missing_credentials()` in both service modules is the
+    shared source of truth), and a service that cannot serve says so with
+    a 503 rather than a 200.
+
+    This reports *configuration completeness*, not live upstream
+    reachability: it deliberately does not round-trip to watsonx or
+    Zilliz, so it stays cheap enough to poll and cannot fail on a
+    transient upstream blip. Credentials that are present but wrong (an
+    expired API key, a deleted collection) still report `"ok"` here and
+    fail at the endpoint — this closes the "misconfigured deployment
+    looks healthy" gap, not the "valid config, broken upstream" one.
+    """
+    missing = watsonx_missing_credentials() + zilliz_missing_credentials()
+    if missing:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        return HealthResponse(
+            status="degraded", backend=_ACTIVE_BACKEND, missing_config=missing
+        )
+    return HealthResponse(status="ok", backend=_ACTIVE_BACKEND)
 
 
 @app.post("/ingest", response_model=IngestResponse)

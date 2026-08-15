@@ -17,8 +17,14 @@ class Settings:
 
     APP_NAME: str = "The North Star"
 
-    # "mock" or "watsonx" — see backend/app/services/providers.py
-    BACKEND_MODE: str = os.getenv("BACKEND_MODE", "mock")
+    # BACKEND_MODE was removed here deliberately. It defaulted to "mock" and
+    # pointed at `app/services/providers.py`, a module that does not exist —
+    # no mock provider was ever implemented, and nothing in the codebase
+    # branched on the value. Its only reader was `/health`, which echoed it
+    # back, so a deployment with no credentials reported itself healthy on
+    # the "mock" backend while every module endpoint returned a 500. See
+    # `app.main.health`. Leaving a stale BACKEND_MODE set in a Railway
+    # service's variables is harmless: nothing reads it now.
 
     # IBM watsonx.ai
     WATSONX_API_KEY: str = os.getenv("WATSONX_API_KEY", "")

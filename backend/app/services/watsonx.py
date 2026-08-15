@@ -28,14 +28,18 @@ from app.config import settings
 _INSTRUCT_PARAMS = {"temperature": 0.2, "max_tokens": 512}
 
 
-def _require_credentials() -> None:
-    """Raise a clear error if watsonx.ai credentials are not configured.
+def missing_credentials() -> list[str]:
+    """Return the names of required watsonx.ai settings that are not set.
 
-    Surfacing a specific, actionable message here is worth it: a bare
-    langchain-ibm/ibm-watsonx-ai auth failure otherwise reads as a generic
-    HTTP error deep in a retrieval call.
+    Single source of truth for "is watsonx configured", shared by
+    `_require_credentials` (which raises on the way into a model call) and
+    `app.main.health` (which reports it without raising). Keeping one list
+    means `/health` can never disagree with what an actual request would
+    do — the drift that let `/health` report a healthy `mock` backend while
+    every endpoint raised from here. Mirrors
+    `app.services.vector_store.missing_credentials`.
     """
-    missing = [
+    return [
         name
         for name, value in (
             ("WATSONX_API_KEY", settings.WATSONX_API_KEY),
@@ -43,6 +47,16 @@ def _require_credentials() -> None:
         )
         if not value
     ]
+
+
+def _require_credentials() -> None:
+    """Raise a clear error if watsonx.ai credentials are not configured.
+
+    Surfacing a specific, actionable message here is worth it: a bare
+    langchain-ibm/ibm-watsonx-ai auth failure otherwise reads as a generic
+    HTTP error deep in a retrieval call.
+    """
+    missing = missing_credentials()
     if missing:
         raise RuntimeError(
             "Missing watsonx.ai credentials: "

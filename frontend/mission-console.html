@@ -2315,12 +2315,26 @@
         return res.json();
       })
       .then(function(data){
-        var conflict = data.allergy_check.indexOf('CONFLICT') === 0;
-        var level = conflict ? 'critical' : 'caution';
-        var label = conflict ? 'Allergy Conflict Flagged' : 'Triage Protocol Active';
+        // allergy_check is typed `str | None` in backend/app/schemas.py
+        // (TriageResponse), so it can legitimately arrive as null — reading
+        // .indexOf off it directly threw a TypeError that aborted this whole
+        // .then(), leaving the hand-authored fallback on screen while the
+        // grounded response was silently discarded. Treat a missing check as
+        // "not performed" rather than as "no conflict": this is the safety
+        // field, so the absence of a result must not read as an all-clear.
+        var allergyCheck = data.allergy_check;
+        var checked = typeof allergyCheck === 'string' && allergyCheck.length > 0;
+        var conflict = checked && allergyCheck.indexOf('CONFLICT') === 0;
+        var allergyText = checked
+          ? allergyCheck
+          : 'Allergy cross-check unavailable for this response — verify against the crew file manually before administering.';
+        var level = conflict || !checked ? 'critical' : 'caution';
+        var label = conflict
+          ? 'Allergy Conflict Flagged'
+          : (checked ? 'Triage Protocol Active' : 'Allergy Check Unavailable');
         var headHtml = '<div class="triage-header">Triage protocol — MET ' + metEl.textContent + ' — ' + c.name + '</div>' +
           '<div class="triage-lead">' + data.triage_lead + '</div>' +
-          '<div class="triage-alert"><span class="ta-tag">Allergy cross-check — crew file vs. protocol</span>' + data.allergy_check + '</div>';
+          '<div class="triage-alert"><span class="ta-tag">Allergy cross-check — crew file vs. protocol</span>' + allergyText + '</div>';
         currentTriage = {
           crew:c, headHtml:headHtml,
           steps:data.instructions,
@@ -2328,7 +2342,7 @@
           activeLevel:level, activeLabel:label
         };
         setModuleAlert('t3', level, c.name + ' — ' + label);
-        logIncident('T3', conflict ? 'critical' : 'info', 'Grounded triage protocol retrieved for ' + c.name + ' (confidence ' + data.confidence + '). Source: ' + data.source);
+        logIncident('T3', conflict || !checked ? 'critical' : 'info', 'Grounded triage protocol retrieved for ' + c.name + ' (confidence ' + data.confidence + ')' + (checked ? '' : ' — ALLERGY CROSS-CHECK MISSING FROM RESPONSE') + '. Source: ' + data.source);
         renderTriageBody();
       })
       .catch(function(err){

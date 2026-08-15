@@ -24,14 +24,15 @@ from app.services.watsonx import get_embedding_model
 logger = logging.getLogger(__name__)
 
 
-def _require_credentials() -> None:
-    """Raise a clear error if Zilliz Cloud credentials are not configured.
+def missing_credentials() -> list[str]:
+    """Return the names of required Zilliz Cloud settings that are not set.
 
-    Same rationale as `watsonx._require_credentials`: a bare pymilvus/gRPC
-    connection failure otherwise reads as a generic error deep in an
-    ingestion or retrieval call.
+    Same single-source-of-truth rationale as
+    `app.services.watsonx.missing_credentials`: `_require_credentials`
+    raises on it, `app.main.health` reports it, and neither can drift from
+    what a real retrieval call would actually do.
     """
-    missing = [
+    return [
         name
         for name, value in (
             ("ZILLIZ_URI", settings.ZILLIZ_URI),
@@ -39,6 +40,16 @@ def _require_credentials() -> None:
         )
         if not value
     ]
+
+
+def _require_credentials() -> None:
+    """Raise a clear error if Zilliz Cloud credentials are not configured.
+
+    Same rationale as `watsonx._require_credentials`: a bare pymilvus/gRPC
+    connection failure otherwise reads as a generic error deep in an
+    ingestion or retrieval call.
+    """
+    missing = missing_credentials()
     if missing:
         raise RuntimeError(
             "Missing Zilliz Cloud credentials: "
