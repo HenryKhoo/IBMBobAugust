@@ -5,12 +5,15 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.schemas import (
+    CrisisAnalyzeRequest,
+    CrisisAnalyzeResponse,
     HealthResponse,
     IngestRequest,
     IngestResponse,
     TelemetryInterpretRequest,
     TelemetryInterpretResponse,
 )
+from app.services.crisis import analyze_crisis
 from app.services.ingestion import ingest_and_upsert
 from app.services.telemetry import interpret_telemetry
 
@@ -52,5 +55,18 @@ def telemetry_interpret(
     """
     try:
         return interpret_telemetry(request.sector_id, request.metrics)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post("/crisis/analyze", response_model=CrisisAnalyzeResponse)
+def crisis_analyze(request: CrisisAnalyzeRequest) -> CrisisAnalyzeResponse:
+    """Retrieve the matching emergency procedure and return a grounded root cause.
+
+    404s if no procedure documentation matches this event feed, rather than
+    returning an ungrounded root cause.
+    """
+    try:
+        return analyze_crisis(request.events)
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
