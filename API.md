@@ -30,7 +30,7 @@ Returns service status and which backend is active, `mock` or `watsonx`.
 
 Ingests mission documents — emergency procedures, sector specifications,
 crew medical files, and prior incident records. Chunks the text, embeds it
-with Granite, and upserts it into Pinecone.
+with Granite, and upserts it into Zilliz.
 
 **Request**
 ```json

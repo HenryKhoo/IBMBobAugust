@@ -40,9 +40,10 @@ class Settings:
         "WATSONX_INSTRUCT_MODEL_FALLBACK_ID", "meta-llama/llama-3-3-70b-instruct"
     )
 
-    # Pinecone
-    PINECONE_API_KEY: str = os.getenv("PINECONE_API_KEY", "")
-    PINECONE_INDEX_NAME: str = os.getenv("PINECONE_INDEX_NAME", "the-north-star")
+    # Zilliz Cloud (managed Milvus), used by services/vector_store.py
+    ZILLIZ_URI: str = os.getenv("ZILLIZ_URI", "")
+    ZILLIZ_TOKEN: str = os.getenv("ZILLIZ_TOKEN", "")
+    ZILLIZ_COLLECTION_NAME: str = os.getenv("ZILLIZ_COLLECTION_NAME", "the_north_star")
 
     # Server
     PORT: int = int(os.getenv("PORT", "8000"))
