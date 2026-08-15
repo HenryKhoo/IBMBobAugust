@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>KAIROS-7 Operations Console — Demo</title>
+<title>The North Star Operations Console — Demo</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -565,7 +565,7 @@
   <div class="brand">
     <div class="brand-mark">K7</div>
     <div class="brand-text">
-      <span class="brand-station">KAIROS-7 · DEEP-TRANSIT HABITAT</span>
+      <span class="brand-station">The North Star · DEEP-TRANSIT HABITAT</span>
       <span class="brand-sub">Independent life support &amp; operations console</span>
     </div>
   </div>
@@ -610,12 +610,12 @@
 
     <div class="panel" style="margin-bottom:18px;">
       <div class="panel-head">
-        <h3>KAIROS-7 hull schematic — 3D model</h3>
+        <h3>The North Star hull schematic — 3D model</h3>
         <span class="checklist-status" id="schematic-status-label">Zones reflect Module 02 sector status live</span>
       </div>
       <div class="schematic-wrap">
         <div class="schematic-3d-wrap">
-          <div class="schematic-3d" id="schematic-3d" role="img" aria-label="Rotating 3D model of KAIROS-7, an original disc-hulled deep-space transit vessel, showing live sector status and hull breach location. Node 2 Life Support Core forms the main disc hull with a ventral docking collar. Twin forward hull prongs frame a raised nav sensor mast with comm dish — Node 1 Command sits as an offset dorsal cockpit blister near the bow. O2/ECLSS and H2O recycler modules sit dorsal and ventral of the hull disc. Node 3 Structural extends aft as an engine spine with Bus B solar/radiator panels and fins. Zones can be hovered and clicked to inspect their status."></div>
+          <div class="schematic-3d" id="schematic-3d" role="img" aria-label="Rotating 3D model of The North Star, an original disc-hulled deep-space transit vessel, showing live sector status and hull breach location. Node 2 Life Support Core forms the main disc hull with a ventral docking collar. Twin forward hull prongs frame a raised nav sensor mast with comm dish — Node 1 Command sits as an offset dorsal cockpit blister near the bow. O2/ECLSS and H2O recycler modules sit dorsal and ventral of the hull disc. Node 3 Structural extends aft as an engine spine with Bus B solar/radiator panels and fins. Zones can be hovered and clicked to inspect their status."></div>
           <div class="schematic-tooltip" id="schematic-tooltip"></div>
           <span class="schematic-3d-hint mono">Drag to orbit · scroll to zoom · click a zone to inspect</span>
         </div>
@@ -877,7 +877,7 @@
     var reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     var bootLines = [
-      'KAIROS-7 OPERATIONS CONSOLE',
+      'The North Star OPERATIONS CONSOLE',
       'MEM CHECK ...................... <span class="boot-ok">OK</span>',
       'BUS A ........................... <span class="boot-ok">NOMINAL</span>',
       'BUS B ........................... <span class="boot-ok">NOMINAL</span>',
@@ -918,7 +918,7 @@
   /* ============================================================ */
   /* HULL 3D MODEL — Module 01 schematic                            */
   /* ============================================================ */
-  // Rotating three.js wireframe model of KAIROS-7 — an original disc-hulled
+  // Rotating three.js wireframe model of The North Star — an original disc-hulled
   // deep-space transit vessel, built entirely from primitive geometries
   // (no imported model/mesh of any kind). Zone status (nominal/degrading/
   // critical) is expressed the same way the old flat-SVG version expressed
@@ -1566,7 +1566,7 @@
     { t:'214:06:12:34', sev:'info',     src:'COMMS',  msg:'Telemetry downlink nominal.' }
   ];
  
-  var procedureSteps = [
+  var defaultProcedureSteps = [
     'Don emergency oxygen mask immediately.',
     'Instruct all crew to move to Node 2 and seal the hatch behind you.',
     'Close manual isolation valve 4B to Node 3.',
@@ -1574,7 +1574,23 @@
     'Report status and cabin pressure to Mission Control.',
     'Monitor Node 2 pressure — do not remove mask until it stabilizes above 13.5 psi.'
   ];
- 
+  var defaultProcRef = 'Ref: Emergency Decompression Procedure, EMER-PROC 4.2.1 (simulated excerpt)';
+
+  // Backend base URL for The North Star API (see API.md — local dev only; this
+  // becomes the deployed backend origin once Railway hosting is set up).
+  // Shared by Module 01's /crisis/analyze call below and Module 02's
+  // /telemetry/interpret call further down.
+  var API_BASE_URL = 'http://localhost:8000';
+
+  // procedureSteps and crisisProcRef start out as the hand-authored fallback
+  // above, and get replaced with the grounded response from POST
+  // /crisis/analyze once the root cause is isolated (see fetchCrisisAnalysis
+  // below). If that call fails, they stay as the hand-authored fallback so
+  // the demo still runs — the same degrade-gracefully pattern
+  // fetchSectorSummary uses for Module 02.
+  var procedureSteps = defaultProcedureSteps.slice();
+  var crisisProcRef = defaultProcRef;
+
   var scenarioTimer = null;
   var checklistState = [];
   var procedureActive = false;
@@ -1603,7 +1619,7 @@
         '<span class="check-text"><span class="check-num">Step ' + (i+1) + '.</span>' + step + '</span>' +
         '</li>';
     });
-    html += '</ul><div class="proc-ref" id="proc-ref">Ref: Emergency Decompression Procedure, EMER-PROC 4.2.1 (simulated excerpt)</div>';
+    html += '</ul><div class="proc-ref" id="proc-ref">' + crisisProcRef + '</div>';
     checklistWrap.innerHTML = html;
     checklistWrap.querySelectorAll('.check-box').forEach(function(box){
       box.addEventListener('click', function(){
@@ -1650,8 +1666,8 @@
       incidentCompletionSeconds = null;
       rcBanner.classList.add('active');
       document.querySelector('#root-cause-banner .rc-tag').textContent = 'Root cause';
-      rcText.textContent = 'Root cause: hull breach at Node 3 starboard panel — rapid cabin depressurization in progress.';
-      if(procRef){ procRef.textContent = 'Ref: Emergency Decompression Procedure, EMER-PROC 4.2.1 (simulated excerpt)'; }
+      rcText.textContent = incidentRootCause;
+      if(procRef){ procRef.textContent = crisisProcRef; }
       setModuleAlert('t1', 'critical', 'Node 3 Breach');
       setSchematicBreach(true);
     }
@@ -1667,6 +1683,8 @@
     checklistState = [];
     checklistWrap.innerHTML = '<div class="checklist-empty">A procedure will populate here once a root cause is confirmed.</div>';
     checklistStatus.textContent = 'No active procedure';
+    procedureSteps = defaultProcedureSteps.slice();
+    crisisProcRef = defaultProcRef;
     setModuleAlert('t1', 'nominal', 'Crisis Timeline nominal');
     setSchematicBreach(false);
     btnInject.disabled = false;
@@ -1679,8 +1697,52 @@
     btnGenerateAar.disabled = true;
   }
 
+  // Calls POST /crisis/analyze once the root cause is isolated, with the live
+  // event feed logged so far (see CrisisEvent/CrisisAnalyzeRequest in
+  // backend/app/schemas.py — this module's ev.t/ev.src/ev.msg map to the wire
+  // shape's timestamp/sector/description). On success, replaces the
+  // hand-authored root cause, procedure checklist, and citation line
+  // injectScenario just rendered synchronously with the grounded ones the API
+  // retrieved, and resets checklist progress against the new step list. On
+  // failure (network error, or a 404 when no procedure documentation matches
+  // this event feed) leaves the hand-authored fallback already on screen in
+  // place — the same degrade-gracefully pattern fetchSectorSummary uses for
+  // Module 02.
+  function fetchCrisisAnalysis(events){
+    return fetch(API_BASE_URL + '/crisis/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        events: events.map(function(ev){
+          return { timestamp: ev.t, sector: ev.src, description: ev.msg };
+        })
+      })
+    })
+      .then(function(res){
+        if(!res.ok){
+          throw new Error('crisis analyze request failed: ' + res.status);
+        }
+        return res.json();
+      })
+      .then(function(data){
+        procedureSteps = data.steps;
+        crisisProcRef = 'Grounded in: ' + data.source;
+        incidentRootCause = 'Root cause: ' + data.root_cause;
+        rcText.textContent = incidentRootCause;
+        checklistState = new Array(procedureSteps.length).fill(false);
+        stepCompletionOrder = [];
+        checklistStatus.textContent = 'Procedure ready — 0 of ' + procedureSteps.length + ' steps complete';
+        renderChecklist();
+      })
+      .catch(function(err){
+        console.error('crisis analyze failed:', err);
+      });
+  }
+
   function injectScenario(){
     feedList.innerHTML = '';
+    procedureSteps = defaultProcedureSteps.slice();
+    crisisProcRef = defaultProcRef;
     checklistState = new Array(procedureSteps.length).fill(false);
     procedureActive = false;
     btnInject.disabled = true;
@@ -1710,6 +1772,11 @@
           checklistStatus.textContent = 'Procedure ready — 0 of ' + procedureSteps.length + ' steps complete';
           renderChecklist();
           logIncident('T1', 'critical', 'Root cause isolated: ' + rcText.textContent);
+          // Kick off the grounded /crisis/analyze call against the live event
+          // feed logged so far. On success this replaces the hand-authored
+          // root cause, checklist, and citation line above with the grounded
+          // ones the API retrieved; on failure it leaves them as they are.
+          fetchCrisisAnalysis(scenarioEvents.slice(0, i + 1));
         }
       }, i * 850);
     });
@@ -1818,9 +1885,8 @@
   function clampNum(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
   function jitter(range){ return (Math.random() * 2 - 1) * range; }
  
-  // Backend base URL for The North Star API (see API.md — local dev only; this
-  // becomes the deployed backend origin once Railway hosting is set up).
-  var API_BASE_URL = 'http://localhost:8000';
+  // API_BASE_URL is declared once, above, in Module 01's section — shared
+  // with the /crisis/analyze call there.
 
   // Calls POST /telemetry/interpret for one sector's current raw readings.
   // sector.state is already the flat { metricName: number } shape the endpoint
