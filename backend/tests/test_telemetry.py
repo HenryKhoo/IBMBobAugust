@@ -6,25 +6,11 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.services import telemetry
 from app.services.extraction import SectorThreshold
+from tests.conftest import _FakeDocument, _FakeInstructModel, _FakeMessage
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
 client = TestClient(app)
-
-
-class _FakeDocument:
-    """Stand-in for a langchain `Document` hit from retrieval."""
-
-    def __init__(self, page_content: str, metadata: dict):
-        self.page_content = page_content
-        self.metadata = metadata
-
-
-class _FakeMessage:
-    """Stand-in for the `AIMessage` a `ChatWatsonx` runnable's `invoke` returns."""
-
-    def __init__(self, content: str):
-        self.content = content
 
 
 class _FakeVectorStore:
@@ -41,18 +27,6 @@ class _FakeVectorStore:
     def similarity_search_with_relevance_scores(self, query, **kwargs):
         self.calls.append({"query": query, **kwargs})
         return self.hits
-
-
-class _FakeInstructModel:
-    """Records whether/how it was invoked and returns a fixed message."""
-
-    def __init__(self, content: str):
-        self.content = content
-        self.invoked_with: list[str] = []
-
-    def invoke(self, prompt):
-        self.invoked_with.append(prompt)
-        return _FakeMessage(self.content)
 
 
 SECTOR_SPEC_TEXT = (FIXTURES / "sample_sector_spec.txt").read_text()
