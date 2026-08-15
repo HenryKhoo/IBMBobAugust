@@ -340,6 +340,67 @@ def test_analyze_crisis_grounds_partially_when_only_some_sectors_match(monkeypat
     assert response.sources == ["procedure:hull-breach-sector-4#chunk0"]
 
 
+def test_analyze_crisis_falls_back_past_a_doc_id_collision(monkeypatch):
+    """Regression test for the "2 scenarios selected, only 1 procedure shows
+    up" bug: retrieval is unscored top-k, so two distinct sectors' queries
+    can both land on the same nearest-neighbor document as their #1 hit even
+    though a genuinely distinct, correct procedure exists for the second
+    sector further down its own candidate list. The old k=1 retrieval had no
+    such candidate to fall back to and just dropped the second sector
+    outright (see crisis.py's module docstring, "Bugfix" section). With
+    `_CANDIDATES_PER_SECTOR` candidates pulled per sector, a `doc_id`
+    collision with an already-claimed sector must fall back to the next
+    candidate instead of dropping the sector.
+    """
+    hull_hit = _FakeDocument(PROCEDURE_TEXT, dict(PROCEDURE_METADATA))
+    eclss_hit = _FakeDocument(SECOND_PROCEDURE_TEXT, dict(SECOND_PROCEDURE_METADATA))
+    # "eclss"'s top hit collides with "sector-4"'s only hit (the hull doc),
+    # but its own genuinely-matching procedure is right behind it.
+    fake_store = _FakeVectorStore(
+        {"sector-4": [hull_hit], "eclss": [hull_hit, eclss_hit]}
+    )
+    fake_model = _FakeInstructModel(STUBBED_ROOT_CAUSE)
+    monkeypatch.setattr(crisis, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(crisis, "get_instruct_model", lambda: fake_model)
+
+    response = crisis.analyze_crisis(COMPOUND_EVENTS)
+
+    # Both sectors are represented — the collision fell back, it didn't drop
+    # "eclss" the way the pre-fix k=1 retrieval did.
+    assert response.steps == EXPECTED_STEPS + SECOND_EXPECTED_STEPS
+    assert response.step_counts == [len(EXPECTED_STEPS), len(SECOND_EXPECTED_STEPS)]
+    assert response.sources == [
+        "procedure:hull-breach-sector-4#chunk0",
+        "procedure:eclss-failure-01#chunk0",
+    ]
+    assert response.contributing_causes == [
+        "sector-4: procedure:hull-breach-sector-4#chunk0",
+        "eclss: procedure:eclss-failure-01#chunk0",
+    ]
+
+
+def test_analyze_crisis_drops_sector_only_when_every_candidate_collides(monkeypatch):
+    """If a sector's *every* candidate is already claimed by an earlier
+    sector (no distinct procedure exists for it within the candidate
+    window), it is still dropped rather than double-counting another
+    sector's document — the fallback in the test above only applies once a
+    genuinely distinct candidate is available.
+    """
+    hull_hit = _FakeDocument(PROCEDURE_TEXT, dict(PROCEDURE_METADATA))
+    # "eclss" only ever retrieves the same document "sector-4" already
+    # claimed — no distinct match exists for it at all.
+    fake_store = _FakeVectorStore({"sector-4": [hull_hit], "eclss": [hull_hit]})
+    fake_model = _FakeInstructModel(STUBBED_ROOT_CAUSE)
+    monkeypatch.setattr(crisis, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(crisis, "get_instruct_model", lambda: fake_model)
+
+    response = crisis.analyze_crisis(COMPOUND_EVENTS)
+
+    assert response.steps == EXPECTED_STEPS
+    assert response.step_counts == [len(EXPECTED_STEPS)]
+    assert response.sources == ["procedure:hull-breach-sector-4#chunk0"]
+
+
 def test_analyze_crisis_caps_sector_grouping_at_max(monkeypatch):
     """More distinct sectors than `crisis._MAX_SECTORS` in one feed should
     only trigger that many retrieval calls, bounding prompt size/cost —

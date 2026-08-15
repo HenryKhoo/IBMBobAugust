@@ -66,6 +66,24 @@ applied per matched cause instead of per request — a compound emergency
 where only some of the concurrent failures have ingested procedure docs
 should still return a grounded (if partial) answer for the ones that do,
 rather than refusing to say anything about any of them.
+
+Bugfix (multiple concurrent scenarios only ever grounding one of them):
+retrieval is unscored top-k (`similarity_search`, not
+`similarity_search_with_relevance_scores` — this endpoint has no
+`confidence` field), so it always returns *a* nearest neighbor, however
+weak the match, as long as the collection has any `procedure`-type
+document at all. The original single-candidate-per-sector retrieval
+(`k=1`) meant that whenever two sectors' queries happened to land on the
+same nearest document — plausible with a small or unevenly-populated
+procedure set — the `doc_id` dedup (needed so two sectors that genuinely
+share one document don't double-count it) had no fallback and silently
+dropped the second sector's procedure entirely: with exactly two sectors
+selected, that collapsed straight to "only one of the two scenarios ever
+gets a procedure." Retrieval now pulls `_CANDIDATES_PER_SECTOR` hits per
+sector, and a `doc_id` collision falls back to that sector's next-best
+distinct candidate instead of dropping the sector — a sector is only
+dropped if every one of its candidates is already claimed by an earlier
+sector, or it retrieved nothing at all.
 """
 
 from __future__ import annotations
@@ -86,6 +104,14 @@ from app.services.watsonx import get_instruct_model
 # than every selection guaranteed its own slot — raise it if the library
 # grows and every concurrent selection should always be individually grounded.
 _MAX_SECTORS = 4
+
+# How many candidate hits to pull per sector so a doc_id collision with an
+# earlier sector (see analyze_crisis) has somewhere to fall back to instead
+# of dropping the sector outright. Retrieval is unscored top-k (see
+# `analyze_crisis`'s use of `similarity_search`, not
+# `similarity_search_with_relevance_scores`), so a k=1 look never had a
+# second-best candidate to fall back on at all.
+_CANDIDATES_PER_SECTOR = 3
 
 _PROMPT_TEMPLATE = """You are the crisis analyst for The North Star, a deep space \
 habitat's mission console. You turn a live event feed into a short, plain-language \
@@ -198,12 +224,21 @@ def analyze_crisis(events: list[CrisisEvent]) -> CrisisAnalyzeResponse:
 
     Groups `events` by sector (see `_group_events_by_sector`) and retrieves
     up to one procedure chunk per distinct sector, deduplicated by
-    `doc_id` so two sectors that happen to match the same document don't
-    double-count it. Raises `LookupError` only if *no* sector matched
-    anything — callers (see `app.main`) should map that to a 404 rather
-    than fall back to an ungrounded root cause. A partial match (some
-    sectors grounded, others not) still returns a response, grounded only
-    in what matched; see the module docstring for why.
+    `doc_id` so two sectors that happen to match the *same* document don't
+    double-count it. Retrieval pulls `_CANDIDATES_PER_SECTOR` hits per
+    sector (not just the top-1) so a `doc_id` collision with an
+    already-matched sector falls back to that sector's next-best distinct
+    candidate instead of dropping the sector outright — with an unscored
+    top-k retrieval and no relevance floor, two sectors' queries landing on
+    the same nearest neighbor doesn't mean the second sector has no real
+    procedure of its own, only that it wasn't the single best match. A
+    sector is only dropped if *every* one of its candidates is already
+    claimed by an earlier sector (or it retrieved nothing at all). Raises
+    `LookupError` only if *no* sector matched anything — callers (see
+    `app.main`) should map that to a 404 rather than fall back to an
+    ungrounded root cause. A partial match (some sectors grounded, others
+    not) still returns a response, grounded only in what matched; see the
+    module docstring for why.
 
     `steps` is extracted deterministically from each matched chunk's
     `doc_text` metadata (the full source document, not the chunk's own
@@ -217,14 +252,15 @@ def analyze_crisis(events: list[CrisisEvent]) -> CrisisAnalyzeResponse:
     seen_doc_ids: set[str] = set()
     for sector, sector_events in groups.items():
         query = _build_retrieval_query(sector_events)
-        hits = store.similarity_search(query, k=1, expr="doc_type == 'procedure'")
-        if not hits:
+        hits = store.similarity_search(
+            query, k=_CANDIDATES_PER_SECTOR, expr="doc_type == 'procedure'"
+        )
+        chunk = next(
+            (hit for hit in hits if hit.metadata["doc_id"] not in seen_doc_ids), None
+        )
+        if chunk is None:
             continue
-        chunk = hits[0]
-        doc_id = chunk.metadata["doc_id"]
-        if doc_id in seen_doc_ids:
-            continue
-        seen_doc_ids.add(doc_id)
+        seen_doc_ids.add(chunk.metadata["doc_id"])
         matched.append((sector, chunk))
 
     if not matched:
