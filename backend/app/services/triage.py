@@ -35,20 +35,27 @@ to `/crisis/analyze` after the fact (see `app.services.crisis`'s module
 docstring for why `page_content` alone loses both chunk-boundary steps and
 all line structure).
 
-`allergy_check` is left `None` in this commit — dev plan Aug 21 Task 2
-("Add the allergy cross check and the source reference line to the triage
-response") is where the retrieved crew file's allergy list gets cross-
-checked against the proposed treatment. `confidence` is computed here from
-the protocol match's retrieval strength alone (no nominal-band signal
-applies to a symptom report the way it does to a sector reading), since
-triage has no dedicated confidence-scoring task on the calendar the way
-telemetry and crisis's follow-up tasks did.
+`allergy_check` (dev plan Aug 21 Task 2, "Add the allergy cross check and
+the source reference line to the triage response") cross-checks the
+retrieved crew file's allergy list against the retrieved protocol's text —
+see `_check_allergies`. It is deterministic, not model-generated: a
+safety-relevant field should report exactly what the documents say, the
+same reasoning `instructions` already follows for step lists. `source`
+(also Task 2) cites both retrieved documents — see `_source_line` — since
+triage, unlike telemetry/crisis, grounds its response in two documents
+rather than one. `confidence` is computed here from the protocol match's
+retrieval strength alone (no nominal-band signal applies to a symptom
+report the way it does to a sector reading), since triage has no
+dedicated confidence-scoring task on the calendar the way telemetry and
+crisis's follow-up tasks did.
 """
 
 from __future__ import annotations
 
+import re
+
 from app.schemas import TriageResponse
-from app.services.extraction import extract_procedure_steps
+from app.services.extraction import extract_allergies, extract_procedure_steps
 from app.services.vector_store import get_vector_store
 from app.services.watsonx import get_instruct_model
 
@@ -105,6 +112,72 @@ def _retrieval_strength(relevance_score: float) -> float:
     return round(max(0.0, min(1.0, relevance_score)), 2)
 
 
+def _check_allergies(protocol_text: str, allergies: list[str]) -> str:
+    """Cross-check a crew member's recorded allergies against a treatment protocol.
+
+    Deterministic text matching, not a model call: this is a
+    safety-relevant field, so it reports only what the documents literally
+    say, the same discipline `extract_procedure_steps` already applies to
+    `instructions`. Each allergen is searched for as a whole word/phrase,
+    case-insensitively, in `protocol_text` (the protocol's full `doc_text`,
+    not its `page_content` excerpt — same grounding-fix reasoning
+    `run_triage` already applies when extracting `instructions`).
+
+    This is plain substring/word-boundary matching, not a medical
+    synonym or cross-reactivity lookup — it will not catch, for example,
+    that a penicillin allergy also implicates amoxicillin. It only ever
+    flags what the protocol text explicitly names.
+
+    Returns one of three messages:
+
+    - No allergies recorded on the crew file at all.
+    - Allergies recorded, but none of them appear in the protocol text.
+    - One or more recorded allergens appear in the protocol text — flagged
+      as a conflict, naming every match (not just the first).
+    """
+    if not allergies:
+        return "No known allergies on file for this crew member."
+
+    matches = [
+        allergen
+        for allergen in allergies
+        if re.search(rf"\b{re.escape(allergen)}\b", protocol_text, re.IGNORECASE)
+    ]
+    if matches:
+        return (
+            "CONFLICT: crew member has a recorded allergy to "
+            f"{', '.join(matches)}, which appears in the recommended treatment. "
+            "Confirm before administering."
+        )
+
+    return (
+        "No conflict detected between recorded allergies "
+        f"({', '.join(allergies)}) and this treatment protocol."
+    )
+
+
+def _source_line(metadata: dict) -> str:
+    """Build a source reference line for a single retrieved chunk's metadata.
+
+    Same format `app.services.telemetry`/`app.services.crisis` use:
+    `f"{doc_type}:{doc_id}#chunk{chunk_index}"`.
+    """
+    return f"{metadata['doc_type']}:{metadata['doc_id']}#chunk{metadata['chunk_index']}"
+
+
+def _combined_source(crew_metadata: dict, protocol_metadata: dict) -> str:
+    """Build the `source` line for a triage response, citing both documents.
+
+    Unlike telemetry/crisis, which each retrieve exactly one document,
+    `/triage` grounds its response in two: the crew file (behind
+    `allergy_check`, and part of `triage_lead`'s grounding) and the
+    protocol (behind `triage_lead` and `instructions`). A single-document
+    source line would misrepresent where the response came from, so both
+    are cited, separated by `"; "`.
+    """
+    return f"{_source_line(crew_metadata)}; {_source_line(protocol_metadata)}"
+
+
 def _crew_file_expr(crew_member_id: str) -> str:
     """Build the Milvus boolean expr for an exact crew-file lookup.
 
@@ -135,7 +208,9 @@ def run_triage(crew_member_id: str, symptom_report: str) -> TriageResponse:
             f"No crew file found for crew member '{crew_member_id}'. "
             "Ingest crew files via POST /ingest first."
         )
-    crew_file_text = crew_hits[0].metadata["doc_text"]
+    crew_metadata = crew_hits[0].metadata
+    crew_file_text = crew_metadata["doc_text"]
+    allergies = extract_allergies(crew_file_text)
 
     protocol_query = _build_protocol_query(symptom_report)
     protocol_hits = get_vector_store().similarity_search_with_relevance_scores(
@@ -151,11 +226,14 @@ def run_triage(crew_member_id: str, symptom_report: str) -> TriageResponse:
     prompt = _build_prompt(protocol_chunk.page_content, crew_file_text, symptom_report)
     message = get_instruct_model().invoke(prompt)
     triage_lead = str(message.content).strip()
-    instructions = extract_procedure_steps(protocol_chunk.metadata["doc_text"])
+    protocol_text = protocol_chunk.metadata["doc_text"]
+    instructions = extract_procedure_steps(protocol_text)
+    allergy_check = _check_allergies(protocol_text, allergies)
 
     return TriageResponse(
         triage_lead=triage_lead,
         instructions=instructions,
-        allergy_check=None,
+        allergy_check=allergy_check,
         confidence=_retrieval_strength(relevance_score),
+        source=_combined_source(crew_metadata, protocol_chunk.metadata),
     )

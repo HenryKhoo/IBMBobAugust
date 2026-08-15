@@ -147,14 +147,29 @@ class TriageResponse(BaseModel):
     fact (see `CrisisAnalyzeResponse`'s docstring), applied here from the
     start instead of repeated as a follow-up.
 
-    `allergy_check` and `confidence` are both optional (`None` by default)
-    for this commit: dev plan Aug 21 Task 2 ("Add the allergy cross check
-    and the source reference line to the triage response") is a separate,
-    later commit that fills `allergy_check` in for real. `confidence` is
-    computed now from retrieval strength on the protocol match (see
-    `app.services.triage._retrieval_strength`) rather than left `None` too,
-    since the dev plan gives triage no dedicated confidence-scoring task
-    the way telemetry (Aug 19 Task 2) and crisis (Aug 20 Task 2) got —
+    `allergy_check` is populated by `app.services.triage._check_allergies`
+    (dev plan Aug 21 Task 2, "Add the allergy cross check and the source
+    reference line to the triage response"): a deterministic, non-LLM
+    comparison of the retrieved crew file's allergy list (see
+    `app.services.extraction.extract_allergies`) against the retrieved
+    protocol's full text — a safety-relevant field is built from what the
+    documents literally say, not a model paraphrase, the same discipline
+    `instructions` already follows. It's typed `str | None` because
+    `_check_allergies` always returns a string once both documents are
+    retrieved (including a "no known allergies on file" case) — `None`
+    only occurs if a caller builds the schema directly without going
+    through `run_triage`.
+
+    `source` cites both retrieved documents, not just one: unlike
+    telemetry/crisis, which each retrieve a single document, `/triage`
+    grounds its response in two (the crew file and the protocol), so a
+    single-document source line would misrepresent where the response came
+    from. See `app.services.triage._source_line` for the exact format.
+
+    `confidence` is computed from retrieval strength on the protocol match
+    (see `app.services.triage._retrieval_strength`) rather than left
+    `None`, since the dev plan gives triage no dedicated confidence-scoring
+    task the way telemetry (Aug 19 Task 2) and crisis (Aug 20 Task 2) got —
     leaving it `None` here would orphan the field with no task to fill it.
     Still `float | None` rather than a required `float`, matching
     `TelemetryInterpretResponse.confidence`'s reasoning: a retrieval
@@ -166,3 +181,4 @@ class TriageResponse(BaseModel):
     instructions: list[str]
     allergy_check: str | None = None
     confidence: float | None = None
+    source: str

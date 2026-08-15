@@ -113,9 +113,14 @@ triage recommendation.
   "triage_lead": "string",
   "instructions": ["string"],
   "allergy_check": "string",
-  "confidence": 0.0
+  "confidence": 0.0,
+  "source": "string"
 }
 ```
+
+`source` cites both retrieved documents (crew file and treatment protocol),
+separated by `"; "` — the only endpoint here grounded in two documents
+rather than one.
 
 ### POST /rationing/simulate
 

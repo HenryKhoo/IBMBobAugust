@@ -93,6 +93,29 @@ PROTOCOL_METADATA = {
     "doc_text": PROTOCOL_TEXT,
 }
 
+# A treatment protocol whose text names two of sample_crew_file.txt's
+# recorded allergens (penicillin, shellfish), used to exercise the
+# allergy-check's conflict-detected path — sample_triage_protocol.txt's
+# "Antibiotic X" deliberately names no real drug, so it only ever exercises
+# the no-conflict path.
+CONFLICT_PROTOCOL_TEXT = (FIXTURES / "sample_triage_protocol_conflict.txt").read_text()
+CONFLICT_PROTOCOL_METADATA = {
+    "doc_id": "severe-allergic-reaction",
+    "doc_type": "procedure",
+    "chunk_index": 0,
+    "doc_text": CONFLICT_PROTOCOL_TEXT,
+}
+
+# A crew file whose allergy line is a none-token ("None known"), used to
+# exercise the allergy-check's "no known allergies" path.
+NO_ALLERGY_CREW_FILE_TEXT = (FIXTURES / "sample_crew_file_no_allergies.txt").read_text()
+NO_ALLERGY_CREW_FILE_METADATA = {
+    "doc_id": "suarez",
+    "doc_type": "crew_file",
+    "chunk_index": 0,
+    "doc_text": NO_ALLERGY_CREW_FILE_TEXT,
+}
+
 STUBBED_TRIAGE_LEAD = (
     "J. Alvarez is presenting with a Stage 2 wound infection and mild shock; treat "
     "as time-critical per the retrieved protocol."
@@ -112,6 +135,31 @@ EXPECTED_INSTRUCTIONS = [
     "Confirm vitals return to baseline before clearing the crew member for duty.",
     "Log the incident in the mission log for post-event review.",
 ]
+
+# Computed by calling app.services.extraction.extract_allergies directly
+# against CREW_FILE_TEXT ("Allergies: penicillin, shellfish and latex").
+EXPECTED_ALLERGIES = ["penicillin", "shellfish", "latex"]
+
+# Computed by calling app.services.triage._check_allergies directly against
+# EXPECTED_ALLERGIES and PROTOCOL_TEXT — no allergen appears in the "Antibiotic
+# X" protocol text, so this is the no-conflict message.
+EXPECTED_NO_CONFLICT_ALLERGY_CHECK = (
+    "No conflict detected between recorded allergies "
+    "(penicillin, shellfish, latex) and this treatment protocol."
+)
+
+# Computed the same way against CONFLICT_PROTOCOL_TEXT, which names both
+# "penicillin" and "shellfish-derived" (a word-boundary match on "shellfish").
+EXPECTED_CONFLICT_ALLERGY_CHECK = (
+    "CONFLICT: crew member has a recorded allergy to penicillin, shellfish, "
+    "which appears in the recommended treatment. Confirm before administering."
+)
+
+EXPECTED_NO_KNOWN_ALLERGY_CHECK = "No known allergies on file for this crew member."
+
+# app.services.triage._source_line's format: "{doc_type}:{doc_id}#chunk{chunk_index}",
+# joined for both retrieved documents with "; " (see _combined_source).
+EXPECTED_SOURCE = "crew_file:kim#chunk0; procedure:stage-2-wound-infection#chunk0"
 
 REQUEST_PAYLOAD = {
     "crew_member_id": "kim",
@@ -148,8 +196,9 @@ def test_run_triage_returns_grounded_lead_and_instructions(
 
     assert response.triage_lead == STUBBED_TRIAGE_LEAD
     assert response.instructions == EXPECTED_INSTRUCTIONS
-    assert response.allergy_check is None
+    assert response.allergy_check == EXPECTED_NO_CONFLICT_ALLERGY_CHECK
     assert response.confidence == 0.87
+    assert response.source == EXPECTED_SOURCE
 
     # crew file was looked up by exact doc_id match, not semantic search.
     crew_call = fake_store.calls[0]
@@ -200,6 +249,73 @@ def test_instructions_are_grounded_in_doc_text_not_page_content(
     # triage_lead grounding still comes from the excerpt, not doc_text.
     assert narrow_excerpt in fake_model.invoked_with[0]
     assert "Escalate to the ground-based flight surgeon" not in fake_model.invoked_with[0]
+
+
+def test_allergy_check_is_grounded_in_doc_text_not_page_content(
+    monkeypatch, fake_crew_hit
+):
+    """Same regression shape as the instructions test above, for allergy_check:
+    a narrow retrieval excerpt must not be what the cross check runs
+    against — doc_text (the full source document) must be.
+    """
+    narrow_excerpt = "1. Administer epinephrine auto-injector into the outer thigh."
+    assert "penicillin" not in narrow_excerpt
+    protocol_hit = _FakeDocument(
+        narrow_excerpt, {**CONFLICT_PROTOCOL_METADATA, "doc_text": CONFLICT_PROTOCOL_TEXT}
+    )
+    fake_store = _FakeVectorStore(
+        crew_hits=[fake_crew_hit], protocol_hits=[(protocol_hit, 0.6)]
+    )
+    fake_model = _FakeInstructModel(STUBBED_TRIAGE_LEAD)
+    monkeypatch.setattr(triage, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(triage, "get_instruct_model", lambda: fake_model)
+
+    response = triage.run_triage(
+        REQUEST_PAYLOAD["crew_member_id"], REQUEST_PAYLOAD["symptom_report"]
+    )
+
+    # the conflict lives in doc_text (the full protocol), not the narrow
+    # page_content excerpt actually returned by retrieval.
+    assert response.allergy_check == EXPECTED_CONFLICT_ALLERGY_CHECK
+
+
+def test_allergy_check_flags_conflict_when_protocol_names_a_recorded_allergen(
+    monkeypatch, fake_crew_hit
+):
+    protocol_hit = _FakeDocument(
+        CONFLICT_PROTOCOL_TEXT, dict(CONFLICT_PROTOCOL_METADATA)
+    )
+    fake_store = _FakeVectorStore(
+        crew_hits=[fake_crew_hit], protocol_hits=[(protocol_hit, 0.72)]
+    )
+    fake_model = _FakeInstructModel(STUBBED_TRIAGE_LEAD)
+    monkeypatch.setattr(triage, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(triage, "get_instruct_model", lambda: fake_model)
+
+    response = triage.run_triage(
+        REQUEST_PAYLOAD["crew_member_id"], REQUEST_PAYLOAD["symptom_report"]
+    )
+
+    assert response.allergy_check == EXPECTED_CONFLICT_ALLERGY_CHECK
+    assert response.allergy_check.startswith("CONFLICT:")
+    assert response.source == "crew_file:kim#chunk0; procedure:severe-allergic-reaction#chunk0"
+
+
+def test_allergy_check_reports_no_known_allergies_when_crew_file_has_none(
+    monkeypatch, fake_protocol_hit
+):
+    crew_hit = _FakeDocument(NO_ALLERGY_CREW_FILE_TEXT, dict(NO_ALLERGY_CREW_FILE_METADATA))
+    fake_store = _FakeVectorStore(
+        crew_hits=[crew_hit], protocol_hits=[(fake_protocol_hit, 0.87)]
+    )
+    fake_model = _FakeInstructModel(STUBBED_TRIAGE_LEAD)
+    monkeypatch.setattr(triage, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(triage, "get_instruct_model", lambda: fake_model)
+
+    response = triage.run_triage("suarez", "Mild headache after EVA prep.")
+
+    assert response.allergy_check == EXPECTED_NO_KNOWN_ALLERGY_CHECK
+    assert response.source == "crew_file:suarez#chunk0; procedure:stage-2-wound-infection#chunk0"
 
 
 def test_run_triage_raises_when_no_crew_file_is_found(monkeypatch, fake_protocol_hit):
@@ -278,11 +394,13 @@ def test_endpoint_happy_path_matches_api_contract_shape(
         "instructions",
         "allergy_check",
         "confidence",
+        "source",
     }
     assert body["triage_lead"] == STUBBED_TRIAGE_LEAD
     assert body["instructions"] == EXPECTED_INSTRUCTIONS
-    assert body["allergy_check"] is None
+    assert body["allergy_check"] == EXPECTED_NO_CONFLICT_ALLERGY_CHECK
     assert body["confidence"] == 0.87
+    assert body["source"] == EXPECTED_SOURCE
 
 
 @pytest.mark.parametrize(

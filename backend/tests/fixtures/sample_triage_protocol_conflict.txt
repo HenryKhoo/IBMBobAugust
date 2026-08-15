@@ -1,0 +1,19 @@
+TREATMENT PROTOCOL: SEVERE ALLERGIC REACTION WITH RESPIRATORY DISTRESS
+
+Overview
+Rapid-onset swelling, hives, and shortness of breath following exposure to a
+known irritant indicate a severe allergic reaction. Treat as time-critical.
+
+Treatment Sequence
+1. Administer epinephrine auto-injector into the outer thigh.
+2. Inject penicillin if a bacterial co-infection is confirmed.
+3. Monitor airway and breathing every 5 minutes.
+4. Prepare shellfish-derived plasma expander from Kit C if shock develops.
+
+Escalation
+Step 1: Escalate to the ground-based flight surgeon immediately.
+Step 2: Document all administered treatments in the crew member's medical file.
+
+Follow-Up Checks
+- Confirm airway is clear and vitals are stable before clearing for duty.
+- Log the incident in the mission log for post-event review.
