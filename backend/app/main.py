@@ -1,11 +1,18 @@
 """FastAPI application entrypoint for The North Star backend."""
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.schemas import HealthResponse, IngestRequest, IngestResponse
+from app.schemas import (
+    HealthResponse,
+    IngestRequest,
+    IngestResponse,
+    TelemetryInterpretRequest,
+    TelemetryInterpretResponse,
+)
 from app.services.ingestion import ingest_and_upsert
+from app.services.telemetry import interpret_telemetry
 
 app = FastAPI(title=settings.APP_NAME)
 
@@ -32,3 +39,18 @@ def ingest(request: IngestRequest) -> IngestResponse:
     """Chunk, embed with Granite, and upsert mission documents into Zilliz."""
     chunks_ingested = ingest_and_upsert(request.documents)
     return IngestResponse(chunks_ingested=chunks_ingested)
+
+
+@app.post("/telemetry/interpret", response_model=TelemetryInterpretResponse)
+def telemetry_interpret(
+    request: TelemetryInterpretRequest,
+) -> TelemetryInterpretResponse:
+    """Retrieve the matching sector documentation and return a grounded summary.
+
+    404s if no sector documentation has been ingested for this sector's
+    readings yet, rather than returning an ungrounded summary.
+    """
+    try:
+        return interpret_telemetry(request.sector_id, request.metrics)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc

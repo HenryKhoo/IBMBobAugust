@@ -47,3 +47,29 @@ class IngestResponse(BaseModel):
     """Response body for POST /ingest."""
 
     chunks_ingested: int
+
+
+class TelemetryInterpretRequest(BaseModel):
+    """Request body for POST /telemetry/interpret.
+
+    `metrics` is a flat map of raw metric name to reading, e.g.
+    `{"eff": 85, "o2pp": 158, "humidity": 34}` for the oxygen sector — see
+    the per-sector `state` shapes in `mission-console.html`'s Module 02.
+    """
+
+    sector_id: str = Field(min_length=1)
+    metrics: dict[str, float] = Field(min_length=1)
+
+
+class TelemetryInterpretResponse(BaseModel):
+    """Response body for POST /telemetry/interpret.
+
+    `confidence` is left unset (`None`) until confidence scoring is added
+    (dev plan Aug 19, Task 2) — the dev plan explicitly rules out a
+    fabricated placeholder number in the meantime ("do not use random
+    numbers to fake a confidence score").
+    """
+
+    summary: str
+    confidence: float | None = None
+    source: str
