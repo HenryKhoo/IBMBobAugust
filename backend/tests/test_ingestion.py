@@ -86,11 +86,32 @@ def test_chunk_document_tags_each_chunk_with_its_source():
     assert chunk.doc_id == "proc-1"
     assert chunk.doc_type == "procedure"
     assert chunk.chunk_index == 0
+    assert chunk.doc_text == document.text
     assert chunk.metadata() == {
         "doc_id": "proc-1",
         "doc_type": "procedure",
         "chunk_index": 0,
+        "doc_text": document.text,
     }
+
+
+def test_chunk_document_carries_full_doc_text_on_every_chunk():
+    # A document long enough to split into several chunks — every chunk,
+    # not just the first, should carry the *whole* original document in
+    # `doc_text`, not just its own piece. This is what lets a retrieval
+    # hit on any chunk reconstruct the full document for structured
+    # extraction (see app.services.crisis and Chunk's docstring), without
+    # a second lookup for the other chunks.
+    text = " ".join(f"word{i}" for i in range(300))
+    document = MissionDocument(id="proc-long", type=DocumentType.PROCEDURE, text=text)
+    chunks = chunk_document(document, chunk_size=100, overlap=20)
+
+    assert len(chunks) > 2
+    for chunk in chunks:
+        assert chunk.doc_text == text
+        # doc_text is the full document; a chunk's own text is at most a
+        # (usually strict) substring/piece of it.
+        assert chunk.text != chunk.doc_text or len(chunks) == 1
 
 
 def test_chunk_documents_processes_a_batch_in_order():

@@ -25,12 +25,29 @@ class Chunk:
     metadata, so a retrieved chunk can always be traced back to its source
     document — the source-attribution line every module's grounded
     response depends on (see dev plan Section 7).
+
+    `doc_text` carries the full, un-chunked source document alongside the
+    chunk's own `text` (a `chunk_text`-produced piece). It exists because
+    `chunk_text` collapses every whitespace run — including newlines —
+    before packing words into chunks (see its docstring), so a chunk's own
+    `text` has lost the line structure a document like an emergency
+    procedure or a sector spec is authored in (numbered steps, one per
+    line; `metric: low-high` threshold lines). `app.services.extraction`'s
+    parsers are line-anchored and need that structure back, so a module
+    grounding structured fields (e.g. `app.services.crisis`'s procedure
+    steps) reads `doc_text` off the retrieved chunk's metadata rather than
+    parsing `text`/`page_content`. Duplicated across every chunk of a
+    document rather than stored once, so a single retrieval hit is always
+    enough — no second lookup keyed by `doc_id` is needed. Cheap at this
+    project's scale (mission documents are single-digit KB, a handful of
+    chunks each).
     """
 
     doc_id: str
     doc_type: str
     chunk_index: int
     text: str
+    doc_text: str
 
     def metadata(self) -> dict:
         """Metadata dict attached to this chunk's vector store record."""
@@ -38,6 +55,7 @@ class Chunk:
             "doc_id": self.doc_id,
             "doc_type": self.doc_type,
             "chunk_index": self.chunk_index,
+            "doc_text": self.doc_text,
         }
 
 
@@ -121,6 +139,7 @@ def chunk_document(
             doc_type=document.type.value,
             chunk_index=index,
             text=piece,
+            doc_text=document.text,
         )
         for index, piece in enumerate(pieces)
     ]
