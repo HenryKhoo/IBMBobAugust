@@ -1579,11 +1579,7 @@
   // Backend base URL for The North Star API (see API.md and RAILWAY.md).
   // Shared by Module 01's /crisis/analyze call below and Module 02's
   // /telemetry/interpret call further down.
-  // TODO(post-deploy): once the backend service is live on Railway, replace
-  // this with its public URL (Railway dashboard -> backend service ->
-  // Settings -> Networking -> Public Networking), then redeploy the
-  // frontend service so this change ships.
-  var API_BASE_URL = 'http://localhost:8000';
+  var API_BASE_URL = 'https://thenorthstar.up.railway.app';
 
   // procedureSteps and crisisProcRef start out as the hand-authored fallback
   // above, and get replaced with the grounded response from POST
