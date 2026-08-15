@@ -1,0 +1,27 @@
+SUPPLY PROCEDURE: FOOD RATIONING UNDER SHORTFALL
+
+Overview
+A confirmed shortfall in food stock relative to the resupply window requires an
+immediate rationing plan. This procedure governs how the crew's daily caloric
+intake is adjusted until the resupply vehicle arrives.
+
+Rationing Sequence
+1. Confirm the current food energy stock on hand and the days remaining until
+   the next scheduled resupply arrival.
+2. Set the daily per-person ration at the highest level that leaves a
+   non-negative projected buffer at resupply, rounding down to the nearest
+   10 kcal.
+3. Suspend high-exertion spacewalks and heavy maintenance tasks to reduce
+   metabolic burn while rationing is in effect.
+4. Prioritize protein and micronutrient rations over caloric bulk to preserve
+   crew health and function at a reduced caloric intake.
+
+Escalation
+Step 1: If the projected buffer is negative at any ration level within the
+allowed range, escalate to mission control and request an expedited resupply.
+Step 2: Log the rationing decision and the modeled survival probability in the
+mission log for post-event review.
+
+Follow-Up Checks
+- Recheck the projected buffer daily as consumption and stock levels are confirmed.
+- Confirm crew health markers remain stable throughout the rationing period.

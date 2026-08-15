@@ -10,6 +10,8 @@ from app.schemas import (
     HealthResponse,
     IngestRequest,
     IngestResponse,
+    RationingSimulateRequest,
+    RationingSimulateResponse,
     TelemetryInterpretRequest,
     TelemetryInterpretResponse,
     TriageRequest,
@@ -17,6 +19,7 @@ from app.schemas import (
 )
 from app.services.crisis import analyze_crisis
 from app.services.ingestion import ingest_and_upsert
+from app.services.rationing import simulate_rationing
 from app.services.telemetry import interpret_telemetry
 from app.services.triage import run_triage
 
@@ -85,5 +88,20 @@ def triage(request: TriageRequest) -> TriageResponse:
     """
     try:
         return run_triage(request.crew_member_id, request.symptom_report)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post("/rationing/simulate", response_model=RationingSimulateResponse)
+def rationing_simulate(request: RationingSimulateRequest) -> RationingSimulateResponse:
+    """Retrieve the matching rationing procedure and return a grounded simulation.
+
+    404s if no rationing/supply procedure documentation matches this
+    scenario, rather than returning an ungrounded narrative.
+    """
+    try:
+        return simulate_rationing(
+            request.stock_level, request.ration_amount, request.days_until_resupply
+        )
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
