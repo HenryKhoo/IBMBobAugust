@@ -15,11 +15,11 @@ Builders Challenge (August theme: *Reimagine Space Exploration with AI*).
 
 ## How to Use
 
-1. **Watch the crisis timeline** — the console reads the live event feed, isolates the event that matters, and builds the matching emergency procedure step by step.
-2. **Read the telemetry translator** — each life support sector gets a plain language read on its status, with a confidence score and a line showing what the reading is grounded in.
-3. **Run a triage** — describe a crew member's symptoms in plain English, and the console cross references their biometrics and file for an immediate, grounded triage protocol.
-4. **Simulate rationing** — trigger a supply shortfall and adjust the ration and resupply window to see a survival probability and a grounded recommendation.
-5. **Ask a question** — search the mission log and procedure library directly, and get an answer sourced back to the passage it came from.
+1. Watch the crisis timeline to see the console read the live event feed, isolate the event that matters, and build the matching emergency procedure step by step.
+2. Read the telemetry translator for a plain language status on each life support sector, complete with a confidence score and a line showing what the reading is grounded in.
+3. Describe a crew member's symptoms in plain English to run a triage; the console cross references their biometrics and file for an immediate, grounded protocol.
+4. Trigger a supply shortfall and adjust the ration and resupply window to simulate rationing and see a survival probability with a grounded recommendation.
+5. Search the mission log and procedure library directly to ask a question, and get an answer sourced back to the passage it came from.
 
 ## Demo
 
@@ -35,10 +35,10 @@ Mission documents, including emergency procedures, sector specifications, crew f
 
 Each module is backed by a small, focused pipeline:
 
-1. **Retrieve** — pull the passages relevant to the current sector, event, symptom report, or supply state.
-2. **Generate** — a Mistral or Granite instruct model on watsonx.ai turns the retrieved passages and live state into a plain language answer.
-3. **Score** — a confidence value is derived from real signals, such as retrieval strength or distance from a nominal band, never a random number.
-4. **Cite** — every answer carries a source reference line back to the document it was grounded in.
+1. Pull the passages relevant to the current sector, event, symptom report, or supply state.
+2. Turn those passages and the live state into a plain language answer, using a Mistral or Granite instruct model on watsonx.ai.
+3. Derive a confidence value from real signals, such as retrieval strength or distance from a nominal band, never a random number.
+4. Carry a source reference line on every answer, back to the document it was grounded in.
 
 ## How IBM Bob was used
 
