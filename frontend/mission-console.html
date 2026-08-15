@@ -271,7 +271,8 @@
   }
   .checklist-empty{padding:40px 20px;text-align:center;color:var(--ink-faint);font-family:var(--mono);font-size:12px;}
  
-  /* ============ TAB 2 : TELEMETRY TRANSLATOR ============ */
+  /* ============ MODULE 01, SECTION B : TELEMETRY TRANSLATOR ============ */
+  .section-divider{margin-top:28px;padding-top:22px;border-top:1px solid var(--line);}
   .t2-toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;}
   .t2-timestamp{font-family:var(--mono);font-size:11.5px;color:var(--ink-faint);}
   .t2-grid{
@@ -280,6 +281,8 @@
     gap:14px;
   }
   .sector-card{background:var(--panel);border:1px solid var(--line);display:flex;flex-direction:column;}
+  .sector-card.scenario-driven{border-color:var(--line-strong);}
+  .scenario-override-tag{display:block;font-family:var(--mono);font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:6px;}
   .sector-head{padding:14px 16px 10px;border-bottom:1px solid var(--line);}
   .sector-head-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;}
   .sector-head-top .sector-name{margin-bottom:0;}
@@ -598,19 +601,16 @@
  
 <nav class="module-nav" role="tablist" aria-label="Console modules">
   <button class="module-btn active" data-tab="1" role="tab" aria-selected="true">
-    <span class="mod-num">01</span><span class="mod-name">Crisis Timeline</span>
+    <span class="mod-num">01</span><span class="mod-name">Crisis Timeline &amp; Telemetry</span>
   </button>
   <button class="module-btn" data-tab="2" role="tab" aria-selected="false">
-    <span class="mod-num">02</span><span class="mod-name">Telemetry Translator</span>
+    <span class="mod-num">02</span><span class="mod-name">Medical Triage</span>
   </button>
   <button class="module-btn" data-tab="3" role="tab" aria-selected="false">
-    <span class="mod-num">03</span><span class="mod-name">Medical Triage</span>
+    <span class="mod-num">03</span><span class="mod-name">Supply &amp; Rationing</span>
   </button>
   <button class="module-btn" data-tab="4" role="tab" aria-selected="false">
-    <span class="mod-num">04</span><span class="mod-name">Supply &amp; Rationing</span>
-  </button>
-  <button class="module-btn" data-tab="5" role="tab" aria-selected="false">
-    <span class="mod-num">05</span><span class="mod-name">Space Weather &amp; ISS Link</span>
+    <span class="mod-num">04</span><span class="mod-name">Space Weather &amp; ISS Link</span>
   </button>
 </nav>
  
@@ -622,14 +622,14 @@
   <section class="tab-panel active" id="tab-1">
     <div class="module-head">
       <span class="label-eyebrow">Module 01</span>
-      <h2 class="module-title">Crisis Timeline &amp; Emergency Procedure Builder</h2>
-      <p class="module-desc">Monitors the live telemetry feed, isolates the event that matters, and builds the matching emergency procedure step by step.</p>
+      <h2 class="module-title">Crisis Timeline &amp; Telemetry Translator</h2>
+      <p class="module-desc">Monitors the live telemetry feed, isolates the event that matters, builds the matching emergency procedure step by step, and translates every sector's raw sensor output into a plain-language read in the telemetry section below.</p>
     </div>
 
     <div class="panel" style="margin-bottom:18px;">
       <div class="panel-head">
         <h3>The North Star hull schematic — 3D model</h3>
-        <span class="checklist-status" id="schematic-status-label">Zones reflect Module 02 sector status live</span>
+        <span class="checklist-status" id="schematic-status-label">Zones reflect live sector status below</span>
       </div>
       <div class="schematic-wrap">
         <div class="schematic-3d-wrap">
@@ -699,32 +699,36 @@
         <div class="checklist-empty">Run an emergency scenario to build an incident log, then generate the after-action report.</div>
       </div>
     </div>
+
+    <!-- ============================================================ -->
+    <!-- SECTION B — PLAIN-LANGUAGE TELEMETRY & SYSTEM HEALTH           -->
+    <!-- Formerly its own tab (Module 02); folded in here so a selected  -->
+    <!-- crisis scenario above and the sector cards below share one      -->
+    <!-- state instead of two independent simulations disagreeing about  -->
+    <!-- the same zone. See scenarioSectorOverrides in the script below. -->
+    <!-- ============================================================ -->
+    <div class="section-divider">
+      <div class="module-head">
+        <span class="label-eyebrow">Live telemetry</span>
+        <h3 class="module-title" style="font-size:17px;">Plain-Language Telemetry &amp; System Health Translator</h3>
+        <p class="module-desc">Turns raw sensor output from each life-support sector into a short, plain-language read on what it means and what to do. A sector under an active scenario above is driven live by that scenario, not by its own independent reading, until it's resolved.</p>
+      </div>
+
+      <div class="t2-toolbar">
+        <span class="t2-timestamp mono" id="t2-timestamp">Last diagnostic pass — MET 214:06:12:00</span>
+        <button class="btn small" id="btn-refresh-t2">Run new diagnostic pass</button>
+      </div>
+
+      <div class="t2-grid" id="t2-grid"></div>
+    </div>
   </section>
- 
+
   <!-- ============================================================ -->
-  <!-- TAB 2 — PLAIN-LANGUAGE TELEMETRY & SYSTEM HEALTH TRANSLATOR    -->
+  <!-- TAB 2 — CREW MEDICAL & PSYCHOLOGICAL TRIAGE CONSOLE            -->
   <!-- ============================================================ -->
   <section class="tab-panel" id="tab-2">
     <div class="module-head">
       <span class="label-eyebrow">Module 02</span>
-      <h2 class="module-title">Plain-Language Telemetry &amp; System Health Translator</h2>
-      <p class="module-desc">Turns raw sensor output from each life-support sector into a short, plain-language read on what it means and what to do.</p>
-    </div>
- 
-    <div class="t2-toolbar">
-      <span class="t2-timestamp mono" id="t2-timestamp">Last diagnostic pass — MET 214:06:12:00</span>
-      <button class="btn small" id="btn-refresh-t2">Run new diagnostic pass</button>
-    </div>
- 
-    <div class="t2-grid" id="t2-grid"></div>
-  </section>
- 
-  <!-- ============================================================ -->
-  <!-- TAB 3 — CREW MEDICAL & PSYCHOLOGICAL TRIAGE CONSOLE            -->
-  <!-- ============================================================ -->
-  <section class="tab-panel" id="tab-3">
-    <div class="module-head">
-      <span class="label-eyebrow">Module 03</span>
       <h2 class="module-title">Crew Medical &amp; Psychological Triage Console</h2>
       <p class="module-desc">Cross-references crew biometrics with a plain-English symptom report to produce an immediate, file-aware triage protocol.</p>
     </div>
@@ -764,11 +768,11 @@
   </section>
  
   <!-- ============================================================ -->
-  <!-- TAB 4 — SUPPLY CHAIN, RESOURCE SCARCITY & RATIONING PREDICTOR  -->
+  <!-- TAB 3 — SUPPLY CHAIN, RESOURCE SCARCITY & RATIONING PREDICTOR  -->
   <!-- ============================================================ -->
-  <section class="tab-panel" id="tab-4">
+  <section class="tab-panel" id="tab-3">
     <div class="module-head">
-      <span class="label-eyebrow">Module 04</span>
+      <span class="label-eyebrow">Module 03</span>
       <h2 class="module-title">Supply Chain, Resource Scarcity &amp; Rationing Predictor</h2>
       <p class="module-desc">Projects consumption forward against the next resupply date and models the trade-offs of a rationing strategy.</p>
     </div>
@@ -832,11 +836,11 @@
   </section>
 
   <!-- ============================================================ -->
-  <!-- TAB 5 — SPACE WEATHER & ISS TELEMETRY (REAL-DATA PROTOTYPE)    -->
+  <!-- TAB 4 — SPACE WEATHER & ISS TELEMETRY (REAL-DATA PROTOTYPE)    -->
   <!-- ============================================================ -->
-  <section class="tab-panel" id="tab-5">
+  <section class="tab-panel" id="tab-4">
     <div class="module-head">
-      <span class="label-eyebrow">Module 05 · Prototype</span>
+      <span class="label-eyebrow">Module 04 · Prototype</span>
       <h2 class="module-title">Space Weather &amp; ISS Telemetry Translator</h2>
       <p class="module-desc">Plain-language operator guidance for two real-data lanes: heliophysics space-weather indices and live ISS system telemetry.</p>
     </div>
@@ -882,7 +886,7 @@
 
 </main>
  
-<p class="foot-note">Demo console — all telemetry, biometrics, and generated analysis on this page are simulated for demonstration purposes only. Module 05's space-weather and ISS readings are representative sample data modeled on public NOAA SWPC / NASA DONKI and ISS telemetry formats — not a live feed.</p>
+<p class="foot-note">Demo console — all telemetry, biometrics, and generated analysis on this page are simulated for demonstration purposes only. Module 04's space-weather and ISS readings are representative sample data modeled on public NOAA SWPC / NASA DONKI and ISS telemetry formats — not a live feed.</p>
  
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -951,9 +955,9 @@
   // (no imported model/mesh of any kind). Zone status (nominal/degrading/
   // critical) is expressed the same way the old flat-SVG version expressed
   // it — dim vs. bright, slow pulse vs. fast pulse — just on material
-  // color/opacity instead of a CSS class. Module 02's diagnostic pass and
-  // Module 01's breach scenario drive this through the same two entry
-  // points: setZoneStatus and setBreach.
+  // color/opacity instead of a CSS class. The telemetry section's diagnostic
+  // pass and this module's breach scenario drive this through the same two
+  // entry points: setZoneStatus and setBreach.
   var Schematic3D = (function(){
     var container = document.getElementById('schematic-3d');
     if(!container || typeof THREE === 'undefined'){
@@ -1601,7 +1605,7 @@
 
   // Toggles a given zone's red breach marker (ring + X + shockwaves) on the
   // habitat schematic, positioned at that zone's own geometry. Driven by
-  // this module's scenario state, independent of Module 02's
+  // this module's scenario state, independent of the telemetry section's
   // separately-simulated sector status. Every concurrent failure point gets
   // its own marker, so injecting N scenarios lights up N markers at once.
   function setSchematicBreach(zoneId, active){
@@ -1781,8 +1785,8 @@
   var defaultProcRef = 'Ref: Emergency Decompression Procedure, EMER-PROC 4.2.1 (simulated excerpt)';
 
   // Backend base URL for The North Star API (see API.md and RAILWAY.md).
-  // Shared by Module 01's /crisis/analyze call below and Module 02's
-  // /telemetry/interpret call further down.
+  // Shared by this module's /crisis/analyze call below and its telemetry
+  // section's /telemetry/interpret call further down.
   var API_BASE_URL = 'https://thenorthstar.up.railway.app';
 
   // procedureSteps and crisisProcRef start out as the hand-authored fallback
@@ -1790,7 +1794,7 @@
   // /crisis/analyze once the root cause is isolated (see fetchCrisisAnalysis
   // below). If that call fails, they stay as the hand-authored fallback so
   // the demo still runs — the same degrade-gracefully pattern
-  // fetchSectorSummary uses for Module 02.
+  // fetchSectorSummary uses for the telemetry section below.
   var procedureSteps = defaultProcedureSteps.slice();
   var crisisProcRef = defaultProcRef;
   // Parallel to procedureSteps: how many of its steps came from each
@@ -1807,6 +1811,31 @@
   // zones (and, for hull, the dedicated breach marker) to drive without
   // needing injectScenario's local state.
   var activeScenarioObjs = [];
+
+  // Sector ids (== schematic zone ids — the mapping is 1:1, see
+  // schematicZoneIds below) currently owned by an active Module 01 scenario,
+  // keyed to the status/note their telemetry card should show *instead of*
+  // their own independently-simulated tick() reading. This is what keeps the
+  // merged telemetry section honest about a zone's real state instead of two
+  // unrelated simulations racing to paint the same card and schematic zone
+  // (see the old standalone-tab version's "known limitation" this replaces).
+  // renderSectors()/updateSchematicZones() consult this; it's cleared the
+  // moment a scenario resolves or is reset, handing the sector back to its
+  // own simulation.
+  var scenarioSectorOverrides = {};
+
+  function setScenarioSectorOverrides(status, note){
+    scenarioSectorOverrides = {};
+    activeScenarioObjs.forEach(function(s){
+      scenarioSectorOverrides[s.zone] = { status: status, note: note || s.label };
+    });
+    if(typeof renderSectors === 'function') renderSectors();
+  }
+
+  function clearScenarioSectorOverrides(){
+    scenarioSectorOverrides = {};
+    if(typeof renderSectors === 'function') renderSectors();
+  }
 
   var scenarioTimers = [];
   var checklistState = [];
@@ -1890,12 +1919,14 @@
   // scenario additionally drives its own dedicated pulsing breach marker (a
   // separate visual from zone status color; see Schematic3D.setBreach), on
   // top of (not instead of) its own zone status — so selecting N concurrent
-  // failure points shows N red markers on the model, one per zone. Known
-  // limitation: Module 02's "Run new diagnostic pass" (updateSchematicZones)
-  // writes the same zoneState this drives, from its own
-  // independently-simulated sector status — running it while a scenario is
-  // active can overwrite that zone's critical highlight here. Each breach
-  // marker is immune to this since it's a separate flag/mesh, not zoneState.
+  // failure points shows N red markers on the model, one per zone. Formerly,
+  // the telemetry section's "Run new diagnostic pass" (updateSchematicZones)
+  // wrote the same zoneState from its own independently-simulated sector
+  // status and could overwrite this zone's critical highlight if run while a
+  // scenario was active; updateSchematicZones now skips any zone listed in
+  // scenarioSectorOverrides, so this call always wins while a scenario is
+  // running. Each breach marker was always immune to this, since it's a
+  // separate flag/mesh, not zoneState.
   function applyScenarioZoneStatus(status){
     activeScenarioObjs.forEach(function(s){
       setSchematicBreach(s.zone, status === 'critical');
@@ -1919,6 +1950,10 @@
       if(procRef){ procRef.textContent = 'Emergency procedure closed out — all ' + total + ' steps confirmed at MET ' + metEl.textContent + '.'; }
       setModuleAlert('t1', 'nominal', activeScenarioObjs.length > 1 ? 'Systems Secured' : (activeScenarioObjs[0] ? activeScenarioObjs[0].securedLabel : 'Node 3 Secured'));
       applyScenarioZoneStatus('nominal');
+      // Procedure closed out — hand the affected sector(s) back to their own
+      // independent telemetry instead of holding them pinned at the resolved
+      // scenario's status.
+      clearScenarioSectorOverrides();
     } else {
       incidentCompletionSeconds = null;
       rcBanner.classList.add('active');
@@ -1927,6 +1962,7 @@
       if(procRef){ procRef.textContent = crisisProcRef; }
       setModuleAlert('t1', 'critical', activeScenarioObjs.length > 1 ? 'Multiple Systems Critical' : (activeScenarioObjs[0] ? activeScenarioObjs[0].alertLabel : 'Node 3 Breach'));
       applyScenarioZoneStatus('critical');
+      setScenarioSectorOverrides('critical', labels.length > 1 ? 'Multiple systems critical — active procedure' : (labels[0] || 'Critical — active procedure'));
     }
   }
 
@@ -1956,6 +1992,7 @@
       Schematic3D.setZoneStatus(scenarioLibrary[id].zone, 'nominal');
     });
     activeScenarioObjs = [];
+    clearScenarioSectorOverrides();
     btnInject.disabled = false;
     scenarioSelect.disabled = false;
 
@@ -1983,7 +2020,7 @@
   // step list. On failure (network error, or a 404 when no procedure
   // documentation matches any sector in this feed) leaves the hand-authored
   // fallback already on screen in place — the same degrade-gracefully
-  // pattern fetchSectorSummary uses for Module 02.
+  // pattern fetchSectorSummary uses for the telemetry section below.
   function fetchCrisisAnalysis(events){
     return fetch(API_BASE_URL + '/crisis/analyze', {
       method: 'POST',
@@ -2028,6 +2065,7 @@
     var plan = buildInjectionPlan(selectedIds); // falls back to ['hull'] if nothing selected
     var runningIds = selectedIds.length ? selectedIds : ['hull'];
     activeScenarioObjs = runningIds.map(function(id){ return scenarioLibrary[id]; }).filter(Boolean);
+    setScenarioSectorOverrides('degrading', 'Anomaly in progress — cause not yet isolated');
 
     feedList.innerHTML = '';
     procedureSteps = defaultProcedureSteps.slice();
@@ -2082,6 +2120,9 @@
       }
 
       applyScenarioZoneStatus('critical');
+      setScenarioSectorOverrides('critical', triggeredObjs.length > 1
+        ? 'Multiple concurrent failures — root cause isolated'
+        : (triggeredObjs[0] ? triggeredObjs[0].rootCause.replace(/^Root cause: /, '') : 'Root cause isolated'));
       setModuleAlert('t1', 'critical', triggeredObjs.length > 1 ? 'Multiple Systems Critical' : (triggeredObjs[0] ? triggeredObjs[0].alertLabel : 'Node 3 Breach'));
       checklistStatus.textContent = 'Procedure ready — 0 of ' + procedureSteps.length + ' steps complete';
       renderChecklist();
@@ -2408,7 +2449,7 @@
       // increase — the station ran on the backup Soyuz-style facility for several
       // days until a replacement pump assembly came up on that flight. This sector
       // reuses that history as the grounding for its status thresholds, the same
-      // "canned-but-honest" pattern as the other Module 02 cards.
+      // "canned-but-honest" pattern as the other telemetry sector cards.
       id:'toilet', name:'Waste & Hygiene Compartment', state:{ pumpCurrent:1.3, cycles:812, tankLevel:38 }, history:[1.1,1.15,1.2,1.25,1.3],
       tick:function(applyJitter){
         if(applyJitter){
@@ -2449,29 +2490,37 @@
     return confidence >= 0.75 ? 'nominal' : confidence >= 0.5 ? 'caution' : 'critical';
   }
 
-  // Maps each Module 02 sector id to the group it drives on the habitat
-  // schematic in Module 01, so the deck map's zones pulse/dim in lockstep
-  // with the real sector status computed above.
+  // Maps each telemetry sector id to the zone group it drives on the
+  // habitat schematic above, so the deck map's zones pulse/dim in lockstep
+  // with the real sector status computed below.
   var schematicZoneIds = { oxygen:'oxygen', water:'water', power:'power', hull:'hull', nav:'nav' };
   function updateSchematicZones(){
     sectors.forEach(function(s){
       var zoneId = schematicZoneIds[s.id];
       if(!zoneId) return;
+      // An active scenario above owns this zone's schematic status — leave
+      // it alone instead of overwriting it with this sector's own
+      // independent tick() reading (see scenarioSectorOverrides).
+      if(scenarioSectorOverrides[zoneId]) return;
       Schematic3D.setZoneStatus(zoneId, s.status);
     });
   }
- 
+
   function renderSectors(){
     t2Grid.innerHTML = sectors.map(function(s){
-      return '<div class="sector-card">' +
+      var override = scenarioSectorOverrides[s.id];
+      var status = override ? override.status : s.status;
+      return '<div class="sector-card' + (override ? ' scenario-driven' : '') + '">' +
         '<div class="sector-head">' +
           '<div class="sector-head-top">' +
             '<div class="sector-name">' + sectorIcon(s.id) + s.name + '</div>' +
             (s.history ? '<span class="sector-spark">' + sparkline(s.history, 64, 20) + '</span>' : '') +
           '</div>' +
-          '<span class="sector-status ' + s.status + '">' + statusLabels[s.status] + '</span>' +
+          '<span class="sector-status ' + status + '">' + statusLabels[status] + '</span>' +
         '</div>' +
-        '<div class="sector-summary">' + (s.gaugeHtml || '') + s.summary +
+        '<div class="sector-summary">' + (s.gaugeHtml || '') +
+          (override ? '<span class="scenario-override-tag">Live — driven by active scenario above</span> ' + override.note + '<br>' : '') +
+          s.summary +
           (s.confidence != null ?
             ' <span class="met-value status-pill level-' + confidenceLevel(s.confidence) + '">' +
               Math.round(s.confidence * 100) + '%</span>' : '') +
@@ -2511,8 +2560,8 @@
  
   document.getElementById('btn-refresh-t2').addEventListener('click', function(){
     runDiagnosticPass(true);
-    // Module 04's water card derives its slope from this sector's rate — keep it in
-    // sync the moment telemetry updates, even if tab 04 isn't the one currently open.
+    // Module 03's water card derives its slope from this sector's rate — keep it in
+    // sync the moment telemetry updates, even if tab 03 isn't the one currently open.
     if(typeof renderSideResources === 'function') renderSideResources();
   });
  
@@ -2609,7 +2658,7 @@
         logIncident('T3', 'info', 'Triage step ' + (idx+1) + ' for ' + currentTriage.crew.name + (currentTriage.state[idx] ? ' confirmed administered.' : ' reopened.'));
         // Discrete inventory coupling: a step tagged with a medicine kit actually
         // draws down (or restores, on uncheck) that kit's on-hand dose count, and
-        // the Module 04 supply card recalculates immediately — even if that tab
+        // the Module 03 supply card recalculates immediately — even if that tab
         // isn't open right now.
         if(step && step.kit){
           adjustMedicineKit(step.kit, currentTriage.state[idx] ? -1 : 1, currentTriage.crew);
@@ -2699,7 +2748,7 @@
       if(c.allergy.indexOf('penicillin') !== -1){
         kitForInjection = 'B';
         headHtml += '<div class="triage-alert"><span class="ta-tag">Allergy alert — cross-checked against crew file</span>Do NOT use Kit A. ' + c.name + ' has a documented penicillin-class allergy with an anaphylaxis history. Use Kit B instead.</div>';
-        headHtml += '<div class="triage-alert"><span class="ta-tag">Supply risk — Module 04</span>' + c.name + ' is Kit-A-contraindicated, so this treatment draws exclusively on Kit B. Confirming this step below will decrement Kit B stock on the Supply &amp; Rationing card in real time.</div>';
+        headHtml += '<div class="triage-alert"><span class="ta-tag">Supply risk — Module 03</span>' + c.name + ' is Kit-A-contraindicated, so this treatment draws exclusively on Kit B. Confirming this step below will decrement Kit B stock on the Supply &amp; Rationing card in real time.</div>';
       }
       currentTriage = {
         crew:c, headHtml:headHtml,
@@ -2797,9 +2846,10 @@
  
   // Side resources (water, medicine, spare parts) — each card is now backed by real
   // state instead of a hand-set decorative slope:
-  //  - Water's depletion rate is derived live from Module 02's water recycler sector,
-  //    so a degrading recycler on tab 02 visibly steepens this line on tab 04.
-  //  - Medicine is a discrete Kit A / Kit B dose count, coupled to Module 03: checking
+  //  - Water's depletion rate is derived live from Module 01's water recycler sector,
+  //    so a degrading recycler in Module 01's telemetry section visibly steepens this
+  //    line on tab 03.
+  //  - Medicine is a discrete Kit A / Kit B dose count, coupled to Module 02: checking
   //    off a kit-tagged triage step decrements that kit and recalculates the card.
   //  - Spare parts is a discrete cartridge count whose draw rate still runs off the
   //    same extraLoss crop-failure coupling used elsewhere on this tab.
@@ -2818,7 +2868,7 @@
     return isFinite(days) ? days.toLocaleString() + ' days at current draw' : 'No measurable draw';
   }
 
-  // Module 02's water sector already ticks a recovery `rate` (70-98%). Rather than a
+  // Module 01's water sector already ticks a recovery `rate` (70-98%). Rather than a
   // hand-set monthly-loss constant, water's depletion slope is a direct function of
   // that rate: the closer to a fully closed recycling loop, the smaller the net draw.
   function waterMonthlyLossFromRate(rate){
@@ -2834,7 +2884,7 @@
     { id:'spareParts', name:'Spare Parts', extraLoss:0, cartridgeRemaining:6, cartridgeTotal:6 }
   ];
 
-  // Kit A / Kit B are tracked as real dose counts, not a percentage. Module 03's
+  // Kit A / Kit B are tracked as real dose counts, not a percentage. Module 02's
   // triage checklist mutates these directly via adjustMedicineKit() below.
   var medicineKits = {
     A: { label:'Kit A', total:36, remaining:36 },
@@ -2872,7 +2922,7 @@
     var thresholdStatus = r.extraLoss > 0 ? (days < 400 ? 'critical' : 'degrading') : 'nominal';
     var status = statusRank[waterSector.status] >= statusRank[thresholdStatus] ? waterSector.status : thresholdStatus;
     var statusLabel = status === 'critical' ? 'Critical' : status === 'degrading' ? 'Degrading' : 'Nominal';
-    var caption = formatDaysRemaining(days) + '. Draw derived live from Module 02’s water recycler recovery rate (' +
+    var caption = formatDaysRemaining(days) + '. Draw derived live from Module 01’s water recycler recovery rate (' +
       Math.round(rate * 10) / 10 + '%, ' + statusLabels[waterSector.status] + ').' +
       (r.extraLoss > 0 ? ' ' + r.elevatedNote : ' ' + r.normalNote);
     return {
@@ -3167,7 +3217,7 @@
   // Prototype for the "wire in real space data" idea: a space-weather
   // operational translator shaped around NOAA SWPC / NASA DONKI feed
   // fields, and an ISS telemetry translator shaped around the public
-  // ISS Lightstreamer channel list. Both reuse Module 02's tick()/
+  // ISS Lightstreamer channel list. Both reuse Module 01 telemetry's tick()/
   // status/summary/raw sector pattern — deterministic state driven by
   // a shared event level, not Math.random() dressed up as AI — and
   // there is no outbound network call anywhere in this section.
@@ -3228,7 +3278,7 @@
           summary = 'Kp index has risen to 5 (minor storm, G1). Possible aurora at high latitudes; negligible impact to habitat systems.';
         } else {
           kp = 7.7; status = 'critical';
-          summary = 'Kp index has spiked to 7.7 (strong storm, G3). Increased atmospheric drag and possible GPS/comms degradation — cross-check the Navigation sector in Module 02 for elevated drift.';
+          summary = 'Kp index has spiked to 7.7 (strong storm, G3). Increased atmospheric drag and possible GPS/comms degradation — cross-check the Navigation sector in Module 01’s telemetry section for elevated drift.';
         }
         this.status = status; this.summary = summary;
         this.gaugeHtml = '<div class="gauge-wrap">' + radialGauge(kp, 0, 9, 56) + '<span class="gauge-value"><span class="gv-num">' + kp.toFixed(1) + '</span><span class="gv-label">Kp of 9</span></span></div>';
@@ -3382,7 +3432,7 @@
       logSwAdvisory('warning', 'WATCH: R1-R2 (minor-moderate) radio blackout — M4.7 flare, AR3872, peak 13:41 UTC.');
     } else if(swEventLevel === 2){
       logSwAdvisory('critical', 'WARNING: X1.2 flare at 14:02 UTC — R3 radio blackout likely on dayside HF for ~36h; S2 proton event in progress; crew EVA window inadvisable for ~36h.');
-      // Cascading nudge into Module 02's Navigation sector — same "grounded, not
+      // Cascading nudge into Module 01's Navigation sector — same "grounded, not
       // random" discipline as the rest of the file: a severe storm measurably
       // degrades star-tracker performance, so this pushes that sector's real
       // state variable rather than faking a separate number.
