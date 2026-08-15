@@ -183,6 +183,12 @@
   @media (max-width:880px){ .t1-grid{grid-template-columns:1fr;} }
  
   .feed-controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+  .simplified-toggle{
+    display:flex;align-items:center;gap:6px;
+    font-family:var(--mono);font-size:11px;letter-spacing:0.02em;color:var(--ink-dim);
+    cursor:pointer;user-select:none;
+  }
+  .simplified-toggle input{accent-color:var(--invert-bg);cursor:pointer;width:13px;height:13px;}
   .scenario-select{
     background:var(--panel-3);border:1px solid var(--line-strong);color:var(--ink);
     font-family:var(--mono);font-size:11px;letter-spacing:0.02em;
@@ -663,6 +669,10 @@
         <div class="panel-head">
           <h3>Telemetry &amp; event feed</h3>
           <div class="feed-controls">
+            <label class="simplified-toggle" for="simplified-terms-toggle" title="Show failure points and alert labels in plain, everyday language instead of technical terms">
+              <input type="checkbox" id="simplified-terms-toggle">
+              Use simplified terms
+            </label>
             <select class="scenario-select" id="scenario-select" multiple size="3" aria-label="Failure points to inject — select one or more" title="Hold Cmd/Ctrl (or Shift for a range) to select more than one failure point">
               <option value="hull" selected>Hull breach — Node 3 starboard panel</option>
               <option value="oxygen">ECLSS — CO2 scrubber failure</option>
@@ -716,7 +726,6 @@
 
       <div class="t2-toolbar">
         <span class="t2-timestamp mono" id="t2-timestamp">Last diagnostic pass — MET 214:06:12:00</span>
-        <button class="btn small" id="btn-refresh-t2">Run new diagnostic pass</button>
       </div>
 
       <div class="t2-grid" id="t2-grid"></div>
@@ -1635,6 +1644,7 @@
     hull: {
       id: 'hull',
       label: 'Hull breach — Node 3 starboard panel',
+      simplifiedLabel: 'Outer wall leak (right side)',
       alertLabel: 'Node 3 Breach',
       securedLabel: 'Node 3 Secured',
       zone: 'hull',
@@ -1656,6 +1666,7 @@
     oxygen: {
       id: 'oxygen',
       label: 'ECLSS — CO2 scrubber failure',
+      simplifiedLabel: 'Air filter system broken',
       alertLabel: 'Scrubber Offline',
       securedLabel: 'Scrubber Secured',
       zone: 'oxygen',
@@ -1675,6 +1686,7 @@
     water: {
       id: 'water',
       label: 'Thermal — coolant loop rupture',
+      simplifiedLabel: 'Cooling pipe burst',
       alertLabel: 'Coolant Loop Breach',
       securedLabel: 'Coolant Loop Secured',
       zone: 'water',
@@ -1694,6 +1706,7 @@
     power: {
       id: 'power',
       label: 'Power — Bus B fault',
+      simplifiedLabel: 'Main power line failure',
       alertLabel: 'Bus B Offline',
       securedLabel: 'Bus B Secured',
       zone: 'power',
@@ -1713,6 +1726,7 @@
     nav: {
       id: 'nav',
       label: 'Nav/Comms — sensor drift + downlink loss',
+      simplifiedLabel: 'Lost GPS and radio signal',
       alertLabel: 'Guidance Degraded',
       securedLabel: 'Guidance Secured',
       zone: 'nav',
@@ -1730,6 +1744,33 @@
       ]
     }
   };
+
+  // "Use simplified terms" (#simplified-terms-toggle, in the Telemetry &
+  // event feed panel head) swaps every scenario's technical `label` for its
+  // plain-language `simplifiedLabel` wherever a failure point's name is
+  // shown to the operator — the scenario picker options, the sector
+  // override note on its telemetry card, the compound-emergency summary,
+  // and the after-action report. Falls back to the technical `label` if a
+  // scenario has no simplifiedLabel defined.
+  var useSimplifiedTerms = false;
+  function scenarioLabel(s){
+    return (useSimplifiedTerms && s.simplifiedLabel) ? s.simplifiedLabel : s.label;
+  }
+
+  // Re-labels the existing <option> elements in place (never rebuilds them)
+  // so the multi-select's current selection survives a toggle flip.
+  function renderScenarioOptions(){
+    Array.prototype.forEach.call(scenarioSelect.options, function(opt){
+      var scenario = scenarioLibrary[opt.value];
+      if(scenario) opt.textContent = scenarioLabel(scenario);
+    });
+  }
+  renderScenarioOptions();
+
+  document.getElementById('simplified-terms-toggle').addEventListener('change', function(e){
+    useSimplifiedTerms = e.target.checked;
+    renderScenarioOptions();
+  });
 
   // Builds the merged, delay-sorted event timeline for one or more selected
   // scenario ids. Each merged event carries its source scenario's id (used
@@ -1827,7 +1868,7 @@
   function setScenarioSectorOverrides(status, note){
     scenarioSectorOverrides = {};
     activeScenarioObjs.forEach(function(s){
-      scenarioSectorOverrides[s.zone] = { status: status, note: note || s.label };
+      scenarioSectorOverrides[s.zone] = { status: status, note: note || scenarioLabel(s) };
     });
     if(typeof renderSectors === 'function') renderSectors();
   }
@@ -1941,7 +1982,7 @@
     var total = procedureSteps.length;
     var done = checklistState.filter(Boolean).length;
     var procRef = document.getElementById('proc-ref');
-    var labels = activeScenarioObjs.map(function(s){ return s.label; });
+    var labels = activeScenarioObjs.map(function(s){ return scenarioLabel(s); });
     if(done === total && total > 0){
       incidentCompletionSeconds = metSeconds;
       rcBanner.classList.remove('active');
@@ -2115,7 +2156,7 @@
       incidentRootCause = pendingText;
 
       if(triggeredObjs.length > 1){
-        rcComplexity.textContent = 'Compound emergency — ' + triggeredObjs.length + ' concurrent failure points (' + triggeredObjs.map(function(s){ return s.label; }).join(', ') + ')';
+        rcComplexity.textContent = 'Compound emergency — ' + triggeredObjs.length + ' concurrent failure points (' + triggeredObjs.map(function(s){ return scenarioLabel(s); }).join(', ') + ')';
         rcComplexity.classList.add('visible');
       }
 
@@ -2223,7 +2264,7 @@
       recs.push('Procedure is not yet complete — regenerate this report once every checklist step is confirmed for a final response-time figure.');
     }
     if(activeScenarioObjs.length > 1){
-      recs.push(t1Criticals.length + ' critical alarms fired across ' + activeScenarioObjs.length + ' concurrent failure points (' + activeScenarioObjs.map(function(s){ return s.label; }).join(', ') + ') — review whether crew attention was split effectively across all of them.');
+      recs.push(t1Criticals.length + ' critical alarms fired across ' + activeScenarioObjs.length + ' concurrent failure points (' + activeScenarioObjs.map(function(s){ return scenarioLabel(s); }).join(', ') + ') — review whether crew attention was split effectively across all of them.');
     } else if(t1Criticals.length > 1){
       recs.push(t1Criticals.length + ' critical alarms fired before root cause was isolated — evaluate whether an earlier correlation between the contributing feeds could isolate the cause on fewer alarms.');
     }
@@ -2556,15 +2597,13 @@
     });
   }
 
+  // "Run new diagnostic pass" (manual re-tick, previously in the
+  // .t2-toolbar) is gone — this section now only ever reflects the baseline
+  // reading below plus whatever "Inject emergency scenario" above drives
+  // through scenarioSectorOverrides (see setScenarioSectorOverrides/
+  // renderSectors), instead of also allowing an independent manual re-tick.
   runDiagnosticPass(false); // initial pass — establishes the baseline reading, no jitter
- 
-  document.getElementById('btn-refresh-t2').addEventListener('click', function(){
-    runDiagnosticPass(true);
-    // Module 03's water card derives its slope from this sector's rate — keep it in
-    // sync the moment telemetry updates, even if tab 03 isn't the one currently open.
-    if(typeof renderSideResources === 'function') renderSideResources();
-  });
- 
+
   /* ============================================================ */
   /* TAB 3 — CREW MEDICAL & PSYCHOLOGICAL TRIAGE CONSOLE            */
   /* ============================================================ */
