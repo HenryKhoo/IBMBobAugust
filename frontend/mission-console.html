@@ -547,6 +547,29 @@
   .t8-stage{background:var(--panel-3);}
   .t8-target-ring{transition:r 0.2s linear;}
 
+  /* ============ TAB 6 : SOLAR FLARE SIMULATOR ============ */
+  .flare-view-toggle{display:flex;gap:6px;}
+  .flare-view-toggle .btn.active{background:var(--invert-bg);color:var(--invert-ink);border-color:var(--invert-bg);}
+  .flare-stage-wrap{flex:0 0 380px;display:flex;flex-direction:column;align-items:center;gap:10px;}
+  .flare-3d{width:100%;max-width:380px;height:300px;background:var(--panel-3);border:1px solid var(--line);cursor:grab;touch-action:none;}
+  .flare-3d:active{cursor:grabbing;}
+  .flare-3d canvas{display:block;width:100%;height:100%;}
+  .flare-2d{width:100%;max-width:380px;background:var(--panel-3);border:1px solid var(--line);}
+  .flare-2d svg{display:block;width:100%;height:auto;}
+  .flare-class-row{display:flex;gap:6px;width:100%;max-width:380px;}
+  .flare-class-btn{flex:1;padding:10px 4px;text-align:center;font-family:var(--mono);font-weight:700;font-size:13px;}
+  .flare-class-btn .fc-mult{display:block;font-weight:400;font-size:9px;color:var(--ink-faint);letter-spacing:0.03em;margin-top:2px;}
+  .flare-class-btn.active{background:var(--invert-bg);color:var(--invert-ink);border-color:var(--invert-bg);}
+  .flare-class-btn.active .fc-mult{color:var(--invert-ink);opacity:0.6;}
+  .flare-class-btn:disabled{opacity:0.5;cursor:default;}
+  .flare-readout{flex:1;min-width:240px;display:flex;flex-direction:column;gap:10px;}
+  .flare-shield-bar{height:7px;background:var(--panel-2);border:1px solid var(--line);overflow:hidden;}
+  .flare-shield-fill{height:100%;width:100%;background:var(--ink);transition:width .35s ease, background .35s ease;}
+  .flare-protect-row{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;letter-spacing:0.03em;color:var(--ink-dim);cursor:pointer;}
+  .flare-protect-row input{accent-color:var(--invert-bg);cursor:pointer;width:13px;height:13px;}
+  .flare-protection-list{margin:8px 0 0 0;padding-left:18px;font-size:12.5px;line-height:1.6;color:var(--ink-dim);}
+  .flare-protection-list li{margin-bottom:4px;}
+
   /* ============ HABITAT SCHEMATIC (3D DECK MODEL) ============ */
   .schematic-wrap{padding:16px;}
 
@@ -661,6 +684,9 @@
   </button>
   <button class="module-btn" data-tab="5" role="tab" aria-selected="false">
     <span class="mod-num">05</span><span class="mod-name">Try It Yourself</span>
+  </button>
+  <button class="module-btn" data-tab="6" role="tab" aria-selected="false">
+    <span class="mod-num">06</span><span class="mod-name">Solar Flare Simulator</span>
   </button>
 </nav>
  
@@ -1032,6 +1058,82 @@
             <button class="btn" id="t8-retry-btn">Retry</button>
           </div>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- TAB 6 — SOLAR FLARE SIMULATION & ANALYSIS                      -->
+  <!-- ============================================================ -->
+  <section class="tab-panel" id="tab-6">
+    <div class="module-head">
+      <span class="label-eyebrow">Module 06 · Interactive</span>
+      <h2 class="module-title">Solar Flare Simulation &amp; Analysis</h2>
+      <p class="module-desc">Fire solar flares of five different strengths from the Sun toward a spacecraft on route to Earth, and see how each one plays out — from a shrug to a full shield-down reboot — then unlock the real-world defenses that limit the damage.</p>
+    </div>
+
+    <p class="t5-proto-note"><b>How it works —</b> this is a hands-built simulation, not live space-weather data (Module 04 covers that). Pick a flare class below to launch it and watch the effect on the spacecraft and on Earth. Toggle <b>Pre-shield spacecraft</b> to see how much early warning and safe-mode shielding actually prevent.</p>
+
+    <div class="panel t6-game-panel">
+      <div class="panel-head">
+        <h3>Sun &middot; spacecraft &middot; Earth</h3>
+        <div style="display:flex;align-items:center;gap:14px;">
+          <span class="checklist-status" id="flare-status-label">Idle — pick a flare class to launch it</span>
+          <div class="flare-view-toggle" role="tablist" aria-label="Simulator view">
+            <button class="btn small active" id="flare-view-3d" type="button">3D</button>
+            <button class="btn small" id="flare-view-2d" type="button">2D</button>
+          </div>
+        </div>
+      </div>
+      <div class="t6-game-layout" style="padding:16px;">
+        <div class="flare-stage-wrap">
+          <div class="flare-3d" id="flare-stage-3d" role="img" aria-label="3D scene of the Sun, Earth, and a spacecraft, showing solar flare eruptions travelling from the Sun and their impact on the spacecraft and Earth"></div>
+          <div class="flare-2d" id="flare-stage-2d" hidden></div>
+          <p class="t6-hint" id="flare-stage-hint">Drag to orbit &middot; scroll to zoom</p>
+        </div>
+        <div class="flare-readout">
+          <div class="flare-class-row">
+            <button class="btn flare-class-btn" data-class="A" title="Smallest">A<span class="fc-mult">&times;1</span></button>
+            <button class="btn flare-class-btn" data-class="B" title="Small">B<span class="fc-mult">&times;10</span></button>
+            <button class="btn flare-class-btn" data-class="C" title="Moderate">C<span class="fc-mult">&times;100</span></button>
+            <button class="btn flare-class-btn" data-class="M" title="Strong">M<span class="fc-mult">&times;1,000</span></button>
+            <button class="btn flare-class-btn" data-class="X" title="Most powerful">X<span class="fc-mult">&times;10,000</span></button>
+          </div>
+          <label class="flare-protect-row">
+            <input type="checkbox" id="flare-protect-toggle">
+            Pre-shield spacecraft (early warning + safe mode)
+          </label>
+          <div class="t6-stat-row"><span class="label">Spacecraft shield</span><span class="value" id="flare-shield-val">100%</span></div>
+          <div class="flare-shield-bar"><div class="flare-shield-fill" id="flare-shield-fill"></div></div>
+          <div class="t6-stat-row"><span class="label">Spacecraft status</span><span class="value" id="flare-craft-status">Nominal</span></div>
+          <div class="t6-stat-row"><span class="label">Earth effect</span><span class="value" id="flare-earth-status">None</span></div>
+          <div class="t6-result-banner" id="flare-result-banner">
+            <span class="t6-result-icon" id="flare-result-icon">&#9679;</span>
+            <span id="flare-result-text"></span>
+          </div>
+          <div class="t6-controls">
+            <button class="btn" id="flare-reset-btn">Reset simulator</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:18px;">
+      <div class="panel-head"><h3>Mission log</h3></div>
+      <div class="feed-list" id="flare-log-list" style="height:200px;">
+        <div class="feed-empty" id="flare-log-empty">No flares fired yet.</div>
+      </div>
+    </div>
+
+    <div class="module-head" style="margin-top:32px;">
+      <span class="label-eyebrow">Activity 4</span>
+      <h3 class="module-title" style="font-size:17px;">Can We Protect Ourselves?</h3>
+      <p class="module-desc">We can't stop a solar flare from happening. Fire an M-class or X-class flare above to unlock the strategies that keep flares like these from becoming disasters.</p>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>Protection strategies</h3></div>
+      <div class="triage-output" id="flare-protection-output">
+        <p>Locked — launch an M-class or X-class flare above to unlock this section.</p>
       </div>
     </div>
   </section>
@@ -4325,6 +4427,416 @@
     resetState();
     render();
   });
+
+})();
+</script>
+
+<!-- ============================================================ -->
+<!-- MODULE 06 — SOLAR FLARE SIMULATION & ANALYSIS (self-contained)  -->
+<!-- ============================================================ -->
+<script>
+(function(){
+  var tab6 = document.getElementById('tab-6');
+  var stage3d = document.getElementById('flare-stage-3d');
+  var stage2d = document.getElementById('flare-stage-2d');
+  if(!tab6 || !stage3d || !stage2d) return;
+
+  /* ---------------------------------------------------------------- */
+  /* Flare class data — A through X, each 10x the one before it.       */
+  /* ---------------------------------------------------------------- */
+  var FLARE_CLASSES = {
+    A: { color:'#ffe9a8', color3d:0xffe9a8, dmg:0,  earth:'none',
+         desc:'Background-level activity — the smallest class. No measurable effect on the spacecraft or on Earth.' },
+    B: { color:'#ffcf7a', color3d:0xffcf7a, dmg:1,  earth:'none',
+         desc:'A small flare. Brief sensor noise on the spacecraft that clears on its own; nothing noticeable at Earth.' },
+    C: { color:'#ffa63d', color3d:0xffa63d, dmg:4,  earth:'none',
+         desc:'Moderate — the most common class. A short instrument glitch that auto-recovers; still nothing at Earth.' },
+    M: { color:'#ff6a3d', color3d:0xff5a2e, dmg:18, earth:'minor',
+         desc:'A strong flare. The spacecraft issues a radiation warning and auto-safes non-critical systems; Earth may see a brief radio blackout near the poles.' },
+    X: { color:'#ff3b30', color3d:0xff3b30, dmg:45, earth:'major',
+         desc:'The most powerful class. The spacecraft’s shields flare and it needs a full system reboot, with real risk to GPS and comms; Earth sees radio blackouts, grid stress, and an expanding aurora.' }
+  };
+  var CLASS_ORDER = ['A', 'B', 'C', 'M', 'X'];
+  var PROTECT_MULT = 0.35;
+
+  var state = { shield:100, protect:false, view:'3d', unlocked:false, firing:false };
+
+  /* ---------------------------------------------------------------- */
+  /* Shared DOM refs + readout / log / protection-panel helpers        */
+  /* ---------------------------------------------------------------- */
+  var statusLabel = document.getElementById('flare-status-label');
+  var classBtns = document.querySelectorAll('.flare-class-btn');
+  var protectToggle = document.getElementById('flare-protect-toggle');
+  var shieldValEl = document.getElementById('flare-shield-val');
+  var shieldFillEl = document.getElementById('flare-shield-fill');
+  var craftStatusEl = document.getElementById('flare-craft-status');
+  var earthStatusEl = document.getElementById('flare-earth-status');
+  var resultBanner = document.getElementById('flare-result-banner');
+  var resultText = document.getElementById('flare-result-text');
+  var resetBtn = document.getElementById('flare-reset-btn');
+  var logList = document.getElementById('flare-log-list');
+  var protectionOutput = document.getElementById('flare-protection-output');
+  var viewBtn3d = document.getElementById('flare-view-3d');
+  var viewBtn2d = document.getElementById('flare-view-2d');
+  var stageHint = document.getElementById('flare-stage-hint');
+
+  function fmtSubclass(cls){
+    return cls + (1 + Math.random() * 8.9).toFixed(1);
+  }
+
+  function earthEffectLabel(level){
+    if(level === 'minor') return 'Minor — polar radio blackout risk';
+    if(level === 'major') return 'Major — radio blackout, grid stress, aurora';
+    return 'None';
+  }
+
+  function updateReadout(){
+    var pct = Math.max(0, Math.round(state.shield));
+    shieldValEl.textContent = pct + '%';
+    shieldFillEl.style.width = pct + '%';
+    shieldFillEl.style.background = pct > 55 ? 'var(--ink)' : (pct > 20 ? 'var(--ink-dim)' : '#ff3b30');
+    craftStatusEl.textContent = state.shield <= 0 ? 'Shields down — reboot required'
+      : state.shield < 40 ? 'Safe mode — non-critical systems offline'
+      : 'Nominal';
+  }
+
+  function logEvent(sev, msg){
+    var empty = document.getElementById('flare-log-empty');
+    if(empty) empty.remove();
+    var el = document.createElement('div');
+    el.className = 'feed-entry sev-' + sev;
+    el.innerHTML = '<div class="feed-sev mono">' + sev + '</div><div class="feed-body"><div class="feed-msg">' + msg + '</div></div>';
+    logList.appendChild(el);
+    logList.scrollTop = logList.scrollHeight;
+  }
+
+  function unlockProtection(){
+    if(state.unlocked) return;
+    state.unlocked = true;
+    protectionOutput.innerHTML =
+      '<p style="margin:0 0 6px 0;">We can’t stop a flare from happening, but four real strategies limit the damage:</p>' +
+      '<ul class="flare-protection-list">' +
+        '<li><b>Early warning</b> — space-weather radars and dedicated spacecraft watch the Sun, so operators know a flare is coming before it arrives.</li>' +
+        '<li><b>Shielding &amp; safe mode</b> — satellites are hardened against radiation and can switch into a protective safe mode for the duration of a big event; power grids are hardened against the same kind of surge.</li>' +
+        '<li><b>Backup systems</b> — GPS, navigation, and communications keep a fallback path, so a knocked-out primary system doesn’t leave anyone stranded.</li>' +
+        '<li><b>Education &amp; awareness</b> — the more people understand what a flare can and can’t do, the faster everyone can prepare.</li>' +
+      '</ul>';
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* View-agnostic controller — fires a flare, updates state/DOM, and   */
+  /* hands the visual off to whichever view (3D or 2D) is active.       */
+  /* ---------------------------------------------------------------- */
+  var resetVisuals3d = function(){};
+  var resetVisuals2d = function(){};
+  var burst3d = function(cls, info, subclass){ onBurstDone(cls, subclass); };
+  var burst2d = function(cls, info, subclass){ onBurstDone(cls, subclass); };
+  var setStaticShield3d = function(){};
+  var setStaticShield2d = function(){};
+  var setStaticEarth3d = function(){};
+  var setStaticEarth2d = function(){};
+
+  function fireFlare(cls){
+    if(state.firing) return;
+    var info = FLARE_CLASSES[cls];
+    if(!info) return;
+    var subclass = fmtSubclass(cls);
+    var dmg = info.dmg * (state.protect ? PROTECT_MULT : 1);
+    state.shield = Math.max(0, state.shield - dmg);
+    updateReadout();
+    earthStatusEl.textContent = earthEffectLabel(info.earth);
+
+    resultBanner.classList.add('visible');
+    resultText.textContent = subclass + ' flare — ' + info.desc + (state.protect && info.dmg > 0 ? ' Pre-shielding cut the damage.' : '');
+
+    var sev = (cls === 'X') ? 'critical' : (cls === 'M') ? 'warning' : 'info';
+    logEvent(sev, subclass + ' flare detected' + (dmg > 0 ? ' — shield down ' + (Math.round(dmg * 10) / 10) + '%' : ' — no action needed') +
+      (info.earth !== 'none' ? '; ' + earthEffectLabel(info.earth).toLowerCase() : '') + '.');
+
+    if(cls === 'M' || cls === 'X') unlockProtection();
+
+    statusLabel.textContent = subclass + ' flare in transit — Sun to spacecraft';
+    state.firing = true;
+    classBtns.forEach(function(b){ b.disabled = true; });
+    setStaticShield3d(state.shield); setStaticShield2d(state.shield);
+    setStaticEarth3d(info.earth); setStaticEarth2d(info.earth);
+    if(state.view === '3d'){ burst3d(cls, info, subclass); } else { burst2d(cls, info, subclass); }
+  }
+
+  function onBurstDone(){
+    state.firing = false;
+    classBtns.forEach(function(b){ b.disabled = false; });
+    statusLabel.textContent = state.shield <= 0 ? 'Spacecraft shields down — reset to continue' : 'Idle — pick a flare class to launch it';
+  }
+
+  function resetSim(){
+    state.shield = 100;
+    state.protect = false;
+    protectToggle.checked = false;
+    updateReadout();
+    earthStatusEl.textContent = 'None';
+    resultBanner.classList.remove('visible');
+    classBtns.forEach(function(b){ b.classList.remove('active'); b.disabled = false; });
+    logList.innerHTML = '<div class="feed-empty" id="flare-log-empty">No flares fired yet.</div>';
+    statusLabel.textContent = 'Idle — pick a flare class to launch it';
+    state.firing = false;
+    resetVisuals3d();
+    resetVisuals2d();
+  }
+
+  function setView(v){
+    state.view = v;
+    viewBtn3d.classList.toggle('active', v === '3d');
+    viewBtn2d.classList.toggle('active', v === '2d');
+    stage3d.hidden = v !== '3d';
+    stage2d.hidden = v !== '2d';
+    stageHint.textContent = v === '3d' ? 'Drag to orbit · scroll to zoom' : 'Top-down view of the Sun – spacecraft – Earth line';
+  }
+
+  classBtns.forEach(function(btn){
+    btn.addEventListener('click', function(){
+      classBtns.forEach(function(b){ b.classList.toggle('active', b === btn); });
+      fireFlare(btn.getAttribute('data-class'));
+    });
+  });
+  protectToggle.addEventListener('change', function(){ state.protect = protectToggle.checked; });
+  resetBtn.addEventListener('click', resetSim);
+  viewBtn3d.addEventListener('click', function(){ setView('3d'); });
+  viewBtn2d.addEventListener('click', function(){ setView('2d'); });
+
+  updateReadout();
+
+  /* ================================================================ */
+  /* 3D scene — Sun, Earth, spacecraft. Same global-THREE + OrbitControls */
+  /* + ResizeObserver setup as Module 01's hull schematic, above.        */
+  /* ================================================================ */
+  (function(){
+    if(!stage3d || typeof THREE === 'undefined') return;
+
+    var scene = new THREE.Scene();
+    var camera = new THREE.PerspectiveCamera(45, 1, 0.1, 400);
+    camera.position.set(8, 20, 55);
+
+    var renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    stage3d.appendChild(renderer.domElement);
+
+    scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+
+    (function starfield(){
+      var count = 800;
+      var pos = new Float32Array(count * 3);
+      for(var i = 0; i < count; i++){
+        var r = 120 + Math.random() * 120;
+        var theta = Math.random() * Math.PI * 2;
+        var phi = Math.acos(2 * Math.random() - 1);
+        pos[i*3] = r * Math.sin(phi) * Math.cos(theta);
+        pos[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
+        pos[i*3+2] = r * Math.cos(phi);
+      }
+      var geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      scene.add(new THREE.Points(geo, new THREE.PointsMaterial({ color:0xffffff, size:0.6, sizeAttenuation:true })));
+    })();
+
+    var SUN_R = 5, ORBIT_R = 26, EARTH_R = 1.5, CRAFT_X = 12;
+
+    var sun = new THREE.Mesh(new THREE.SphereGeometry(SUN_R, 32, 32), new THREE.MeshBasicMaterial({ color:0xff3020 }));
+    scene.add(sun);
+    var sunGlow = new THREE.Mesh(new THREE.SphereGeometry(SUN_R * 1.35, 24, 24), new THREE.MeshBasicMaterial({ color:0xff5a2e, transparent:true, opacity:0.28 }));
+    scene.add(sunGlow);
+    scene.add(new THREE.PointLight(0xffddaa, 2.6, 0, 0));
+
+    var orbitPts = new THREE.EllipseCurve(0, 0, ORBIT_R, ORBIT_R, 0, Math.PI * 2, false, 0).getPoints(96).map(function(p){ return new THREE.Vector3(p.x, 0, p.y); });
+    scene.add(new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(orbitPts), new THREE.LineBasicMaterial({ color:0x445066, transparent:true, opacity:0.5 })));
+
+    var earthGroup = new THREE.Group();
+    var earth = new THREE.Mesh(new THREE.SphereGeometry(EARTH_R, 24, 24), new THREE.MeshStandardMaterial({ color:0x2f6fd6, roughness:0.75 }));
+    earthGroup.add(earth);
+    var earthRing = new THREE.Mesh(new THREE.TorusGeometry(EARTH_R * 1.6, 0.05, 8, 32), new THREE.MeshBasicMaterial({ color:0x7fd7ff, transparent:true, opacity:0.18 }));
+    earthGroup.add(earthRing);
+    earthGroup.position.set(ORBIT_R, 0, 0);
+    scene.add(earthGroup);
+
+    function buildCraft(){
+      var g = new THREE.Group();
+      var bodyMat = new THREE.MeshStandardMaterial({ color:0xd8dee9, roughness:0.4, metalness:0.5 });
+      var accentMat = new THREE.MeshStandardMaterial({ color:0xff5a3c, roughness:0.4 });
+      var nose = new THREE.Mesh(new THREE.ConeGeometry(0.5, 1.3, 10), bodyMat);
+      nose.rotation.z = -Math.PI / 2; nose.position.x = 1.3;
+      g.add(nose);
+      var body = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 2.0, 10), bodyMat);
+      body.rotation.z = Math.PI / 2;
+      g.add(body);
+      var wingGeo = new THREE.BoxGeometry(0.8, 0.08, 1.5);
+      var wL = new THREE.Mesh(wingGeo, accentMat); wL.position.set(-0.3, 0, 0.85); g.add(wL);
+      var wR = new THREE.Mesh(wingGeo, accentMat); wR.position.set(-0.3, 0, -0.85); g.add(wR);
+      return g;
+    }
+    var craft = buildCraft();
+    craft.position.set(CRAFT_X, 0, 0);
+    scene.add(craft);
+    var shieldBubble = new THREE.Mesh(new THREE.SphereGeometry(1.9, 16, 16), new THREE.MeshBasicMaterial({ color:0x9fd8ff, wireframe:true, transparent:true, opacity:0.35 }));
+    craft.add(shieldBubble);
+
+    function sizeToContainer(){
+      var w = stage3d.clientWidth || 1, h = stage3d.clientHeight || 1;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+    }
+    sizeToContainer();
+    window.addEventListener('resize', sizeToContainer);
+    if(window.ResizeObserver) new ResizeObserver(sizeToContainer).observe(stage3d);
+
+    var controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.target.set(10, 0, 0);
+    controls.minDistance = 16;
+    controls.maxDistance = 110;
+
+    setStaticShield3d = function(pct){
+      shieldBubble.material.opacity = 0.1 + 0.35 * Math.max(0, pct) / 100;
+      shieldBubble.material.color.setHex(pct > 20 ? 0x9fd8ff : 0xff3b30);
+    };
+    setStaticEarth3d = function(level){
+      earthRing.material.opacity = level === 'major' ? 0.7 : level === 'minor' ? 0.4 : 0.18;
+      earthRing.material.color.setHex(level === 'major' ? 0xff5a2e : 0x7fd7ff);
+    };
+    resetVisuals3d = function(){
+      setStaticShield3d(100);
+      setStaticEarth3d('none');
+      flashUntil = 0;
+      burstGroup.visible = false;
+    };
+
+    var burstGroup = new THREE.Group();
+    burstGroup.visible = false;
+    scene.add(burstGroup);
+    var burstPoints = null, burstStart = 0, burstDuration = 0, flashUntil = 0;
+    var burstFrom = new THREE.Vector3(0, 0, 0), burstTo = new THREE.Vector3(CRAFT_X, 0, 0);
+
+    burst3d = function(cls, info, subclass){
+      if(burstPoints){ burstGroup.remove(burstPoints); burstPoints.geometry.dispose(); burstPoints.material.dispose(); burstPoints = null; }
+      var count = 40 + CLASS_ORDER.indexOf(cls) * 30;
+      var pos = new Float32Array(count * 3);
+      for(var i = 0; i < count; i++){
+        var theta = Math.random() * Math.PI * 2;
+        var phi = Math.acos(2 * Math.random() - 1);
+        var rr = SUN_R * (0.9 + Math.random() * 0.3);
+        pos[i*3]   = rr * Math.sin(phi) * Math.cos(theta);
+        pos[i*3+1] = rr * Math.sin(phi) * Math.sin(theta) * 0.3;
+        pos[i*3+2] = rr * Math.cos(phi);
+      }
+      var geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      var mat = new THREE.PointsMaterial({ color: info.color3d, size: 0.9, transparent:true, opacity:0.9, sizeAttenuation:true });
+      burstPoints = new THREE.Points(geo, mat);
+      burstGroup.add(burstPoints);
+      burstGroup.visible = true;
+      burstStart = performance.now();
+      burstDuration = 1100;
+      flashUntil = burstStart + burstDuration + 250;
+      sunGlow.userData.pulse = 1.6;
+      setTimeout(function(){ onBurstDone(cls, subclass); }, burstDuration + 120);
+    };
+
+    setStaticShield3d(100);
+    setStaticEarth3d('none');
+
+    var clock = new THREE.Clock();
+    function animate(){
+      requestAnimationFrame(animate);
+      var t = clock.getElapsedTime();
+      earthGroup.position.set(Math.cos(t * 0.05) * ORBIT_R, 0, Math.sin(t * 0.05) * ORBIT_R);
+      earth.rotation.y += 0.004;
+      sunGlow.scale.setScalar(1 + Math.sin(t * 1.2) * 0.03 + (sunGlow.userData.pulse || 0));
+      if(sunGlow.userData.pulse) sunGlow.userData.pulse = Math.max(0, sunGlow.userData.pulse - 0.03);
+
+      if(burstGroup.visible && burstPoints){
+        var p = Math.min(1, (performance.now() - burstStart) / burstDuration);
+        var target = burstFrom.clone().lerp(burstTo, p);
+        var arr = burstPoints.geometry.attributes.position.array;
+        for(var i = 0; i < arr.length; i += 3){
+          arr[i]   = target.x + (arr[i]   - burstFrom.x) * (1 - p * 0.6);
+          arr[i+1] = target.y + (arr[i+1] - burstFrom.y) * (1 - p * 0.6);
+          arr[i+2] = target.z + (arr[i+2] - burstFrom.z) * (1 - p * 0.6);
+        }
+        burstPoints.geometry.attributes.position.needsUpdate = true;
+        burstPoints.material.opacity = 0.9 * (1 - p * 0.4);
+        if(p >= 1) burstGroup.visible = false;
+      }
+      if(flashUntil && performance.now() < flashUntil){
+        shieldBubble.material.opacity = 0.55;
+      } else if(flashUntil){
+        flashUntil = 0;
+        setStaticShield3d(state.shield);
+      }
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    requestAnimationFrame(animate);
+  })();
+
+  /* ================================================================ */
+  /* 2D scene — top-down SVG diagram, same string-built-SVG convention   */
+  /* as the DART Navigator / deorbit simulator stages, above.            */
+  /* ================================================================ */
+  (function(){
+    if(!stage2d) return;
+    var SUN_X = 40, CRAFT_X2 = 170, EARTH_X = 350, LINE_Y = 100;
+
+    stage2d.innerHTML =
+      '<svg viewBox="0 0 380 200" width="380" height="200">' +
+        '<line x1="' + (SUN_X + 26) + '" y1="' + LINE_Y + '" x2="' + (EARTH_X - 14) + '" y2="' + LINE_Y + '" stroke="var(--line)" stroke-width="1" stroke-dasharray="3,3"/>' +
+        '<circle id="flare-2d-glow" cx="' + SUN_X + '" cy="' + LINE_Y + '" r="30" fill="#ff5a2e" opacity="0.22"/>' +
+        '<circle cx="' + SUN_X + '" cy="' + LINE_Y + '" r="20" fill="#ff3020"/>' +
+        '<text x="' + SUN_X + '" y="' + (LINE_Y + 38) + '" text-anchor="middle" font-family="var(--mono)" font-size="8" fill="var(--ink-faint)">SUN</text>' +
+        '<circle id="flare-2d-shield-ring" cx="' + CRAFT_X2 + '" cy="' + LINE_Y + '" r="15" fill="none" stroke="#9fd8ff" stroke-width="1.6" opacity="0.5"/>' +
+        '<polygon points="' + (CRAFT_X2 - 8) + ',' + LINE_Y + ' ' + (CRAFT_X2 + 8) + ',' + (LINE_Y - 6) + ' ' + (CRAFT_X2 + 8) + ',' + (LINE_Y + 6) + '" fill="var(--ink)"/>' +
+        '<text x="' + CRAFT_X2 + '" y="' + (LINE_Y + 32) + '" text-anchor="middle" font-family="var(--mono)" font-size="8" fill="var(--ink-faint)">SPACECRAFT</text>' +
+        '<circle id="flare-2d-earth-ring" cx="' + EARTH_X + '" cy="' + LINE_Y + '" r="18" fill="none" stroke="#7fd7ff" stroke-width="1.6" opacity="0.25"/>' +
+        '<circle cx="' + EARTH_X + '" cy="' + LINE_Y + '" r="11" fill="#2f6fd6"/>' +
+        '<text x="' + EARTH_X + '" y="' + (LINE_Y + 34) + '" text-anchor="middle" font-family="var(--mono)" font-size="8" fill="var(--ink-faint)">EARTH</text>' +
+        '<circle id="flare-2d-burst" cx="' + SUN_X + '" cy="' + LINE_Y + '" r="0" fill="#ff3020" opacity="0"/>' +
+      '</svg>';
+
+    var shieldRingEl = document.getElementById('flare-2d-shield-ring');
+    var earthRingEl = document.getElementById('flare-2d-earth-ring');
+    var burstEl = document.getElementById('flare-2d-burst');
+
+    setStaticShield2d = function(pct){
+      shieldRingEl.setAttribute('opacity', (0.2 + 0.5 * Math.max(0, pct) / 100).toFixed(2));
+      shieldRingEl.setAttribute('stroke', pct > 20 ? '#9fd8ff' : '#ff3b30');
+    };
+    setStaticEarth2d = function(level){
+      earthRingEl.setAttribute('opacity', level === 'major' ? '0.75' : level === 'minor' ? '0.45' : '0.25');
+      earthRingEl.setAttribute('stroke', level === 'major' ? '#ff5a2e' : '#7fd7ff');
+    };
+    resetVisuals2d = function(){ setStaticShield2d(100); setStaticEarth2d('none'); burstEl.setAttribute('opacity', '0'); };
+    setStaticShield2d(100);
+    setStaticEarth2d('none');
+
+    var animId = null, burstStart2 = 0, burstDuration2 = 1100;
+    burst2d = function(cls, info, subclass){
+      var startR = 5 + CLASS_ORDER.indexOf(cls) * 2;
+      burstEl.setAttribute('fill', info.color);
+      burstStart2 = performance.now();
+      if(animId) cancelAnimationFrame(animId);
+      function tick(){
+        var p = Math.min(1, (performance.now() - burstStart2) / burstDuration2);
+        var x = SUN_X + (CRAFT_X2 - SUN_X) * p;
+        burstEl.setAttribute('cx', x.toFixed(1));
+        burstEl.setAttribute('r', (startR * (1 - p * 0.3)).toFixed(1));
+        burstEl.setAttribute('opacity', (0.9 * (1 - p * 0.3)).toFixed(2));
+        if(p < 1){ animId = requestAnimationFrame(tick); }
+        else { burstEl.setAttribute('opacity', '0'); onBurstDone(cls, subclass); }
+      }
+      tick();
+    };
+  })();
 
 })();
 </script>
