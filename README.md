@@ -18,7 +18,7 @@ Builders Challenge (August theme: *Reimagine Space Exploration with AI*).
 1. Watch the crisis timeline to see the console read the live event feed, isolate the event that matters, and build the matching emergency procedure step by step.
 2. Read the telemetry translator for a plain language status on each life support sector, complete with a confidence score and a line showing what the reading is grounded in.
 3. Describe a crew member's symptoms in plain English to run a triage; the console cross references their biometrics and file for an immediate, grounded protocol.
-4. Trigger a supply shortfall and adjust the ration and resupply window to simulate rationing and see a survival probability with a grounded recommendation.
+4. Trigger a Veggie grow-chamber failure, diagnose the cause, and tune the LED spectrum and water delivery method to recover the crop — a hands-on simulation grounded in NASA's real Veggie/APH plant-research findings, not the retrieval pipeline.
 5. Search the mission log and procedure library directly to ask a question, and get an answer sourced back to the passage it came from.
 
 ## Demo
@@ -29,7 +29,7 @@ Demo video: [add the demo video link]
 
 ### Retrieval-augmented generation — IBM Granite embeddings + Pinecone
 
-Mission documents, including emergency procedures, sector specifications, crew files, and prior incident records, are chunked, embedded with IBM's Granite embedding model on watsonx.ai, and indexed in a Pinecone serverless vector database. Every generated answer, whether it is a telemetry summary, a crisis root cause, a triage protocol, or a rationing plan, is answered from passages retrieved from that index rather than the model's own memory. This keeps every AI response traceable back to a real source document instead of a guess.
+Mission documents, including emergency procedures, sector specifications, crew files, and prior incident records, are chunked, embedded with IBM's Granite embedding model on watsonx.ai, and indexed in a Pinecone serverless vector database. Every generated answer, whether it is a telemetry summary, a crisis root cause, or a triage protocol, is answered from passages retrieved from that index rather than the model's own memory. This keeps every AI response traceable back to a real source document instead of a guess. (The Growing Plants in Space module and the "Try It Yourself" modules are hands-on client-side simulations, not backed by this retrieval pipeline.)
 
 ### Grounded decision support — IBM watsonx.ai
 
