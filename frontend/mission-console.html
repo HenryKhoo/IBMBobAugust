@@ -418,7 +418,10 @@
   }
   .triage-steps li:last-child{border-bottom:none;}
   .triage-steps .ts-num{font-family:var(--mono);color:var(--ink-faint);flex-shrink:0;}
- 
+
+  .suit-reference{margin-top:16px;}
+  .suit-reference img{width:100%;display:block;border-top:1px solid var(--line);}
+
   /* ============ TAB 4 : SUPPLY & RATIONING ============ */
   .t4-top-grid{
     display:grid;
@@ -840,6 +843,18 @@
         <div class="triage-output" id="triage-output">
           <p class="triage-placeholder">No analysis run yet. Select a crew member, describe the symptoms, and run the analysis.</p>
         </div>
+      </div>
+    </div>
+
+    <div class="panel suit-reference">
+      <div class="panel-head"><h3>EVA suit reference — full suit diagram</h3></div>
+      <img src="public/nasa-eva-suit-reference.png"
+           alt="NASA EVA spacesuit diagram: helmet, gloves, portable life support system, hard upper torso, lower torso, communications carrier, cooling garment, and colored ID stripes."
+           loading="lazy">
+      <div class="proc-ref">
+        Reference: NASA, "Spacewalk: Spacesuit Basics" —
+        <a href="https://www.nasa.gov/feature/spacewalk-spacesuit-basics" target="_blank" rel="noopener">nasa.gov/feature/spacewalk-spacesuit-basics</a>.
+        Provided for crew reference during suit-related injury or EVA-anomaly triage; not part of the RAG-grounded index.
       </div>
     </div>
   </section>
