@@ -619,39 +619,12 @@
     border-top:1px solid var(--line);
   }
 
-  /* ============ BOOT SEQUENCE ============ */
-  .boot-overlay{
-    position:fixed; inset:0; z-index:9999;
-    background:var(--bg);
-    display:flex; flex-direction:column; justify-content:center;
-    padding:48px; gap:2px;
-    transition:opacity .4s ease;
-  }
-  .boot-overlay.boot-hidden{opacity:0; pointer-events:none;}
-  .boot-mark{
-    font-family:var(--mono); font-weight:700; font-size:12px; letter-spacing:0.02em;
-    color:var(--ink-faint); border:1px solid var(--line-strong);
-    width:34px; height:34px; display:flex; align-items:center; justify-content:center;
-    margin-bottom:20px;
-  }
-  .boot-lines{font-family:var(--mono);font-size:12.5px;line-height:1.95;color:var(--ink-dim);max-width:540px;}
-  .boot-line{opacity:0;animation:boot-line-in .15s ease forwards;}
-  .boot-line .boot-ok{color:var(--ink);font-weight:600;}
-  @keyframes boot-line-in{from{opacity:0;transform:translateY(2px);}to{opacity:1;transform:translateY(0);}}
-  .boot-skip{position:absolute;bottom:40px;right:48px;}
-  @media (prefers-reduced-motion:reduce){ .boot-line{animation:none;opacity:1;} }
-
   /* ============ THEME TOGGLE ============ */
   .theme-toggle{letter-spacing:0.08em;}
 </style>
 </head>
 <body>
 
-<div class="boot-overlay" id="boot-overlay" role="status" aria-live="polite">
-  <div class="boot-mark">K7</div>
-  <div class="boot-lines" id="boot-lines"></div>
-  <button class="btn small boot-skip" id="boot-skip" aria-label="Skip boot sequence">Skip</button>
-</div>
 
 <header class="topbar">
   <div class="brand">
@@ -1087,60 +1060,6 @@
   function themeTokenHexInt(name){
     return parseInt(themeToken(name).replace('#', ''), 16);
   }
-
-  /* ============================================================ */
-  /* BOOT SEQUENCE — POST-style self-test overlay                   */
-  /* ============================================================ */
-  // Purely cosmetic gate in front of the console: everything else in this
-  // file initializes normally underneath it regardless of boot state. Lines
-  // reveal on a stagger (same technique Module 01's event feed already uses
-  // for its own timed reveal), then the overlay fades and removes itself.
-  (function(){
-    var overlay = document.getElementById('boot-overlay');
-    var linesEl = document.getElementById('boot-lines');
-    var skipBtn = document.getElementById('boot-skip');
-    if(!overlay || !linesEl) return;
-
-    var reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-    var bootLines = [
-      'The North Star OPERATIONS CONSOLE',
-      'MEM CHECK ...................... <span class="boot-ok">OK</span>',
-      'BUS A ........................... <span class="boot-ok">NOMINAL</span>',
-      'BUS B ........................... <span class="boot-ok">NOMINAL</span>',
-      'ECLSS TELEMETRY LINK ............ <span class="boot-ok">OK</span>',
-      'CREW BIOMETRIC UPLINK ........... <span class="boot-ok">OK</span>',
-      'NAV SUBSYSTEM .................... <span class="boot-ok">OK</span>',
-      'COMMS DOWNLINK ................... <span class="boot-ok">OK</span>',
-      'LOADING MODULES 01\u201305 .......... <span class="boot-ok">OK</span>',
-      'CONSOLE READY'
-    ];
-
-    var timers = [];
-    function dismissBoot(){
-      timers.forEach(clearTimeout);
-      overlay.classList.add('boot-hidden');
-      setTimeout(function(){ overlay.style.display = 'none'; }, 420);
-    }
-
-    if(reducedMotion){
-      linesEl.innerHTML = bootLines.map(function(l){ return '<div class="boot-line">' + l + '</div>'; }).join('');
-      timers.push(setTimeout(dismissBoot, 550));
-    } else {
-      bootLines.forEach(function(line, i){
-        timers.push(setTimeout(function(){
-          var d = document.createElement('div');
-          d.className = 'boot-line';
-          d.innerHTML = line;
-          linesEl.appendChild(d);
-        }, i * 165));
-      });
-      timers.push(setTimeout(dismissBoot, bootLines.length * 165 + 500));
-    }
-
-    if(skipBtn){ skipBtn.addEventListener('click', dismissBoot); }
-    overlay.addEventListener('click', function(e){ if(e.target === overlay) dismissBoot(); });
-  })();
 
   /* ============================================================ */
   /* HULL 3D MODEL — Module 01 schematic                            */
