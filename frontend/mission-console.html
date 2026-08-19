@@ -4,11 +4,41 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>The North Star Operations Console — Demo</title>
+<script>
+  // Resolve theme before first paint so there's no flash of the wrong
+  // palette. Default is light; only an explicit stored "dark" choice
+  // switches it. Runs synchronously in <head>, ahead of the <style> block.
+  (function(){
+    try{
+      if(localStorage.getItem('console-theme') === 'dark'){
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
+    }catch(e){ /* localStorage unavailable — falls back to default light */ }
+  })();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
+    /* Light theme — default. Switched off by the [data-theme="dark"] block
+       below; toggled via #theme-toggle in the topbar. */
+    --bg:#f5f5f4;
+    --panel:#ffffff;
+    --panel-2:#ececea;
+    --panel-3:#eeeeec;
+    --line:#d8d8d5;
+    --line-strong:#9a9a96;
+    --ink:#141414;
+    --ink-dim:#4a4a48;
+    --ink-faint:#767672;
+    --invert-bg:#141414;
+    --invert-ink:#f5f5f4;
+    --disp:'Space Grotesk', 'Segoe UI', sans-serif;
+    --mono:'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+    --radius:3px;
+  }
+  html[data-theme="dark"]{
     --bg:#0b0b0c;
     --panel:#141416;
     --panel-2:#1a1a1d;
@@ -20,11 +50,8 @@
     --ink-faint:#6c6c73;
     --invert-bg:#ececee;
     --invert-ink:#0b0b0c;
-    --disp:'Space Grotesk', 'Segoe UI', sans-serif;
-    --mono:'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
-    --radius:3px;
   }
- 
+
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
   body{
@@ -507,6 +534,19 @@
   .t6-arrow-pulse{animation:schem-pulse-degrading 2.2s ease-in-out infinite;}
   @media (prefers-reduced-motion:reduce){ .t6-arrow-pulse{animation:none;} }
 
+  /* ============ TAB 5 : TRY IT YOURSELF — PROTECT OUR PLANET QUIZ ============ */
+  .t7-quiz-opt{display:block;width:100%;text-align:left;margin-bottom:8px;}
+  .t7-quiz-opt:last-child{margin-bottom:0;}
+  .t7-quiz-opt.selected{background:var(--invert-bg);color:var(--invert-ink);border-color:var(--invert-bg);font-weight:700;}
+  .t7-quiz-feedback{border-top:1px solid var(--line);padding:14px 16px;margin-top:14px;font-size:13px;line-height:1.55;}
+  .t7-quiz-feedback p{margin:0 0 8px 0;}
+  .t7-quiz-feedback p:last-child{margin-bottom:0;}
+  .t7-strategy-list{margin:8px 0 0 0;padding-left:18px;font-size:12.5px;line-height:1.6;color:var(--ink-dim);}
+
+  /* ============ TAB 5 : TRY IT YOURSELF — DART NAVIGATOR ============ */
+  .t8-stage{background:var(--panel-3);}
+  .t8-target-ring{transition:r 0.2s linear;}
+
   /* ============ HABITAT SCHEMATIC (3D DECK MODEL) ============ */
   .schematic-wrap{padding:16px;}
 
@@ -600,6 +640,9 @@
   @keyframes boot-line-in{from{opacity:0;transform:translateY(2px);}to{opacity:1;transform:translateY(0);}}
   .boot-skip{position:absolute;bottom:40px;right:48px;}
   @media (prefers-reduced-motion:reduce){ .boot-line{animation:none;opacity:1;} }
+
+  /* ============ THEME TOGGLE ============ */
+  .theme-toggle{letter-spacing:0.08em;}
 </style>
 </head>
 <body>
@@ -624,6 +667,9 @@
       <span class="met-value mono" id="met-clock">214:06:12:00</span>
     </div>
     <div class="status-pill level-nominal" id="global-status">System Nominal</div>
+    <button class="btn small theme-toggle" id="theme-toggle" type="button" aria-pressed="false" aria-label="Toggle light/dark theme">
+      <span class="mono" id="theme-toggle-label">Light</span>
+    </button>
   </div>
 </header>
  
@@ -955,6 +1001,66 @@
         </div>
       </div>
     </div>
+
+    <div class="module-head" style="margin-top:32px;">
+      <span class="label-eyebrow">Activity 2</span>
+      <h3 class="module-title" style="font-size:17px;">Protect Our Planet</h3>
+      <p class="module-desc">Step into the mind of an astronomer developing ways to protect our planet. Which of these potential threats should we be most worried about?</p>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h3>Threat assessment</h3></div>
+      <div class="intake-body">
+        <div id="t7-quiz-options">
+          <button class="btn t7-quiz-opt" data-choice="A" data-label="An alien invasion">A. An alien invasion</button>
+          <button class="btn t7-quiz-opt" data-choice="B" data-label="Asteroids impacting Earth">B. Asteroids impacting Earth</button>
+          <button class="btn t7-quiz-opt" data-choice="C" data-label="Nearby gamma-ray bursts">C. Nearby gamma-ray bursts</button>
+        </div>
+        <div class="t7-quiz-feedback" id="t7-quiz-feedback" style="display:none;"></div>
+
+        <div class="intake-row" style="margin-top:18px;">
+          <label for="t7-quiz-open">Can you think of other ways we might deal with an asteroid on a collision course with Earth?</label>
+          <textarea class="intake-textarea" id="t7-quiz-open" placeholder="Jot down your own ideas..."></textarea>
+          <div class="intake-examples">
+            <button class="btn small" id="t7-reveal-strategies">Show real planetary-defense strategies</button>
+          </div>
+        </div>
+        <div class="triage-output" id="t7-strategies-output" style="display:none;"></div>
+      </div>
+    </div>
+
+    <div class="module-head" style="margin-top:32px;">
+      <span class="label-eyebrow">Activity 3</span>
+      <h3 class="module-title" style="font-size:17px;">Experience Piloting a DART Spacecraft</h3>
+      <p class="module-desc">Think about all the smaller asteroids in space. Now think about what it would be like to fly a DART spacecraft through that field in order to protect Earth from a larger asteroid on the other side. Try this simulation and protect us from an asteroid called Dimorphos.</p>
+    </div>
+
+    <p class="t5-proto-note"><b>How to play —</b> this is a hands-built simulation, not real spacecraft telemetry. Steer left and right with the <b>Left/Right Arrow</b> keys, or move your mouse or finger across the diagram, to thread DART through the debris field of smaller asteroids. Line up with Dimorphos before closing distance hits zero — the target corridor narrows as you get closer, just like the real spacecraft needed increasingly precise autonomous targeting in its final minutes. Take three debris strikes and DART loses its lock.</p>
+
+    <div class="panel t6-game-panel">
+      <div class="panel-head">
+        <h3>DART navigator</h3>
+        <span class="checklist-status" id="t8-status-label">Cruise phase — hold course toward Dimorphos</span>
+      </div>
+      <div class="t6-game-layout">
+        <div class="t6-stage-wrap">
+          <div class="t6-stage t8-stage" id="t8-stage" tabindex="0" role="application" aria-label="DART navigator — steer with the left and right arrow keys, or by moving the mouse, to guide the spacecraft into Dimorphos while avoiding smaller asteroids"></div>
+          <p class="t6-hint">Left/Right arrows, or mouse/touch, to steer. Avoid debris, line up on Dimorphos.</p>
+        </div>
+        <div class="t6-readout">
+          <div class="t6-stat-row"><span class="label">Range to Dimorphos</span><span class="value" id="t8-range">—</span></div>
+          <div class="t6-stat-row"><span class="label">Debris strikes</span><span class="value" id="t8-strikes">0 / 3</span></div>
+          <div class="t6-stat-row"><span class="label">Attempts</span><span class="value" id="t8-attempts">0</span></div>
+          <div class="t6-result-banner" id="t8-result-banner">
+            <span class="t6-result-icon" id="t8-result-icon">&#10003;</span>
+            <span id="t8-result-text"></span>
+          </div>
+          <div class="t6-controls">
+            <button class="btn" id="t8-retry-btn">Retry</button>
+          </div>
+        </div>
+      </div>
+    </div>
   </section>
 
 </main>
@@ -965,6 +1071,22 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script>
 (function(){
+
+  /* ============================================================ */
+  /* THEME — light/dark token bridge for canvas + three.js           */
+  /* ============================================================ */
+  // CSS custom properties drive every themed color in the stylesheet and
+  // in plain SVG markup (var() works in SVG presentation attributes), but
+  // canvas strokeStyle/fillStyle and three.js material colors can't read
+  // custom properties directly. These two helpers pull the *current*
+  // resolved token value so canvas/WebGL code can stay in sync with
+  // whichever theme is active, both at boot and after a toggle.
+  function themeToken(name){
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
+  function themeTokenHexInt(name){
+    return parseInt(themeToken(name).replace('#', ''), 16);
+  }
 
   /* ============================================================ */
   /* BOOT SEQUENCE — POST-style self-test overlay                   */
@@ -1034,13 +1156,24 @@
   var Schematic3D = (function(){
     var container = document.getElementById('schematic-3d');
     if(!container || typeof THREE === 'undefined'){
-      return { setZoneStatus:function(){}, setBreach:function(){} };
+      return { setZoneStatus:function(){}, setBreach:function(){}, setThemeColors:function(){} };
     }
 
     var reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-    var COLOR = { dim:0x5a5a62, mid:0xa2a2a9, bright:0xececee, breach:0xff3b30 };
+    // Initialized from the active theme's tokens at construction time, and
+    // updated in place by setThemeColors() on toggle. animate() below reads
+    // COLOR.dim/mid/bright fresh every frame, so mutating these values is
+    // enough to repaint the zone materials — no per-mesh update needed.
+    // breach stays a fixed alarm red in both themes.
+    var COLOR = {
+      dim: themeTokenHexInt('--line-strong'),
+      mid: themeTokenHexInt('--ink-dim'),
+      bright: themeTokenHexInt('--ink'),
+      breach: 0xff3b30
+    };
     var OPACITY = { dim:0.35, mid:0.65, bright:0.95 };
+    var starMat; // assigned below, updated by setThemeColors
 
     var scene = new THREE.Scene();
     var camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
@@ -1066,7 +1199,7 @@
       }
       var starGeo = new THREE.BufferGeometry();
       starGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-      var starMat = new THREE.PointsMaterial({ color:0x5a5a62, size:0.05, transparent:true, opacity:0.5 });
+      starMat = new THREE.PointsMaterial({ color:COLOR.dim, size:0.05, transparent:true, opacity:0.5 });
       scene.add(new THREE.Points(starGeo, starMat));
     })();
 
@@ -1167,7 +1300,7 @@
       ctx = cv.getContext('2d');
       ctx.font = font;
       ctx.textBaseline = 'middle';
-      ctx.fillStyle = color || '#ececee';
+      ctx.fillStyle = color || themeToken('--ink');
       ctx.fillText(text.toUpperCase(), 4 * S, cv.height / 2);
       var tex = new THREE.CanvasTexture(cv);
       tex.minFilter = THREE.LinearFilter;
@@ -1393,6 +1526,30 @@
           breachMarkers[id].active = !!active;
           if(id === selectedZone) refreshReadout();
         }
+      },
+      // Called on theme toggle. zoneMaterials pick up COLOR.dim/mid/bright
+      // automatically next animate() frame, so this only needs to: (a)
+      // repaint the static starfield material, and (b) regenerate zone
+      // label textures — those are canvas-baked once at creation and won't
+      // otherwise notice the ink color changed.
+      setThemeColors: function(){
+        COLOR.dim = themeTokenHexInt('--line-strong');
+        COLOR.mid = themeTokenHexInt('--ink-dim');
+        COLOR.bright = themeTokenHexInt('--ink');
+        if(starMat) starMat.color.setHex(COLOR.dim);
+        var ink = themeToken('--ink');
+        Object.keys(ZONE_INFO).forEach(function(id){
+          var old = labelSprites[id];
+          if(!old) return;
+          var spr = makeLabel(ZONE_INFO[id].name, ink);
+          spr.position.copy(old.position);
+          spr.material.opacity = old.material.opacity;
+          shipGroup.remove(old);
+          if(old.material.map) old.material.map.dispose();
+          old.material.dispose();
+          shipGroup.add(spr);
+          labelSprites[id] = spr;
+        });
       }
     };
   })();
@@ -1464,7 +1621,45 @@
   }
   renderMet();
   setInterval(function(){ metSeconds += 1; renderMet(); }, 1000);
- 
+
+  /* ============================================================ */
+  /* THEME TOGGLE — default light, persisted to localStorage         */
+  /* ============================================================ */
+  // The [data-theme] attribute (and its default absence = light) is
+  // resolved before first paint by the inline <head> script. This wires
+  // the visible control: flip the attribute, persist the choice, update
+  // the button, and re-sync the canvas/three.js color spots that can't
+  // read CSS custom properties on their own (see themeToken() above).
+  (function(){
+    var toggleBtn = document.getElementById('theme-toggle');
+    var toggleLabel = document.getElementById('theme-toggle-label');
+    if(!toggleBtn) return;
+
+    function isDarkActive(){
+      return document.documentElement.getAttribute('data-theme') === 'dark';
+    }
+    function applyThemeUI(){
+      var dark = isDarkActive();
+      toggleBtn.setAttribute('aria-pressed', String(dark));
+      if(toggleLabel) toggleLabel.textContent = dark ? 'Dark' : 'Light';
+    }
+    applyThemeUI();
+
+    toggleBtn.addEventListener('click', function(){
+      var goingDark = !isDarkActive();
+      if(goingDark){
+        document.documentElement.setAttribute('data-theme', 'dark');
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+      }
+      try{ localStorage.setItem('console-theme', goingDark ? 'dark' : 'light'); }catch(e){}
+      applyThemeUI();
+      // re-sync JS-drawn colors to the newly active theme
+      EKG_INK = themeToken('--ink');
+      if(Schematic3D && Schematic3D.setThemeColors) Schematic3D.setThemeColors();
+    });
+  })();
+
   /* ============================================================ */
   /* SPARKLINE HELPER (grayscale, no fill)                          */
   /* ============================================================ */
@@ -1500,7 +1695,7 @@
     [0.60, 0], [0.68, 0.30], [0.78, 0],
     [1.00, 0]
   ];
-  var EKG_INK = '#ececee';      // mirrors --ink — kept as a literal since canvas strokeStyle can't read CSS custom properties
+  var EKG_INK = themeToken('--ink');      // mirrors --ink — canvas strokeStyle can't read CSS custom properties directly, so this is re-synced in the theme-toggle click handler above
   var ekgFrames = {};
   var ekgReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -3947,6 +4142,268 @@
     attemptsEl.textContent = String(attempts);
     // Slight randomization each retry so the timing isn't identical every run.
     resetState(-Math.PI / 2 + (Math.random() - 0.5) * 1.2);
+    render();
+  });
+
+})();
+</script>
+
+<!-- ============================================================ -->
+<!-- MODULE 05 — TRY IT YOURSELF: PROTECT OUR PLANET (self-contained) -->
+<!-- ============================================================ -->
+<script>
+(function(){
+  var options = document.querySelectorAll('#t7-quiz-options .t7-quiz-opt');
+  var feedback = document.getElementById('t7-quiz-feedback');
+  if(!options.length || !feedback) return;
+
+  var FEEDBACK = {
+    A: '<p><b>An astronomer’s take —</b> alien invasion makes for great fiction, but there’s no observational evidence for it, so it isn’t something planetary-defense budgets are built around.</p><p>The two threats worth taking seriously are the other two options on this list — give them a look too.</p>',
+    B: '<p><b>An astronomer’s take —</b> this is the one most professionals point to. Earth has been struck by asteroids before (Chicxulub, Tunguska, Chelyabinsk), it happens on a scale we can predict, and — critically — it’s a threat we can actually do something about. NASA’s Planetary Defense Coordination Office tracks near-Earth objects for exactly this reason, and the 2022 DART mission proved we can nudge one off course.</p>',
+    C: '<p><b>An astronomer’s take —</b> a nearby gamma-ray burst would be catastrophic, but no known source close enough to threaten Earth is currently aimed our way, and it’s also extraordinarily rare. Astronomers watch for them, but there’s little we could do to deflect one even if we saw it coming.</p>'
+  };
+
+  options.forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var choice = btn.getAttribute('data-choice');
+      options.forEach(function(o){ o.classList.toggle('selected', o === btn); });
+      feedback.innerHTML = FEEDBACK[choice] || '';
+      feedback.style.display = 'block';
+    });
+  });
+
+  var revealBtn = document.getElementById('t7-reveal-strategies');
+  var strategiesOutput = document.getElementById('t7-strategies-output');
+  if(revealBtn && strategiesOutput){
+    revealBtn.addEventListener('click', function(){
+      var shown = strategiesOutput.style.display === 'block';
+      if(shown){
+        strategiesOutput.style.display = 'none';
+        revealBtn.textContent = 'Show real planetary-defense strategies';
+        return;
+      }
+      strategiesOutput.innerHTML =
+        '<p style="margin:0 0 6px 0;">Real planetary-defense concepts, beyond DART’s kinetic-impactor approach:</p>' +
+        '<ul class="t7-strategy-list">' +
+          '<li><b>Gravity tractor</b> — park a spacecraft alongside the asteroid for years; its tiny gravitational pull slowly tugs the asteroid off course.</li>' +
+          '<li><b>Nuclear deflection</b> — detonate a device near (not on) the asteroid to vaporize surface material and push it off course, reserved for short-warning or very large objects.</li>' +
+          '<li><b>Ion beam shepherd / laser ablation</b> — fire a sustained beam at the surface over time to erode material and produce a slow, steady thrust.</li>' +
+          '<li><b>Early detection &amp; tracking</b> — the earlier we spot a threatening object, the smaller the nudge needed to make it miss Earth entirely.</li>' +
+          '<li><b>Evacuation &amp; disaster response</b> — the last-resort option if a smaller object can’t be deflected in time.</li>' +
+        '</ul>';
+      strategiesOutput.style.display = 'block';
+      revealBtn.textContent = 'Hide planetary-defense strategies';
+    });
+  }
+})();
+</script>
+
+<!-- ============================================================ -->
+<!-- MODULE 05 — TRY IT YOURSELF: DART NAVIGATOR (self-contained)   -->
+<!-- ============================================================ -->
+<script>
+(function(){
+  var stage = document.getElementById('t8-stage');
+  if(!stage) return;
+
+  var DURATION = 15;      // seconds to close the distance
+  var ACCEL = 260;        // px/sec^2 while a steering key is held
+  var MAXV = 170;         // px/sec top steering speed
+  var FRICTION = 3.2;     // velocity decay when no key is held
+  var SHIP_R = 9;
+  var END_HALF_WIDTH = 18; // how close to center-x you must be at zero range to score a hit
+
+  function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
+
+  stage.innerHTML =
+    '<svg viewBox="0 0 300 300" width="300" height="300">' +
+      '<path d="M 40,262 L 150,34" fill="none" stroke="var(--line)" stroke-width="1" stroke-dasharray="3,3"/>' +
+      '<path d="M 260,262 L 150,34" fill="none" stroke="var(--line)" stroke-width="1" stroke-dasharray="3,3"/>' +
+      '<circle id="t8-target-ring" class="t8-target-ring" cx="150" cy="30" r="10" fill="var(--panel-2)" stroke="var(--line-strong)" stroke-width="1.4"/>' +
+      '<text x="150" y="15" text-anchor="middle" font-family="var(--mono)" font-size="8" fill="var(--ink-faint)">DIMORPHOS</text>' +
+      '<g id="t8-debris-layer"></g>' +
+      '<g id="t8-ship"><polygon points="0,-11 7,9 0,4 -7,9" fill="var(--ink)"/></g>' +
+      '<text x="8" y="292" font-family="var(--mono)" font-size="9" fill="var(--ink-faint)">DART — TERMINAL APPROACH (ILLUSTRATIVE)</text>' +
+    '</svg>';
+
+  var targetRing = document.getElementById('t8-target-ring');
+  var debrisLayer = document.getElementById('t8-debris-layer');
+  var shipGroup = document.getElementById('t8-ship');
+  var rangeEl = document.getElementById('t8-range');
+  var strikesEl = document.getElementById('t8-strikes');
+  var attemptsEl = document.getElementById('t8-attempts');
+  var statusLabelEl = document.getElementById('t8-status-label');
+  var resultBanner = document.getElementById('t8-result-banner');
+  var resultIcon = document.getElementById('t8-result-icon');
+  var resultText = document.getElementById('t8-result-text');
+  var retryBtn = document.getElementById('t8-retry-btn');
+
+  var state, lastTime, spawnTimer, keysLeft = false, keysRight = false, pointerX = null;
+  var attempts = 1;
+
+  function resetState(){
+    state = {
+      playerX: 150,
+      prevX: 150,
+      playerVX: 0,
+      elapsed: 0,
+      strikes: 0,
+      finished: false,
+      result: null,
+      debris: []
+    };
+    spawnTimer = 0;
+    resultBanner.classList.remove('visible', 'win', 'lose');
+    strikesEl.textContent = '0 / 3';
+  }
+
+  function onFinish(){
+    resultBanner.classList.add('visible');
+    if(state.result === 'win'){
+      resultBanner.classList.add('win');
+      resultBanner.classList.remove('lose');
+      resultIcon.innerHTML = '&#10003;';
+      resultText.textContent = 'Impact confirmed — in the real 2022 mission this technique shifted Dimorphos’ orbital period around Didymos by about 32 minutes, the first time humanity deliberately altered the motion of a celestial object.';
+    } else {
+      resultBanner.classList.add('lose');
+      resultBanner.classList.remove('win');
+      resultIcon.innerHTML = '&#10007;';
+      resultText.textContent = state.result === 'lose-strikes'
+        ? 'Debris strike knocked out DART’s terminal guidance camera — no impact. Hit Retry and thread the field more carefully.'
+        : 'DART flew past Dimorphos — course deviation was too large at closest approach. Hit Retry and stay inside the narrowing corridor.';
+    }
+  }
+
+  function render(){
+    var progress = Math.min(1, state.elapsed / DURATION);
+    targetRing.setAttribute('r', (10 + progress * 22).toFixed(1));
+
+    var tiltDeg = clamp((state.playerX - state.prevX) * 6, -22, 22);
+    state.prevX = state.playerX;
+    shipGroup.setAttribute('transform', 'translate(' + state.playerX.toFixed(1) + ',260) rotate(' + tiltDeg.toFixed(1) + ')');
+
+    debrisLayer.innerHTML = state.debris.map(function(d){
+      return '<circle cx="' + d.x.toFixed(1) + '" cy="' + d.y.toFixed(1) + '" r="' + d.r.toFixed(1) + '" fill="var(--panel-2)" stroke="var(--ink-dim)" stroke-width="1.2"/>';
+    }).join('');
+
+    var rangeKm = Math.round((1 - progress) * 11000000);
+    rangeEl.textContent = rangeKm.toLocaleString() + ' km';
+    attemptsEl.textContent = String(attempts);
+
+    if(state.finished){
+      statusLabelEl.textContent = state.result === 'win' ? 'Impact confirmed — terminal guidance locked'
+        : (state.result === 'lose-strikes' ? 'Lost lock — debris strike disabled guidance' : 'Missed Dimorphos — flew past at closest approach');
+    } else if(progress > 0.65){
+      statusLabelEl.textContent = 'Terminal approach — corridor narrowing, hold your line';
+    } else {
+      statusLabelEl.textContent = 'Cruise phase — hold course toward Dimorphos';
+    }
+  }
+
+  function tick(now){
+    if(lastTime == null) lastTime = now;
+    var dt = Math.min((now - lastTime) / 1000, 0.05);
+    lastTime = now;
+
+    if(!state.finished){
+      state.elapsed += dt;
+      var progress = Math.min(1, state.elapsed / DURATION);
+
+      if(pointerX != null){
+        state.playerX = pointerX;
+        state.playerVX = 0;
+      } else {
+        var accel = 0;
+        if(keysLeft) accel -= ACCEL;
+        if(keysRight) accel += ACCEL;
+        state.playerVX += accel * dt;
+        if(!keysLeft && !keysRight) state.playerVX *= Math.max(0, 1 - FRICTION * dt);
+        state.playerVX = clamp(state.playerVX, -MAXV, MAXV);
+        state.playerX += state.playerVX * dt;
+      }
+      state.playerX = clamp(state.playerX, 16, 284);
+
+      spawnTimer += dt;
+      if(spawnTimer >= 0.5){
+        spawnTimer = 0;
+        state.debris.push({
+          x: 24 + Math.random() * 252,
+          y: -14,
+          r: 6 + Math.random() * 7,
+          vy: 78 + Math.random() * 40
+        });
+      }
+
+      for(var i = state.debris.length - 1; i >= 0; i--){
+        var d = state.debris[i];
+        d.y += d.vy * dt;
+        if(d.y > 300 + d.r){ state.debris.splice(i, 1); continue; }
+        var dx = d.x - state.playerX, dy = d.y - 260;
+        if(Math.sqrt(dx * dx + dy * dy) < d.r + SHIP_R){
+          state.debris.splice(i, 1);
+          state.strikes += 1;
+          strikesEl.textContent = state.strikes + ' / 3';
+          if(state.strikes >= 3){
+            state.finished = true;
+            state.result = 'lose-strikes';
+            onFinish();
+            break;
+          }
+        }
+      }
+
+      if(!state.finished && progress >= 1){
+        state.finished = true;
+        state.result = Math.abs(state.playerX - 150) <= END_HALF_WIDTH ? 'win' : 'lose-miss';
+        onFinish();
+      }
+    }
+    render();
+    requestAnimationFrame(tick);
+  }
+
+  resetState();
+  requestAnimationFrame(tick);
+
+  function setPointerFromClientX(clientX){
+    var rect = stage.getBoundingClientRect();
+    if(!rect.width) return;
+    var rel = (clientX - rect.left) / rect.width;
+    pointerX = clamp(16 + rel * (284 - 16), 16, 284);
+  }
+
+  stage.addEventListener('mousemove', function(e){ setPointerFromClientX(e.clientX); });
+  stage.addEventListener('mouseleave', function(){ pointerX = null; });
+  stage.addEventListener('touchstart', function(e){
+    e.preventDefault();
+    if(e.touches && e.touches[0]) setPointerFromClientX(e.touches[0].clientX);
+  }, { passive:false });
+  stage.addEventListener('touchmove', function(e){
+    e.preventDefault();
+    if(e.touches && e.touches[0]) setPointerFromClientX(e.touches[0].clientX);
+  }, { passive:false });
+  window.addEventListener('touchend', function(){ pointerX = null; });
+
+  document.addEventListener('keydown', function(e){
+    if(e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    var tab5 = document.getElementById('tab-5');
+    if(!tab5 || !tab5.classList.contains('active')) return;
+    var tag = (e.target && e.target.tagName) || '';
+    if(tag === 'SELECT' || tag === 'INPUT' || tag === 'TEXTAREA') return;
+    e.preventDefault();
+    pointerX = null;
+    if(e.key === 'ArrowLeft') keysLeft = true; else keysRight = true;
+  });
+  document.addEventListener('keyup', function(e){
+    if(e.key === 'ArrowLeft') keysLeft = false;
+    if(e.key === 'ArrowRight') keysRight = false;
+  });
+  window.addEventListener('blur', function(){ keysLeft = false; keysRight = false; pointerX = null; });
+
+  retryBtn.addEventListener('click', function(){
+    attempts += 1;
+    keysLeft = false; keysRight = false; pointerX = null;
+    resetState();
     render();
   });
 
