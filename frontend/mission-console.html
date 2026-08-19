@@ -679,14 +679,11 @@
   <button class="module-btn" data-tab="3" role="tab" aria-selected="false">
     <span class="mod-num">03</span><span class="mod-name">Supply &amp; Rationing</span>
   </button>
-  <button class="module-btn" data-tab="4" role="tab" aria-selected="false">
-    <span class="mod-num">04</span><span class="mod-name">Space Weather &amp; ISS Link</span>
+  <button class="module-btn" data-tab="6" role="tab" aria-selected="false">
+    <span class="mod-num">04</span><span class="mod-name">Solar Flare Simulator</span>
   </button>
   <button class="module-btn" data-tab="5" role="tab" aria-selected="false">
     <span class="mod-num">05</span><span class="mod-name">Try It Yourself</span>
-  </button>
-  <button class="module-btn" data-tab="6" role="tab" aria-selected="false">
-    <span class="mod-num">06</span><span class="mod-name">Solar Flare Simulator</span>
   </button>
 </nav>
  
@@ -1067,12 +1064,12 @@
   <!-- ============================================================ -->
   <section class="tab-panel" id="tab-6">
     <div class="module-head">
-      <span class="label-eyebrow">Module 06 · Interactive</span>
+      <span class="label-eyebrow">Module 04 · Interactive</span>
       <h2 class="module-title">Solar Flare Simulation &amp; Analysis</h2>
       <p class="module-desc">Fire solar flares of five different strengths from the Sun toward a spacecraft on route to Earth, and see how each one plays out — from a shrug to a full shield-down reboot — then unlock the real-world defenses that limit the damage.</p>
     </div>
 
-    <p class="t5-proto-note"><b>How it works —</b> this is a hands-built simulation, not live space-weather data (Module 04 covers that). Pick a flare class below to launch it and watch the effect on the spacecraft and on Earth. Toggle <b>Pre-shield spacecraft</b> to see how much early warning and safe-mode shielding actually prevent.</p>
+    <p class="t5-proto-note"><b>How it works —</b> this is a hands-built simulation, not live space-weather data. Pick a flare class below to launch it and watch the effect on the spacecraft and on Earth. Toggle <b>Pre-shield spacecraft</b> to see how much early warning and safe-mode shielding actually prevent.</p>
 
     <div class="panel t6-game-panel">
       <div class="panel-head">
@@ -1140,7 +1137,7 @@
 
 </main>
  
-<p class="foot-note">Demo console — all telemetry, biometrics, and generated analysis on this page are simulated for demonstration purposes only. Module 04's space-weather and ISS readings are representative sample data modeled on public NOAA SWPC / NASA DONKI and ISS telemetry formats — not a live feed.</p>
+<p class="foot-note">Demo console — all telemetry, biometrics, and generated analysis on this page are simulated for demonstration purposes only.</p>
  
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -1593,11 +1590,15 @@
     t1: { level:'nominal', label:'Crisis Timeline nominal' },
     t2: { level:'nominal', label:'Telemetry nominal' },
     t3: { level:'nominal', label:'Medical nominal' },
-    t4: { level:'nominal', label:'Supply nominal' },
-    t5: { level:'nominal', label:'Space Weather & ISS Link nominal' }
+    t4: { level:'nominal', label:'Supply nominal' }
+    // t5 (Space Weather & ISS Link) intentionally omitted — that module is
+    // hidden from the nav, so it shouldn't be able to drive the header pill.
   };
  
   function setModuleAlert(key, level, label){
+    // t5 (Space Weather & ISS Link) is hidden from the nav — don't let its
+    // background updates re-enter the header pill's status aggregation.
+    if(key === 't5') return;
     moduleAlerts[key] = { level:level, label:label };
     recomputeGlobalStatus();
   }
