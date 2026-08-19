@@ -485,6 +485,28 @@
   .iss-marker{transition:opacity 0.3s;}
   .iss-marker.los{opacity:0.3;}
 
+  /* ============ TAB 6 : TRY IT YOURSELF — DEORBIT SIMULATOR ============ */
+  .t6-game-panel{padding:16px;}
+  .t6-game-layout{display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start;}
+  .t6-stage-wrap{flex:0 0 320px;display:flex;flex-direction:column;align-items:center;gap:10px;}
+  .t6-stage{width:100%;max-width:320px;background:var(--panel-3);border:1px solid var(--line);touch-action:none;cursor:pointer;user-select:none;}
+  .t6-stage svg{display:block;width:100%;height:auto;}
+  .t6-hint{font-family:var(--mono);font-size:11px;color:var(--ink-faint);text-align:center;letter-spacing:0.03em;max-width:300px;}
+  .t6-readout{flex:1;min-width:220px;display:flex;flex-direction:column;gap:10px;}
+  .t6-stat-row{display:flex;align-items:center;justify-content:space-between;font-family:var(--mono);padding:9px 12px;border:1px solid var(--line);background:var(--panel-2);}
+  .t6-stat-row .label{color:var(--ink-faint);letter-spacing:0.08em;text-transform:uppercase;font-size:10.5px;}
+  .t6-stat-row .value{color:var(--ink);font-weight:600;font-size:12.5px;}
+  .t6-result-banner{border:1px solid var(--line-strong);padding:12px 14px;font-size:13px;line-height:1.5;display:none;align-items:flex-start;gap:10px;}
+  .t6-result-banner.visible{display:flex;}
+  .t6-result-banner.win{background:var(--invert-bg);color:var(--invert-ink);border-color:var(--invert-bg);}
+  .t6-result-banner.lose{background:var(--panel-2);border:1px dashed var(--ink-dim);}
+  .t6-result-icon{font-family:var(--mono);font-weight:700;font-size:16px;flex-shrink:0;line-height:1.4;}
+  .t6-controls{display:flex;gap:10px;align-items:center;}
+  .t6-sat-thrust{opacity:0;transition:opacity .1s;}
+  .t6-thrusting .t6-sat-thrust{opacity:1;}
+  .t6-arrow-pulse{animation:schem-pulse-degrading 2.2s ease-in-out infinite;}
+  @media (prefers-reduced-motion:reduce){ .t6-arrow-pulse{animation:none;} }
+
   /* ============ HABITAT SCHEMATIC (3D DECK MODEL) ============ */
   .schematic-wrap{padding:16px;}
 
@@ -617,6 +639,9 @@
   </button>
   <button class="module-btn" data-tab="4" role="tab" aria-selected="false">
     <span class="mod-num">04</span><span class="mod-name">Space Weather &amp; ISS Link</span>
+  </button>
+  <button class="module-btn" data-tab="5" role="tab" aria-selected="false">
+    <span class="mod-num">05</span><span class="mod-name">Try It Yourself</span>
   </button>
 </nav>
  
@@ -906,6 +931,44 @@
         <p class="orbit-caption" id="iss-orbit-caption">Illustrative orbit diagram, not to scale — link state: AOS</p>
       </div>
       <div class="t2-grid" id="iss-grid"></div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- TAB 5 — TRY IT YOURSELF: SATELLITE DEORBIT SIMULATOR           -->
+  <!-- ============================================================ -->
+  <section class="tab-panel" id="tab-5">
+    <div class="module-head">
+      <span class="label-eyebrow">Module 05 · Interactive</span>
+      <h2 class="module-title">Try It Yourself — Retiring a Dead Satellite</h2>
+      <p class="module-desc">What would space agencies and mission control teams have to do if a satellite were too big to burn up completely in the atmosphere? It's a real problem — an uncontrolled reentry can scatter wreckage over places where people live. So large, dead satellites are nudged onto a controlled path down into an empty stretch of ocean, sometimes with the help of a small onboard rocket burn.</p>
+    </div>
+
+    <p class="t5-proto-note"><b>How to play —</b> this module is a hands-on simulation, not backed by live telemetry or the retrieval pipeline the rest of this console uses. Hold your left mouse button on the diagram, or hold the <b>Down Arrow</b> key, to fire the deorbit thruster and shrink the satellite's orbit. Release to coast at the current altitude — the satellite keeps circling either way. Your goal: bring it down inside the safe zone marked by the arrow. Time it wrong and it comes down somewhere it shouldn't.</p>
+
+    <div class="panel t6-game-panel">
+      <div class="panel-head">
+        <h3>Deorbit simulator</h3>
+        <span class="checklist-status" id="t6-status-label">Satellite coasting — waiting for a pass over the safe zone</span>
+      </div>
+      <div class="t6-game-layout">
+        <div class="t6-stage-wrap">
+          <div class="t6-stage" id="t6-stage" tabindex="0" role="application" aria-label="Deorbit simulator — hold the left mouse button or the down arrow key to fire the deorbit thruster"></div>
+          <p class="t6-hint">Hold left mouse button on the diagram, or hold &darr;, to fire the deorbit burn. Release to coast.</p>
+        </div>
+        <div class="t6-readout">
+          <div class="t6-stat-row"><span class="label">Orbit altitude</span><span class="value" id="t6-altitude">—</span></div>
+          <div class="t6-stat-row"><span class="label">Thruster</span><span class="value" id="t6-thruster">Idle</span></div>
+          <div class="t6-stat-row"><span class="label">Attempts</span><span class="value" id="t6-attempts">0</span></div>
+          <div class="t6-result-banner" id="t6-result-banner">
+            <span class="t6-result-icon" id="t6-result-icon">&#10003;</span>
+            <span id="t6-result-text"></span>
+          </div>
+          <div class="t6-controls">
+            <button class="btn" id="t6-retry-btn">Retry</button>
+          </div>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -3688,6 +3751,222 @@
 
 })();
 </script>
- 
+
+<!-- ============================================================ -->
+<!-- MODULE 05 — TRY IT YOURSELF: DEORBIT SIMULATOR (self-contained) -->
+<!-- ============================================================ -->
+<script>
+(function(){
+  var stage = document.getElementById('t6-stage');
+  if(!stage) return;
+
+  var CENTER = { x:150, y:150 };
+  var EARTH_R = 42;
+  var R_MAX = 118;
+  var R_MIN = EARTH_R + 2;
+  var OMEGA = (2 * Math.PI) / 9.5;      // ~9.5s per lap
+  var SHRINK_RATE = 15;                  // px/sec of orbit radius while thruster is firing
+  var SAFE_CENTER = Math.PI;             // pointing left, matches the arrow
+  var SAFE_HALF = 0.30;                  // ~17 degrees each side of center
+  var TRAIL_MAX = 70;
+
+  function polar(cx, cy, r, theta){
+    return { x: cx + r * Math.cos(theta), y: cy + r * Math.sin(theta) };
+  }
+  function normalizeAngle(a){
+    a = a % (2 * Math.PI);
+    if(a < 0) a += 2 * Math.PI;
+    return a;
+  }
+  function isInSafeZone(angle){
+    var a = normalizeAngle(angle);
+    var lo = normalizeAngle(SAFE_CENTER - SAFE_HALF);
+    var hi = normalizeAngle(SAFE_CENTER + SAFE_HALF);
+    return a >= lo && a <= hi;
+  }
+  function arcPathD(cx, cy, r, startAngle, endAngle){
+    var p1 = polar(cx, cy, r, startAngle);
+    var p2 = polar(cx, cy, r, endAngle);
+    var largeArc = (endAngle - startAngle) > Math.PI ? 1 : 0;
+    return 'M ' + p1.x.toFixed(2) + ',' + p1.y.toFixed(2) +
+      ' A ' + r + ',' + r + ' 0 ' + largeArc + ',1 ' + p2.x.toFixed(2) + ',' + p2.y.toFixed(2);
+  }
+
+  // ---- Build the stage markup once ----
+  var arrowPos = polar(CENTER.x, CENTER.y, EARTH_R + 27, SAFE_CENTER);
+  var arrowDeg = (SAFE_CENTER * 180 / Math.PI) + 180; // point inward, toward the safe zone
+
+  stage.innerHTML =
+    '<svg viewBox="0 0 300 300" width="300" height="300">' +
+      '<path id="t6-trail" d="" fill="none" stroke="var(--ink-faint)" stroke-width="1" stroke-dasharray="2,3" opacity="0.5"/>' +
+      '<circle cx="150" cy="150" r="' + R_MAX + '" fill="none" stroke="var(--line)" stroke-width="1" stroke-dasharray="3,3"/>' +
+      '<circle id="t6-orbit-ring" cx="150" cy="150" r="' + R_MAX + '" fill="none" stroke="var(--ink-dim)" stroke-width="1"/>' +
+      '<circle cx="150" cy="150" r="' + EARTH_R + '" fill="var(--panel-2)" stroke="var(--line-strong)" stroke-width="1.4"/>' +
+      '<path d="' + arcPathD(CENTER.x, CENTER.y, EARTH_R, SAFE_CENTER - SAFE_HALF, SAFE_CENTER + SAFE_HALF) + '" fill="none" stroke="var(--ink)" stroke-width="4" stroke-linecap="round"/>' +
+      '<g class="t6-arrow-pulse" transform="translate(' + arrowPos.x.toFixed(2) + ',' + arrowPos.y.toFixed(2) + ') rotate(' + arrowDeg.toFixed(1) + ')">' +
+        '<polygon points="-15,-6 5,-6 5,-13 19,0 5,13 5,6 -15,6" fill="var(--ink)"/>' +
+      '</g>' +
+      '<g id="t6-sat">' +
+        '<line class="t6-sat-thrust" x1="-4" y1="0" x2="-17" y2="0" stroke="var(--ink-dim)" stroke-width="2"/>' +
+        '<line x1="-9" y1="0" x2="-5" y2="0" stroke="var(--ink-dim)" stroke-width="1"/>' +
+        '<line x1="5" y1="0" x2="9" y2="0" stroke="var(--ink-dim)" stroke-width="1"/>' +
+        '<rect x="-4" y="-3" width="8" height="6" fill="var(--ink)"/>' +
+      '</g>' +
+      '<text x="10" y="18" font-family="var(--mono)" font-size="9" fill="var(--ink-faint)">DEAD SATELLITE — ORBIT DECAY (ILLUSTRATIVE)</text>' +
+    '</svg>';
+
+  var satGroup = document.getElementById('t6-sat');
+  var orbitRing = document.getElementById('t6-orbit-ring');
+  var trailPath = document.getElementById('t6-trail');
+  var altitudeEl = document.getElementById('t6-altitude');
+  var thrusterEl = document.getElementById('t6-thruster');
+  var attemptsEl = document.getElementById('t6-attempts');
+  var statusLabelEl = document.getElementById('t6-status-label');
+  var resultBanner = document.getElementById('t6-result-banner');
+  var resultIcon = document.getElementById('t6-result-icon');
+  var resultText = document.getElementById('t6-result-text');
+  var retryBtn = document.getElementById('t6-retry-btn');
+
+  var state, lastTime, trailTimer;
+
+  function resetState(startAngle){
+    state = {
+      radius: R_MAX,
+      angle: startAngle,
+      holding: false,
+      finished: false,
+      result: null,
+      trail: []
+    };
+    trailTimer = 0;
+    resultBanner.classList.remove('visible', 'win', 'lose');
+    satGroup.classList.remove('t6-thrusting');
+  }
+
+  var attempts = 1;
+  resetState(-Math.PI / 2);
+  attemptsEl.textContent = String(attempts);
+
+  function setHolding(v){
+    if(state.finished) v = false;
+    state.holding = v;
+  }
+
+  function onFinish(){
+    resultBanner.classList.add('visible');
+    if(state.result === 'win'){
+      resultBanner.classList.add('win');
+      resultBanner.classList.remove('lose');
+      resultIcon.innerHTML = '&#10003;';
+      resultText.textContent = 'Nailed it — controlled reentry inside the safe zone. That’s exactly how agencies retire a satellite too big to fully burn up in the atmosphere.';
+    } else {
+      resultBanner.classList.add('lose');
+      resultBanner.classList.remove('win');
+      resultIcon.innerHTML = '&#10007;';
+      resultText.textContent = 'Missed the safe zone — this reentry would have come down somewhere uncontrolled. Hit Retry and time the burn differently.';
+    }
+  }
+
+  function render(){
+    var p = polar(CENTER.x, CENTER.y, state.radius, state.angle);
+    var deg = (state.angle * 180 / Math.PI) + 90;
+    satGroup.setAttribute('transform', 'translate(' + p.x.toFixed(2) + ',' + p.y.toFixed(2) + ') rotate(' + deg.toFixed(1) + ')');
+    satGroup.classList.toggle('t6-thrusting', state.holding && !state.finished);
+    orbitRing.setAttribute('r', state.radius.toFixed(2));
+
+    if(state.trail.length > 1){
+      var d = 'M ' + state.trail[0].x.toFixed(2) + ',' + state.trail[0].y.toFixed(2);
+      for(var i = 1; i < state.trail.length; i++){
+        d += ' L ' + state.trail[i].x.toFixed(2) + ',' + state.trail[i].y.toFixed(2);
+      }
+      trailPath.setAttribute('d', d);
+    }
+
+    var altKm = Math.max(0, Math.round((state.radius - R_MIN) * 6.8));
+    altitudeEl.textContent = altKm + ' km';
+
+    if(state.finished){ thrusterEl.textContent = 'Shutdown — reentry complete'; }
+    else if(state.holding){ thrusterEl.textContent = 'Firing — deorbit burn'; }
+    else { thrusterEl.textContent = 'Idle — coasting'; }
+
+    if(state.finished){
+      statusLabelEl.textContent = state.result === 'win'
+        ? 'Reentry complete — satellite landed inside the safe zone'
+        : 'Reentry complete — satellite missed the safe zone';
+    } else if(state.holding){
+      statusLabelEl.textContent = 'Deorbit burn active — orbit shrinking';
+    } else {
+      statusLabelEl.textContent = 'Satellite coasting — waiting for a pass over the safe zone';
+    }
+  }
+
+  function tick(now){
+    if(lastTime == null) lastTime = now;
+    var dt = Math.min((now - lastTime) / 1000, 0.05);
+    lastTime = now;
+
+    if(!state.finished){
+      state.angle = normalizeAngle(state.angle + OMEGA * dt);
+      if(state.holding){
+        state.radius -= SHRINK_RATE * dt;
+        if(state.radius <= R_MIN){
+          state.radius = R_MIN;
+          state.finished = true;
+          state.result = isInSafeZone(state.angle) ? 'win' : 'lose';
+          onFinish();
+        }
+      }
+      trailTimer += dt;
+      if(trailTimer > 0.06){
+        trailTimer = 0;
+        state.trail.push(polar(CENTER.x, CENTER.y, state.radius, state.angle));
+        if(state.trail.length > TRAIL_MAX) state.trail.shift();
+      }
+    }
+    render();
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+
+  // ---- Input: hold left mouse button on the stage, or hold Down Arrow ----
+  stage.addEventListener('mousedown', function(e){
+    if(e.button !== 0) return;
+    e.preventDefault();
+    setHolding(true);
+  });
+  stage.addEventListener('touchstart', function(e){
+    e.preventDefault();
+    setHolding(true);
+  }, { passive:false });
+  window.addEventListener('mouseup', function(){ setHolding(false); });
+  window.addEventListener('touchend', function(){ setHolding(false); });
+  window.addEventListener('touchcancel', function(){ setHolding(false); });
+  window.addEventListener('blur', function(){ setHolding(false); });
+
+  document.addEventListener('keydown', function(e){
+    if(e.key !== 'ArrowDown') return;
+    var tab5 = document.getElementById('tab-5');
+    if(!tab5 || !tab5.classList.contains('active')) return;
+    var tag = (e.target && e.target.tagName) || '';
+    if(tag === 'SELECT' || tag === 'INPUT' || tag === 'TEXTAREA') return;
+    e.preventDefault();
+    setHolding(true);
+  });
+  document.addEventListener('keyup', function(e){
+    if(e.key !== 'ArrowDown') return;
+    setHolding(false);
+  });
+
+  retryBtn.addEventListener('click', function(){
+    attempts += 1;
+    attemptsEl.textContent = String(attempts);
+    // Slight randomization each retry so the timing isn't identical every run.
+    resetState(-Math.PI / 2 + (Math.random() - 0.5) * 1.2);
+    render();
+  });
+
+})();
+</script>
+
 </body>
 </html>
