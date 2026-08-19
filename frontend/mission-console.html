@@ -3145,22 +3145,71 @@
   }
 
   function suitDiagramSVG(){
-    // Simplified front-view suit outline built from plain shapes — matches
-    // this console's existing raw-inline-SVG idiom (no canvas/WebGL, no
-    // external asset). Colors come entirely from the theme's CSS variables
-    // via the .suit-hotspot class (inherited by each shape's fill/stroke),
-    // so the diagram follows light/dark mode automatically like the rest
-    // of the UI, rather than hardcoding suit-diagram-specific colors.
-    return '<svg viewBox="0 0 200 320" xmlns="http://www.w3.org/2000/svg">' +
-      '<g data-part="hut-plss" class="suit-hotspot"><rect x="55" y="38" width="20" height="140" rx="6"></rect></g>' + // PLSS backpack, drawn first so the HUT overlaps its edges
-      '<g data-part="hut-plss" class="suit-hotspot"><rect x="63" y="66" width="74" height="92" rx="10"></rect></g>' + // HUT / chest
-      '<g data-part="helmet" class="suit-hotspot"><circle cx="100" cy="36" r="32"></circle></g>' +
-      '<g data-part="lcvg" class="suit-hotspot"><rect x="71" y="74" width="58" height="78" rx="8" style="fill:none;stroke-dasharray:4 3;"></rect></g>' + // cooling garment shown as an inner outline layer
-      '<rect x="34" y="146" width="20" height="52" rx="8" style="fill:var(--panel-2);stroke:var(--line-strong);"></rect>' + // left arm connector (non-interactive)
-      '<rect x="146" y="146" width="20" height="52" rx="8" style="fill:var(--panel-2);stroke:var(--line-strong);"></rect>' + // right arm connector
-      '<g data-part="gloves" class="suit-hotspot"><circle cx="46" cy="180" r="14"></circle></g>' +
-      '<g data-part="gloves" class="suit-hotspot"><circle cx="154" cy="180" r="14"></circle></g>' +
-      '<g data-part="legs" class="suit-hotspot"><rect x="63" y="160" width="74" height="106" rx="8"></rect></g>' +
+    // Front-view suit outline built from plain shapes — matches this
+    // console's existing raw-inline-SVG idiom (no canvas/WebGL, no external
+    // asset). Colors come entirely from the theme's CSS variables via the
+    // .suit-hotspot class (inherited by each shape's fill/stroke) or as
+    // fixed --ink-derived opacity layers for decorative-only detail (visor
+    // tint, ID stripe, vent lines), so the diagram follows light/dark mode
+    // automatically like the rest of the UI rather than hardcoding
+    // suit-diagram-specific colors — this monochrome theme has no color
+    // channel to spend on "gold visor" / "red stripe" realism, so those
+    // details are rendered as shading and pattern instead (same language
+    // the .suit-hotspot.flagged dashed-outline convention already uses).
+    // Proportions and part count go beyond the original overlapping-rects
+    // version (separate upper arm / elbow / forearm / wrist segments, a
+    // two-piece LTA with boots, a visor and neck ring) so the figure reads
+    // as a suited crew member rather than five loosely stacked blobs.
+    return '<svg viewBox="0 0 200 340" xmlns="http://www.w3.org/2000/svg">' +
+      // PLSS backpack — drawn first so the HUT overlaps its edges; vent
+      // lines and antenna are decorative (pointer-events:none) so they
+      // don't fragment the hotspot's hit area.
+      '<g data-part="hut-plss" class="suit-hotspot"><rect x="52" y="76" width="96" height="118" rx="10"></rect></g>' +
+      '<g style="pointer-events:none;fill:none;stroke:var(--line-strong);stroke-width:1.5;">' +
+        '<line x1="58" y1="96" x2="66" y2="96"></line>' +
+        '<line x1="58" y1="110" x2="66" y2="110"></line>' +
+        '<line x1="58" y1="124" x2="66" y2="124"></line>' +
+        '<line x1="146" y1="60" x2="146" y2="82"></line>' + // comms antenna
+      '</g>' +
+      // Neck ring connecting helmet to HUT.
+      '<rect x="88" y="68" width="24" height="10" rx="3" style="fill:var(--panel-2);stroke:var(--line-strong);"></rect>' +
+      // HUT — shoulder yoke plus chest, tapering toward the waist.
+      '<g data-part="hut-plss" class="suit-hotspot">' +
+        '<path d="M58,78 L142,78 L134,96 L66,96 Z"></path>' +
+        '<rect x="66" y="92" width="68" height="90" rx="10"></rect>' +
+      '</g>' +
+      '<rect x="70" y="180" width="60" height="8" rx="3" style="fill:var(--panel-2);stroke:var(--line-strong);"></rect>' + // waist ring, HUT-to-LTA seal
+      '<g data-part="lcvg" class="suit-hotspot"><rect x="74" y="100" width="52" height="76" rx="8" style="fill:none;stroke-dasharray:4 3;"></rect></g>' + // cooling garment shown as an inner outline layer
+      // Arms — shoulder/elbow/wrist rings plus tapered upper-arm and
+      // forearm segments (non-interactive, matching the HUT's finish).
+      '<g style="fill:var(--panel-2);stroke:var(--line-strong);">' +
+        '<circle cx="58" cy="90" r="7"></circle>' +
+        '<rect x="40" y="92" width="16" height="50" rx="7"></rect>' +
+        '<circle cx="48" cy="145" r="7"></circle>' +
+        '<rect x="38" y="148" width="16" height="48" rx="7"></rect>' +
+        '<circle cx="46" cy="198" r="6"></circle>' +
+        '<circle cx="142" cy="90" r="7"></circle>' +
+        '<rect x="144" y="92" width="16" height="50" rx="7"></rect>' +
+        '<circle cx="152" cy="145" r="7"></circle>' +
+        '<rect x="146" y="148" width="16" height="48" rx="7"></rect>' +
+        '<circle cx="154" cy="198" r="6"></circle>' +
+      '</g>' +
+      '<rect x="42" y="100" width="12" height="14" rx="2" style="pointer-events:none;fill:var(--ink);fill-opacity:0.18;"></rect>' + // crew ID stripe, left upper arm
+      '<g data-part="gloves" class="suit-hotspot"><circle cx="46" cy="210" r="15"></circle></g>' +
+      '<g data-part="gloves" class="suit-hotspot"><circle cx="154" cy="210" r="15"></circle></g>' +
+      // Lower torso assembly — two legs and boots rather than one block.
+      '<g data-part="legs" class="suit-hotspot">' +
+        '<rect x="70" y="188" width="26" height="88" rx="10"></rect>' +
+        '<rect x="104" y="188" width="26" height="88" rx="10"></rect>' +
+        '<rect x="66" y="276" width="34" height="22" rx="8"></rect>' +
+        '<rect x="100" y="276" width="34" height="22" rx="8"></rect>' +
+      '</g>' +
+      '<g style="pointer-events:none;fill:none;stroke:var(--line);stroke-width:1;stroke-dasharray:2 2;">' +
+        '<line x1="70" y1="228" x2="96" y2="228"></line>' +
+        '<line x1="104" y1="228" x2="130" y2="228"></line>' +
+      '</g>' +
+      '<g data-part="helmet" class="suit-hotspot"><circle cx="100" cy="42" r="32"></circle></g>' +
+      '<ellipse cx="100" cy="44" rx="24" ry="27" style="pointer-events:none;fill:var(--ink);fill-opacity:0.14;"></ellipse>' + // sun visor tint, drawn on top but non-interactive so clicks fall through to the helmet hotspot
       '<text x="100" y="18" text-anchor="middle" class="suit-part-label">EMU — front view</text>' +
     '</svg>';
   }
@@ -3180,12 +3229,20 @@
   // ---- Optional 3D view -------------------------------------------------
   // Reuses the THREE global already loaded for Module 01's Schematic3D
   // (see the <script> tags near the top of this file) rather than pulling
-  // in a second copy of the library. Deliberately minimal — five
-  // primitive-geometry meshes and a slow auto-rotate, matching this
-  // panel's "reference diagram" scope rather than a full flight
-  // simulator. No raycasting/click-on-mesh picking is implemented (see the
-  // block comment at the top of this section) — the pill button row
-  // drives selection in both views instead.
+  // in a second copy of the library. Built from primitive geometry only —
+  // no external model/asset — but with enough segments (jointed arms with
+  // shoulder/elbow/wrist rings, a two-piece leg-and-boot LTA, a neck ring,
+  // a tinted visor) to read as a suited figure rather than five
+  // disconnected blocks, matching this panel's "reference diagram" scope
+  // rather than a full flight simulator. Materials stay in the same grey
+  // family the rest of this console uses (no red/gold NASA-accurate
+  // colors) — shading and metalness/roughness contrast carry the realism
+  // instead, consistent with the monochrome theme. No raycasting/
+  // click-on-mesh picking is implemented (see the block comment at the top
+  // of this section) — the pill button row drives selection in both views
+  // instead, so only the five SUIT_COMPONENTS ids are tracked for
+  // highlighting; joints, rings, and the visor are decorative and untracked,
+  // the same non-interactive treatment their 2D counterparts get.
   var suit3D = null;
   function buildSuit3D(){
     if(!window.THREE || typeof THREE.Scene !== 'function') return null;
@@ -3197,22 +3254,59 @@
     var renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
     var resizeObserver = null;
 
-    function baseMat(){ return new THREE.MeshStandardMaterial({ color:0x9a9a96, roughness:0.6, metalness:0.05 }); }
+    function baseMat(){ return new THREE.MeshStandardMaterial({ color:0x9a9a96, roughness:0.6, metalness:0.05 }); }   // suit fabric
+    function jointMat(){ return new THREE.MeshStandardMaterial({ color:0x6e6e6b, roughness:0.5, metalness:0.15 }); }  // rings / joints
+    function plssMat(){ return new THREE.MeshStandardMaterial({ color:0x828280, roughness:0.65, metalness:0.08 }); }  // PLSS backpack
+    function bootMat(){ return new THREE.MeshStandardMaterial({ color:0x575755, roughness:0.55, metalness:0.1 }); }   // boots
+    function stripeMat(){ return new THREE.MeshStandardMaterial({ color:0xbdbdb9, roughness:0.4, metalness:0.05 }); } // ID stripe band
+    function visorMat(){ return new THREE.MeshStandardMaterial({ color:0x4a4a48, roughness:0.25, metalness:0.4, transparent:true, opacity:0.55 }); }
     var meshesByPart = {};
-    function addMesh(part, geometry, pos){
-      var mesh = new THREE.Mesh(geometry, baseMat());
+    // part: SUIT_COMPONENTS id to track for selection/flag highlighting, or
+    // null for a decorative mesh that isn't individually selectable.
+    function addMesh(part, geometry, pos, rot, mat, scale){
+      var mesh = new THREE.Mesh(geometry, mat || baseMat());
       mesh.position.set(pos[0], pos[1], pos[2]);
+      if(rot) mesh.rotation.set(rot[0], rot[1], rot[2]);
+      if(scale) mesh.scale.set(scale[0], scale[1], scale[2]);
       scene.add(mesh);
-      meshesByPart[part] = meshesByPart[part] || [];
-      meshesByPart[part].push(mesh);
+      if(part){
+        meshesByPart[part] = meshesByPart[part] || [];
+        meshesByPart[part].push(mesh);
+      }
+      return mesh;
     }
-    addMesh('helmet', new THREE.SphereGeometry(0.62, 20, 16), [0, 1.5, 0]);
-    addMesh('hut-plss', new THREE.BoxGeometry(1.3, 1.5, 0.5), [0, 0.5, -0.1]);   // PLSS, set slightly behind the HUT
-    addMesh('hut-plss', new THREE.BoxGeometry(1.1, 1.4, 0.6), [0, 0.55, 0.15]);  // HUT, in front
-    addMesh('lcvg', new THREE.CylinderGeometry(0.5, 0.5, 1.25, 16, 1, true), [0, 0.55, 0.15]);
-    addMesh('gloves', new THREE.SphereGeometry(0.22, 12, 10), [-0.85, -0.1, 0.2]);
-    addMesh('gloves', new THREE.SphereGeometry(0.22, 12, 10), [0.85, -0.1, 0.2]);
-    addMesh('legs', new THREE.CylinderGeometry(0.55, 0.45, 1.65, 16), [0, -1.15, 0]);
+
+    // Helmet + visor + neck ring.
+    addMesh('helmet', new THREE.SphereGeometry(0.6, 20, 16), [0, 1.55, 0]);
+    addMesh('helmet', new THREE.SphereGeometry(0.46, 16, 12), [0, 1.55, 0.26], null, visorMat(), [1, 1, 0.55]);
+    addMesh(null, new THREE.TorusGeometry(0.32, 0.07, 8, 16), [0, 1.05, 0], [Math.PI/2, 0, 0], jointMat());
+
+    // HUT + PLSS backpack + shoulder yoke.
+    addMesh('hut-plss', new THREE.BoxGeometry(1.2, 1.55, 0.42), [0, 0.42, -0.32], null, plssMat());  // PLSS, set slightly behind the HUT
+    addMesh('hut-plss', new THREE.BoxGeometry(1.08, 1.4, 0.58), [0, 0.48, 0.12]);                    // HUT, in front
+    addMesh(null, new THREE.BoxGeometry(1.3, 0.18, 0.5), [0, 1.12, 0.05]);                           // shoulder yoke, ties the HUT to both shoulders
+    addMesh('lcvg', new THREE.CylinderGeometry(0.44, 0.44, 1.15, 16, 1, true), [0, 0.48, 0.14]);
+    addMesh(null, new THREE.TorusGeometry(0.58, 0.07, 8, 20), [0, -0.28, 0.05], [Math.PI/2, 0, 0], jointMat()); // waist ring, HUT-to-LTA seal
+
+    // Arms — mirrored shoulder ball / upper arm / elbow / forearm / wrist,
+    // decorative and untracked like their 2D counterparts.
+    [-1, 1].forEach(function(side){
+      addMesh(null, new THREE.SphereGeometry(0.16, 10, 8), [side * 0.68, 1.05, 0.08], null, jointMat());
+      addMesh(null, new THREE.CylinderGeometry(0.15, 0.14, 0.62, 10), [side * 0.72, 0.68, 0.08], [0, 0, side * -0.12]);
+      addMesh(null, new THREE.SphereGeometry(0.14, 10, 8), [side * 0.78, 0.35, 0.08], null, jointMat());
+      addMesh(null, new THREE.CylinderGeometry(0.13, 0.12, 0.55, 10), [side * 0.82, 0.02, 0.12], [0, 0, side * -0.08]);
+      addMesh(null, new THREE.TorusGeometry(0.13, 0.035, 6, 12), [side * 0.84, -0.28, 0.14], [Math.PI/2, 0, 0], jointMat());
+    });
+    addMesh(null, new THREE.CylinderGeometry(0.155, 0.155, 0.1, 10), [-0.72, 0.55, 0.08], [0, 0, 0.12], stripeMat()); // crew ID stripe, left upper arm
+    addMesh('gloves', new THREE.SphereGeometry(0.19, 12, 10), [-0.85, -0.45, 0.15]);
+    addMesh('gloves', new THREE.SphereGeometry(0.19, 12, 10), [0.85, -0.45, 0.15]);
+
+    // Lower torso assembly — two legs and boots rather than one cylinder.
+    [-1, 1].forEach(function(side){
+      addMesh('legs', new THREE.CylinderGeometry(0.27, 0.22, 1.15, 14), [side * 0.27, -0.95, 0]);
+      addMesh(null, new THREE.TorusGeometry(0.24, 0.035, 6, 14), [side * 0.27, -1.28, 0], [Math.PI/2, 0, 0], jointMat());
+      addMesh('legs', new THREE.BoxGeometry(0.32, 0.2, 0.5), [side * 0.27, -1.68, 0.08], null, bootMat());
+    });
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.7));
     var keyLight = new THREE.DirectionalLight(0xffffff, 0.6);
