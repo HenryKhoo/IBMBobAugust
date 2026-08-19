@@ -420,9 +420,45 @@
   .triage-steps .ts-num{font-family:var(--mono);color:var(--ink-faint);flex-shrink:0;}
 
   .suit-reference{margin-top:16px;}
-  .suit-reference img{width:100%;display:block;border-top:1px solid var(--line);}
+  .suit-reference img{width:100%;display:block;}
 
-  /* ============ TAB 4 : SUPPLY & RATIONING ============ */
+  /* ---- interactive EVA suit diagram (2D hotspots + optional 3D toggle) ---- */
+  .suit-diagram-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;border-top:1px solid var(--line);flex-wrap:wrap;}
+  .suit-diagram-hint{font-family:var(--mono);font-size:10.5px;color:var(--ink-faint);letter-spacing:0.02em;}
+  .suit-diagram-body{display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--line);}
+  @media (max-width:640px){ .suit-diagram-body{grid-template-columns:1fr;} }
+  .suit-diagram-stage{padding:14px;display:flex;align-items:center;justify-content:center;border-right:1px solid var(--line);min-height:260px;}
+  @media (max-width:640px){ .suit-diagram-stage{border-right:none;border-bottom:1px solid var(--line);} }
+  .suit-diagram-stage svg{width:100%;max-width:210px;height:auto;}
+  .suit-hotspot{fill:var(--panel-2);stroke:var(--line-strong);stroke-width:1.5;cursor:pointer;transition:fill 0.15s,stroke 0.15s;}
+  .suit-hotspot:hover{stroke:var(--ink);}
+  .suit-hotspot.selected{fill:var(--ink);fill-opacity:0.16;stroke:var(--ink);stroke-width:2;}
+  /* Monochrome theme has no color channel to "glow amber" with, so a
+     flagged reading (see selectedCrewSuitFlagged()) is shown as a dashed
+     outline instead — same non-color-dependent flag language .biometric-
+     value.flag and .crew-eva-badge.flag already use elsewhere on this tab. */
+  .suit-hotspot.flagged{stroke-dasharray:3 2;}
+  .suit-part-label{font-family:var(--mono);font-size:8.5px;fill:var(--ink-faint);pointer-events:none;}
+  .suit-canvas-wrap{width:100%;height:232px;}
+  .suit-canvas-wrap canvas{width:100% !important;height:100% !important;display:block;}
+  .suit-datasheet{padding:14px 16px;}
+  .suit-datasheet h4{font-size:12.5px;margin:0 0 8px;}
+  .suit-stat-row{display:flex;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);font-size:12px;line-height:1.5;}
+  .suit-stat-row:last-of-type{border-bottom:none;}
+  .suit-stat-label{font-family:var(--mono);font-size:10px;letter-spacing:0.04em;color:var(--ink-faint);flex-shrink:0;width:112px;}
+  .suit-stat-value{color:var(--ink-dim);flex:1;}
+  .suit-datasheet .proc-ref{margin-top:8px;padding-top:8px;border-top:1px solid var(--line);}
+  .suit-extra-btns{display:flex;gap:8px;flex-wrap:wrap;padding:12px 14px;border-top:1px solid var(--line);}
+  .suit-extra-btns .btn.selected{background:var(--invert-bg);color:var(--invert-ink);border-color:var(--invert-bg);}
+  .suit-original-ref{border-top:1px solid var(--line);}
+  .suit-original-ref summary{cursor:pointer;padding:9px 16px;font-family:var(--mono);font-size:10.5px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);list-style:none;}
+  .suit-original-ref summary::-webkit-details-marker{display:none;}
+  .suit-original-ref summary:before{content:'+ ';}
+  .suit-original-ref[open] summary:before{content:'\2013 ';}
+  .crew-eva-badge{font-family:var(--mono);font-size:9px;letter-spacing:0.06em;text-transform:uppercase;border:1px solid var(--line-strong);padding:1px 6px;color:var(--ink-dim);margin-left:6px;}
+  .crew-eva-badge.flag{border-color:var(--ink);color:var(--ink);font-weight:700;}
+
+  /* ============ TAB 3 : GROWING PLANTS IN SPACE (self-contained) ============ */
   .t4-top-grid{
     display:grid;
     grid-template-columns:repeat(auto-fit, minmax(260px,1fr));
@@ -680,7 +716,7 @@
     <span class="mod-num">02</span><span class="mod-name">Medical Triage</span>
   </button>
   <button class="module-btn" data-tab="3" role="tab" aria-selected="false">
-    <span class="mod-num">03</span><span class="mod-name">Supply &amp; Rationing</span>
+    <span class="mod-num">03</span><span class="mod-name">Growing Plants in Space</span>
   </button>
   <button class="module-btn" data-tab="6" role="tab" aria-selected="false">
     <span class="mod-num">04</span><span class="mod-name">Solar Flare Simulator</span>
@@ -834,6 +870,7 @@
             <div class="intake-examples">
               <button class="btn small" id="ex-1">Example: laceration + confusion</button>
               <button class="btn small" id="ex-2">Example: dizziness + chest tightness</button>
+              <button class="btn small" id="ex-3">Example: EVA suit CO2 alarm</button>
             </div>
           </div>
           <div class="intake-actions">
@@ -847,81 +884,105 @@
     </div>
 
     <div class="panel suit-reference">
-      <div class="panel-head"><h3>EVA suit reference — full suit diagram</h3></div>
-      <img src="public/nasa-eva-suit-reference.png"
-           alt="NASA EVA spacesuit diagram: helmet, gloves, portable life support system, hard upper torso, lower torso, communications carrier, cooling garment, and colored ID stripes."
-           loading="lazy">
+      <div class="panel-head"><h3>EVA suit reference — interactive suit diagram</h3></div>
+      <div class="suit-diagram-toolbar">
+        <span class="suit-diagram-hint">Click a suit component for its specs.</span>
+        <button class="btn small" id="btn-suit-view-toggle">Switch to 3D view</button>
+      </div>
+      <div class="suit-diagram-body">
+        <div class="suit-diagram-stage" id="suit-diagram-stage"></div>
+        <div class="suit-datasheet" id="suit-datasheet"></div>
+      </div>
+      <div class="suit-extra-btns" id="suit-extra-btns"></div>
+      <details class="suit-original-ref">
+        <summary>Original NASA reference diagram</summary>
+        <img src="public/nasa-eva-suit-reference.png"
+             alt="NASA EVA spacesuit diagram: helmet, gloves, portable life support system, hard upper torso, lower torso, communications carrier, cooling garment, and colored ID stripes."
+             loading="lazy">
+      </details>
       <div class="proc-ref">
         Reference: NASA, "Spacewalk: Spacesuit Basics" —
-        <a href="https://www.nasa.gov/feature/spacewalk-spacesuit-basics" target="_blank" rel="noopener">nasa.gov/feature/spacewalk-spacesuit-basics</a>.
-        Provided for crew reference during suit-related injury or EVA-anomaly triage; not part of the RAG-grounded index.
+        <a href="https://www.nasa.gov/feature/spacewalk-spacesuit-basics" target="_blank" rel="noopener">nasa.gov/feature/spacewalk-spacesuit-basics</a>;
+        NASA Advanced EMU Portable Life Support System (PLSS) technical report, NTRS 20120009158;
+        NASA TP-2011-216147 and the NASA OCHMO Decompression Sickness Prebreathe Reference Library.
+        Datapoints below are demo figures grounded in these published specs, not a live suit feed — not part of the RAG-grounded index. See the medical intake terminal for AI-grounded triage.
       </div>
     </div>
   </section>
  
   <!-- ============================================================ -->
-  <!-- TAB 3 — SUPPLY CHAIN, RESOURCE SCARCITY & RATIONING PREDICTOR  -->
+  <!-- TAB 3 — GROWING PLANTS IN SPACE (self-contained)                -->
   <!-- ============================================================ -->
   <section class="tab-panel" id="tab-3">
     <div class="module-head">
-      <span class="label-eyebrow">Module 03</span>
-      <h2 class="module-title">Supply Chain, Resource Scarcity &amp; Rationing Predictor</h2>
-      <p class="module-desc">Projects consumption forward against the next resupply date and models the trade-offs of a rationing strategy.</p>
+      <span class="label-eyebrow">Module 03 · Interactive</span>
+      <h2 class="module-title">Growing Plants in Space</h2>
+      <p class="module-desc">Diagnose and recover a Veggie grow-chamber failure, tuning LED spectrum and water delivery against NASA's real Veggie/APH plant-research findings.</p>
     </div>
- 
+
+    <p class="t5-proto-note"><b>How to play —</b> this module is a hands-on simulation, not backed by live telemetry or the retrieval pipeline the rest of this console uses. Trigger the Veggie failure, diagnose the cause, then tune the LED spectrum and water delivery method to recover the crop.</p>
+
     <div class="t4-top-grid" id="t4-resource-grid"></div>
- 
+
     <div class="sim-panel">
       <div class="panel-head">
-        <h3>Rationing simulation — hydroponics crop failure</h3>
+        <h3>Veggie grow-chamber simulation — crop failure</h3>
         <div class="feed-controls">
-          <button class="btn small" id="btn-trigger-crop-failure">Trigger crop failure</button>
+          <button class="btn small" id="btn-trigger-crop-failure">Trigger Veggie failure</button>
           <button class="btn small" id="btn-reset-supply">Reset</button>
         </div>
       </div>
       <div class="sim-body">
-        <p class="sim-question" id="sim-question">Hydroponics bay nominal. Trigger a crop failure to run the rationing scenario.</p>
- 
+        <p class="sim-question" id="sim-question">Veggie bay nominal. Trigger a failure to run the grow-chamber recovery scenario.</p>
+
+        <div class="resource-chart-wrap" id="grow-chamber-wrap"></div>
+
         <div class="sim-controls">
           <div class="sim-control">
-            <label for="sim-days">Days until resupply arrival — <span class="sim-slider-value" id="sim-days-value">45</span></label>
-            <input type="range" id="sim-days" min="20" max="90" step="1" value="45" disabled>
+            <label for="sim-diagnosis">Diagnosed cause</label>
+            <select class="intake-select" id="sim-diagnosis" disabled>
+              <option value="overwatering">Overwatering + poor airflow</option>
+              <option value="light">Insufficient light</option>
+              <option value="nutrient">Nutrient deficiency</option>
+              <option value="pest">Pest infestation</option>
+            </select>
           </div>
           <div class="sim-control">
-            <label for="sim-ration">Daily ration per person — <span class="sim-slider-value" id="sim-ration-value">2,500</span> kcal</label>
-            <input type="range" id="sim-ration" min="1200" max="2500" step="10" value="2500" disabled>
+            <label for="sim-light">LED spectrum — red/blue mix, <span class="sim-slider-value" id="sim-light-value">50</span>%</label>
+            <input type="range" id="sim-light" min="0" max="100" step="1" value="50" disabled>
           </div>
-          <button class="btn small" id="btn-auto-ration" disabled>Auto-set optimal ration</button>
+          <div class="sim-control">
+            <label for="sim-water">Water delivery</label>
+            <select class="intake-select" id="sim-water" disabled>
+              <option value="pillow">Pillow (Veggie, hand-watered)</option>
+              <option value="ponds">PONDS reservoir (passive)</option>
+            </select>
+          </div>
+          <button class="btn small" id="btn-auto-ration" disabled>Apply NASA-recommended fix</button>
           <button class="btn primary" id="btn-run-sim" disabled>Run simulation</button>
         </div>
- 
+
         <div class="sim-metrics">
           <div class="sim-metric">
-            <div class="sim-metric-label">Food energy on hand</div>
-            <div class="sim-metric-value mono" id="metric-stock">1,650,000 kcal</div>
+            <div class="sim-metric-label">Crop status</div>
+            <div class="sim-metric-value mono" id="metric-crop-status">6 plants nominal</div>
           </div>
           <div class="sim-metric">
-            <div class="sim-metric-label">Current ration</div>
-            <div class="sim-metric-value mono" id="metric-calories">— kcal</div>
+            <div class="sim-metric-label">LED spectrum</div>
+            <div class="sim-metric-value mono" id="metric-light">—</div>
           </div>
           <div class="sim-metric">
-            <div class="sim-metric-label">Projected buffer at resupply</div>
-            <div class="sim-metric-value mono" id="metric-buffer">—</div>
+            <div class="sim-metric-label">Water delivery</div>
+            <div class="sim-metric-value mono" id="metric-water">—</div>
           </div>
           <div class="sim-metric">
-            <div class="sim-metric-label">Modeled survival probability</div>
-            <div class="sim-metric-value mono" id="metric-survival">—</div>
+            <div class="sim-metric-label">Projected crop health</div>
+            <div class="sim-metric-value mono" id="metric-health">—</div>
           </div>
         </div>
- 
-        <div class="resource-chart-wrap" id="food-chart-wrap"></div>
-        <div class="chart-legend">
-          <div class="legend-item"><span class="legend-swatch dashed"></span> Reference: standard-rate consumption, no rationing (2,500 kcal/person/day)</div>
-          <div class="legend-item"><span class="legend-swatch solid-strong"></span> Live projection at the current ration and resupply date</div>
-        </div>
- 
+
         <div class="sim-output" id="sim-output">
-          <p class="sim-output-placeholder">Trigger the hydroponics crop failure to begin the rationing simulation.</p>
+          <p class="sim-output-placeholder">Trigger the Veggie failure to begin the grow-chamber recovery scenario.</p>
         </div>
       </div>
     </div>
@@ -1882,7 +1943,7 @@
   /* ============================================================ */
  
   /* ---- Unified incident log (feeds Modules 01, 03, 04) ---- */
-  // Every event, checklist confirmation, triage step, and rationing decision
+  // Every event, checklist confirmation, triage step, and crop-recovery decision
   // appends one entry here. This single array is the input to the after-action
   // report generator below — nothing in the report is authored independently
   // of what's actually logged.
@@ -2910,7 +2971,15 @@
   var crew = [
     { id:'okafor', name:'R. Okafor', role:'Commander', hr:[74,76,79,81,83,85,86], sleep:'6.2h', sleepFlag:true, sleepHist:[7.6,7.3,7.0,6.8,6.6,6.4,6.2], cortisol:'Elevated', cortisolFlag:true, cortisolHist:[12,13,14,16,18,19,21], allergy:'No known drug allergies on file.' },
     { id:'petrova', name:'L. Petrova', role:'Systems Engineer', hr:[64,65,63,66,65,64,65], sleep:'7.4h', sleepFlag:false, sleepHist:[7.5,7.3,7.6,7.2,7.5,7.3,7.4], cortisol:'Nominal', cortisolFlag:false, cortisolHist:[11,12,13,12,11,12,12], allergy:'No known drug allergies on file.' },
-    { id:'suarez', name:'M. Suarez', role:'Botanist', hr:[70,71,69,72,71,70,71], sleep:'7.0h', sleepFlag:false, sleepHist:[7.1,6.9,7.2,7.0,6.8,7.1,7.0], cortisol:'Nominal', cortisolFlag:false, cortisolHist:[10,11,12,11,10,11,11], allergy:'No known drug allergies on file.' },
+    { id:'suarez', name:'M. Suarez', role:'Botanist', hr:[70,71,69,72,71,70,71], sleep:'7.0h', sleepFlag:false, sleepHist:[7.1,6.9,7.2,7.0,6.8,7.1,7.0], cortisol:'Nominal', cortisolFlag:false, cortisolHist:[10,11,12,11,10,11,11], allergy:'No known drug allergies on file.',
+      // Suit-status datapoints, shown only while evaActive — demo figures
+      // grounded in the EMU/PLSS nominal ranges cited in the suit-reference
+      // panel below (6.5-8h PLSS duration, 4.3 psi suit pressure), not a
+      // live suit telemetry feed. Suarez is the crew member currently on
+      // EVA for demo purposes; her O2 reserve and PLSS battery are flagged
+      // to drive the suit diagram's flagged-hotspot highlighting and the
+      // "EVA suit CO2 alarm" triage example below.
+      suit:{ active:true, o2RemainingHrs:1.4, o2Flag:true, pressurePsi:4.3, pressureFlag:false, plssBatteryPct:38, battFlag:true } },
     { id:'kim', name:'J. Kim', role:'Systems Specialist', hr:[92,97,101,105,108,110,112], sleep:'4.8h', sleepFlag:true, sleepHist:[6.8,6.3,5.9,5.5,5.2,5.0,4.8], cortisol:'High', cortisolFlag:true, cortisolHist:[16,18,21,24,27,29,32], allergy:'Allergy on file: penicillin-class compounds (Kit A). Reaction history: anaphylaxis.' }
   ];
  
@@ -2921,11 +2990,26 @@
   function renderCrew(){
     stopAllEKG();
     crewList.innerHTML = crew.map(function(c){
+      var evaBadge = c.suit && c.suit.active
+        ? '<span class="crew-eva-badge' + ((c.suit.o2Flag || c.suit.pressureFlag || c.suit.battFlag) ? ' flag' : '') + '">EVA active</span>'
+        : '';
+      // Suit-status rows only render for a crew member currently marked
+      // evaActive (see the `crew` array above) — everyone else keeps the
+      // original three-row biometric card unchanged. An empty
+      // .biometric-spark span keeps the value column's right alignment
+      // consistent with the sparkline rows above it, rather than
+      // reflowing left when there's no chart to draw.
+      var suitRows = (c.suit && c.suit.active) ?
+        '<div class="biometric-row"><span class="biometric-label">Suit O2</span><span class="biometric-spark"></span><span class="biometric-value' + (c.suit.o2Flag ? ' flag' : '') + '">' + c.suit.o2RemainingHrs + 'h left</span></div>' +
+        '<div class="biometric-row"><span class="biometric-label">Suit psi</span><span class="biometric-spark"></span><span class="biometric-value' + (c.suit.pressureFlag ? ' flag' : '') + '">' + c.suit.pressurePsi + ' psi</span></div>' +
+        '<div class="biometric-row"><span class="biometric-label">PLSS batt</span><span class="biometric-spark"></span><span class="biometric-value' + (c.suit.battFlag ? ' flag' : '') + '">' + c.suit.plssBatteryPct + '%</span></div>'
+        : '';
       return '<div class="crew-card' + (c.id === selectedCrewId ? ' selected' : '') + '" data-id="' + c.id + '">' +
-        '<div class="crew-top"><span class="crew-name">' + c.name + '</span><span class="crew-role">' + c.role + '</span></div>' +
+        '<div class="crew-top"><span class="crew-name">' + c.name + '</span><span class="crew-role">' + c.role + evaBadge + '</span></div>' +
         '<div class="biometric-row"><span class="biometric-label">Heart rate</span><span class="biometric-spark"><canvas class="crew-ekg" id="ekg-' + c.id + '" width="110" height="28"></canvas></span><span class="biometric-value' + (c.hr[c.hr.length-1] > 95 ? ' flag' : '') + '">' + c.hr[c.hr.length-1] + ' bpm</span></div>' +
         '<div class="biometric-row"><span class="biometric-label">Sleep</span><span class="biometric-spark">' + sparkline(c.sleepHist, 90, 18) + '</span><span class="biometric-value' + (c.sleepFlag ? ' flag' : '') + '">' + c.sleep + '/night</span></div>' +
         '<div class="biometric-row"><span class="biometric-label">Cortisol</span><span class="biometric-spark">' + sparkline(c.cortisolHist, 90, 18) + '</span><span class="biometric-value' + (c.cortisolFlag ? ' flag' : '') + '">' + c.cortisol + '</span></div>' +
+        suitRows +
         '<div class="allergy-note">' + c.allergy + '</div>' +
       '</div>';
     }).join('');
@@ -2939,9 +3023,266 @@
     crew.forEach(function(c){
       startEKG(document.getElementById('ekg-' + c.id), c);
     });
+    // Keep the suit diagram's flagged-hotspot state in sync with whichever
+    // crew member is selected — see syncSuitHotspotClasses() below. Guarded
+    // there (not here) against running before the suit diagram block has
+    // initialized `suitStage`, since renderCrew() is also called once
+    // during this tab's initial synchronous setup, before that later block
+    // has executed.
+    syncSuitHotspotClasses();
   }
   renderCrew();
- 
+
+  /* ============================================================ */
+  /* TAB 3 — INTERACTIVE EVA SUIT REFERENCE DIAGRAM                 */
+  /* ============================================================ */
+  // Hand-authored datapoints grounded in NASA's published EMU/PLSS specs
+  // and prebreathe protocol documentation (see docs/module-02-spacesuit-
+  // datapoints-plan.md for sourcing) — demo figures, not a live suit
+  // telemetry feed, and not part of the RAG-grounded index, same
+  // disclosure the original static diagram carried (see the .proc-ref
+  // line in the suit-reference panel above).
+  //
+  // Two view modes share one selection state: a default 2D SVG diagram
+  // with clickable hotspot regions, and an optional 3D Three.js toggle
+  // that reuses the THREE global already loaded for Module 01's hull
+  // schematic (Schematic3D, above) rather than adding a new dependency.
+  // The 3D view deliberately skips mesh raycasting/picking (out of scope
+  // for this pass) and instead drives the same selection state through
+  // the pill button row under the stage, so "click a component, see its
+  // specs" holds in both views rather than being a 2D-only interaction.
+  var SUIT_COMPONENTS = [
+    { id:'helmet', label:'Helmet & comms carrier',
+      stats:[
+        { label:'O₂ flow rate', value:'~0.8 ft³/min, adjustable at the suit-mounted control module' },
+        { label:'Comms', value:'Headset integrated into the communications carrier assembly' }
+      ],
+      source:'NASA Advanced EMU PLSS technical report, NTRS 20120009158' },
+    { id:'hut-plss', label:'Hard upper torso + PLSS backpack',
+      stats:[
+        { label:'Suit pressure', value:'4.3 psi (29.6 kPa) pure O₂ — about ⅓ sea-level pressure' },
+        { label:'PLSS-rated duration', value:'6.5–8 hours of O₂, CO₂ removal, cooling water, and battery power' },
+        { label:'PLSS mass', value:'~54 kg (119 lb) — roughly half the suit’s total mass' },
+        { label:'CO₂ scrubbing', value:'Contaminant control cartridge — historically lithium hydroxide (LiOH)' }
+      ],
+      source:'NASA, "Spacewalk: Spacesuit Basics"; NASA PLSS technical report, NTRS 20120009158' },
+    { id:'lcvg', label:'Liquid cooling & ventilation garment',
+      stats:[
+        { label:'Cooling loop', value:'~300 ft of tubing, chilled water circulated at 1.5 L/min' },
+        { label:'Heat rejection', value:'Up to 2,000 BTU/hr via the PLSS sublimator' }
+      ],
+      source:'NASA PLSS technical report, NTRS 20120009158' },
+    { id:'gloves', label:'Gloves',
+      stats:[
+        { label:'Pressure', value:'Same 4.3 psi suit-wide pressure — the primary source of EVA hand fatigue' },
+        { label:'Construction', value:'Dexterity-optimized outer layer over a pressure bladder and restraint layer' }
+      ],
+      source:'NASA, "Spacewalk: Spacesuit Basics"' },
+    { id:'legs', label:'Lower torso assembly',
+      stats:[
+        { label:'Function', value:'Waist, legs, and boots — fitted per crew member, sealed to the HUT at the waist ring' }
+      ],
+      source:'NASA, "Spacewalk: Spacesuit Basics"' }
+  ];
+  var SUIT_PREBREATHE = { id:'prebreathe', label:'Pre-EVA prebreathe protocol',
+    stats:[
+      { label:'ISS 2-hr protocol', value:'50 min O₂ breathing at 14.7 psi (incl. 10 min exercise at 75% VO₂max) → 30 min O₂ breathing during depress 14.7→10.2 psi → 30–60 min suit-don break at 10.2 psi, 26.5% O₂' },
+      { label:'ISLE alternative', value:'In-suit light-exercise prebreathe — saves ~6 lb of O₂ per EVA vs. staged prebreathe' }
+    ],
+    source:'NASA TP-2011-216147; NASA OCHMO Decompression Sickness Prebreathe Reference Library' };
+  var SUIT_ALL_PARTS = SUIT_COMPONENTS.concat([SUIT_PREBREATHE]);
+
+  var suitStage = document.getElementById('suit-diagram-stage');
+  var suitDatasheet = document.getElementById('suit-datasheet');
+  var suitExtraBtns = document.getElementById('suit-extra-btns');
+  var suitView = '2d'; // '2d' | '3d'
+  var selectedSuitPartId = 'hut-plss';
+
+  function suitPartById(id){
+    return SUIT_ALL_PARTS.filter(function(p){ return p.id === id; })[0];
+  }
+
+  function renderSuitDatasheet(){
+    var part = suitPartById(selectedSuitPartId) || SUIT_COMPONENTS[0];
+    var html = '<h4>' + part.label + '</h4>';
+    part.stats.forEach(function(s){
+      html += '<div class="suit-stat-row"><span class="suit-stat-label">' + s.label + '</span><span class="suit-stat-value">' + s.value + '</span></div>';
+    });
+    html += '<div class="proc-ref">Source: ' + part.source + '</div>';
+    suitDatasheet.innerHTML = html;
+  }
+
+  // Whichever crew member is currently selected drives the flagged hotspot
+  // — suit.active crew carry o2Flag/pressureFlag/battFlag booleans (see the
+  // `crew` array above), all of which live physically on the PLSS/HUT, so
+  // any one of them flags that single hotspot rather than inventing a
+  // per-reading hotspot the diagram has no separate component for.
+  function selectedCrewSuitFlagged(){
+    var c = crew.filter(function(x){ return x.id === selectedCrewId; })[0];
+    return !!(c && c.suit && c.suit.active && (c.suit.o2Flag || c.suit.pressureFlag || c.suit.battFlag));
+  }
+
+  function syncSuitHotspotClasses(){
+    if(!suitStage) return; // not initialized yet — see the call inside renderCrew() above
+    var flagged = selectedCrewSuitFlagged();
+    suitStage.querySelectorAll('[data-part]').forEach(function(el){
+      el.classList.toggle('selected', el.dataset.part === selectedSuitPartId);
+      el.classList.toggle('flagged', flagged && el.dataset.part === 'hut-plss');
+    });
+    suitExtraBtns.querySelectorAll('[data-part]').forEach(function(btn){
+      btn.classList.toggle('selected', btn.dataset.part === selectedSuitPartId);
+    });
+    if(suit3D){
+      suit3D.setSelected(selectedSuitPartId);
+      suit3D.setFlagged('hut-plss', flagged);
+    }
+  }
+
+  function selectSuitPart(id){
+    selectedSuitPartId = id;
+    renderSuitDatasheet();
+    syncSuitHotspotClasses();
+  }
+
+  function suitDiagramSVG(){
+    // Simplified front-view suit outline built from plain shapes — matches
+    // this console's existing raw-inline-SVG idiom (no canvas/WebGL, no
+    // external asset). Colors come entirely from the theme's CSS variables
+    // via the .suit-hotspot class (inherited by each shape's fill/stroke),
+    // so the diagram follows light/dark mode automatically like the rest
+    // of the UI, rather than hardcoding suit-diagram-specific colors.
+    return '<svg viewBox="0 0 200 320" xmlns="http://www.w3.org/2000/svg">' +
+      '<g data-part="hut-plss" class="suit-hotspot"><rect x="55" y="38" width="20" height="140" rx="6"></rect></g>' + // PLSS backpack, drawn first so the HUT overlaps its edges
+      '<g data-part="hut-plss" class="suit-hotspot"><rect x="63" y="66" width="74" height="92" rx="10"></rect></g>' + // HUT / chest
+      '<g data-part="helmet" class="suit-hotspot"><circle cx="100" cy="36" r="32"></circle></g>' +
+      '<g data-part="lcvg" class="suit-hotspot"><rect x="71" y="74" width="58" height="78" rx="8" style="fill:none;stroke-dasharray:4 3;"></rect></g>' + // cooling garment shown as an inner outline layer
+      '<rect x="34" y="146" width="20" height="52" rx="8" style="fill:var(--panel-2);stroke:var(--line-strong);"></rect>' + // left arm connector (non-interactive)
+      '<rect x="146" y="146" width="20" height="52" rx="8" style="fill:var(--panel-2);stroke:var(--line-strong);"></rect>' + // right arm connector
+      '<g data-part="gloves" class="suit-hotspot"><circle cx="46" cy="180" r="14"></circle></g>' +
+      '<g data-part="gloves" class="suit-hotspot"><circle cx="154" cy="180" r="14"></circle></g>' +
+      '<g data-part="legs" class="suit-hotspot"><rect x="63" y="160" width="74" height="106" rx="8"></rect></g>' +
+      '<text x="100" y="18" text-anchor="middle" class="suit-part-label">EMU — front view</text>' +
+    '</svg>';
+  }
+
+  function renderSuit2D(){
+    suitStage.innerHTML = suitDiagramSVG();
+    suitStage.querySelectorAll('[data-part]').forEach(function(el){
+      el.addEventListener('click', function(){ selectSuitPart(el.dataset.part); });
+    });
+  }
+
+  suitExtraBtns.innerHTML = '<button class="btn small" data-part="prebreathe">Pre-EVA prebreathe protocol</button>';
+  suitExtraBtns.querySelectorAll('[data-part]').forEach(function(btn){
+    btn.addEventListener('click', function(){ selectSuitPart(btn.dataset.part); });
+  });
+
+  // ---- Optional 3D view -------------------------------------------------
+  // Reuses the THREE global already loaded for Module 01's Schematic3D
+  // (see the <script> tags near the top of this file) rather than pulling
+  // in a second copy of the library. Deliberately minimal — five
+  // primitive-geometry meshes and a slow auto-rotate, matching this
+  // panel's "reference diagram" scope rather than a full flight
+  // simulator. No raycasting/click-on-mesh picking is implemented (see the
+  // block comment at the top of this section) — the pill button row
+  // drives selection in both views instead.
+  var suit3D = null;
+  function buildSuit3D(){
+    if(!window.THREE || typeof THREE.Scene !== 'function') return null;
+    var mount = document.createElement('div');
+    mount.className = 'suit-canvas-wrap';
+    var scene = new THREE.Scene();
+    var camera = new THREE.PerspectiveCamera(40, 1, 0.1, 50);
+    camera.position.set(0, 0.35, 5.2);
+    var renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+    var resizeObserver = null;
+
+    function baseMat(){ return new THREE.MeshStandardMaterial({ color:0x9a9a96, roughness:0.6, metalness:0.05 }); }
+    var meshesByPart = {};
+    function addMesh(part, geometry, pos){
+      var mesh = new THREE.Mesh(geometry, baseMat());
+      mesh.position.set(pos[0], pos[1], pos[2]);
+      scene.add(mesh);
+      meshesByPart[part] = meshesByPart[part] || [];
+      meshesByPart[part].push(mesh);
+    }
+    addMesh('helmet', new THREE.SphereGeometry(0.62, 20, 16), [0, 1.5, 0]);
+    addMesh('hut-plss', new THREE.BoxGeometry(1.3, 1.5, 0.5), [0, 0.5, -0.1]);   // PLSS, set slightly behind the HUT
+    addMesh('hut-plss', new THREE.BoxGeometry(1.1, 1.4, 0.6), [0, 0.55, 0.15]);  // HUT, in front
+    addMesh('lcvg', new THREE.CylinderGeometry(0.5, 0.5, 1.25, 16, 1, true), [0, 0.55, 0.15]);
+    addMesh('gloves', new THREE.SphereGeometry(0.22, 12, 10), [-0.85, -0.1, 0.2]);
+    addMesh('gloves', new THREE.SphereGeometry(0.22, 12, 10), [0.85, -0.1, 0.2]);
+    addMesh('legs', new THREE.CylinderGeometry(0.55, 0.45, 1.65, 16), [0, -1.15, 0]);
+
+    scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+    var keyLight = new THREE.DirectionalLight(0xffffff, 0.6);
+    keyLight.position.set(2, 3, 4);
+    scene.add(keyLight);
+
+    mount.appendChild(renderer.domElement);
+
+    function resize(){
+      var w = mount.clientWidth || 210, h = mount.clientHeight || 232;
+      renderer.setSize(w, h);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    }
+
+    var raf = null;
+    function tick(){
+      scene.rotation.y += 0.006;
+      renderer.render(scene, camera);
+      raf = requestAnimationFrame(tick);
+    }
+
+    function setSelected(partId){
+      Object.keys(meshesByPart).forEach(function(part){
+        meshesByPart[part].forEach(function(mesh){
+          mesh.material.emissive = new THREE.Color(part === partId ? 0x2a2a2e : 0x000000);
+        });
+      });
+    }
+    function setFlagged(partId, on){
+      (meshesByPart[partId] || []).forEach(function(mesh){ mesh.material.wireframe = !!on; });
+    }
+    function mountIn(container){
+      container.innerHTML = '';
+      container.appendChild(mount);
+      resize();
+      if(!raf) tick();
+      if(!resizeObserver && window.ResizeObserver){
+        resizeObserver = new ResizeObserver(resize);
+        resizeObserver.observe(mount);
+      }
+    }
+    function stop(){
+      if(raf){ cancelAnimationFrame(raf); raf = null; }
+    }
+    return { mountIn:mountIn, stop:stop, setSelected:setSelected, setFlagged:setFlagged };
+  }
+
+  var btnSuitViewToggle = document.getElementById('btn-suit-view-toggle');
+  btnSuitViewToggle.addEventListener('click', function(){
+    if(suitView === '2d'){
+      suit3D = suit3D || buildSuit3D();
+      if(!suit3D) return; // THREE failed to load — stay on the 2D view rather than showing a blank stage
+      suitView = '3d';
+      btnSuitViewToggle.textContent = 'Switch to 2D view';
+      suit3D.mountIn(suitStage);
+      syncSuitHotspotClasses();
+    } else {
+      if(suit3D) suit3D.stop();
+      suitView = '2d';
+      btnSuitViewToggle.textContent = 'Switch to 3D view';
+      renderSuit2D();
+      syncSuitHotspotClasses();
+    }
+  });
+
+  renderSuit2D();
+  renderSuitDatasheet();
+  syncSuitHotspotClasses();
+
   intakeCrewSelect.innerHTML = crew.map(function(c){ return '<option value="' + c.id + '">' + c.name + ' — ' + c.role + '</option>'; }).join('');
   intakeCrewSelect.value = selectedCrewId;
   intakeCrewSelect.addEventListener('change', function(){
@@ -2957,6 +3298,10 @@
   document.getElementById('ex-2').addEventListener('click', function(){
     intakeCrewSelect.value = 'okafor'; selectedCrewId = 'okafor'; renderCrew();
     intakeText.value = 'Crew member reports dizziness on standing, mild chest tightness, and has been sleeping poorly for several nights.';
+  });
+  document.getElementById('ex-3').addEventListener('click', function(){
+    intakeCrewSelect.value = 'suarez'; selectedCrewId = 'suarez'; renderCrew();
+    intakeText.value = 'Crew member on EVA reports a rising CO2 alarm on the suit display, helmet fogging, and a headache.';
   });
  
   var triageOutput = document.getElementById('triage-output');
@@ -3076,14 +3421,62 @@
     var c = crew.filter(function(x){ return x.id === selectedCrewId; })[0];
     currentTriage = null;
  
-    if(text.indexOf('laceration') !== -1 || text.indexOf('swelling') !== -1 || text.indexOf('confusion') !== -1){
+    // Suit/EVA-related reports are checked first, ahead of the dizziness/
+    // chest-tightness branch below, since a suit CO2 alarm's hypercapnia
+    // symptoms (headache, confusion, rapid breathing) can otherwise read as
+    // generic and get misrouted to that branch instead. Word-boundary
+    // matching (\b) is used rather than a plain indexOf, since a plain
+    // "eva" substring match would false-positive on unrelated words like
+    // "elevated" (already used elsewhere on this tab, e.g. "elevated
+    // cortisol").
+    var suitReportMatch = /\b(suit|eva|helmet|co2|plss|decompress\w*|prebreathe)\b/.test(text);
+    if(suitReportMatch){
+      var isDCS = /\b(decompress\w*|joint)\b/.test(text);
+      var headHtml3, steps3, level3, label3, logMsg3;
+      if(isDCS){
+        headHtml3 = '<div class="triage-header">Triage protocol — MET ' + metEl.textContent + ' — ' + c.name + '</div>' +
+          '<div class="triage-lead">Findings consistent with suspected decompression sickness (DCS) following EVA repress. Treat as time-critical.</div>' +
+          '<div class="triage-alert"><span class="ta-tag">EVA suit reference — prebreathe protocol</span>Confirm the full pre-EVA prebreathe protocol was completed; incomplete denitrogenation is the leading risk factor for post-EVA DCS.</div>';
+        steps3 = [
+          'Administer 100% O2 by mask immediately.',
+          'Keep the crew member still and reclined; avoid all exertion.',
+          'Recheck joint pain, skin mottling, and neurological status every 10 minutes.',
+          'Prepare for possible hyperbaric/recompression treatment per the DCS protocol on file.',
+          'Escalate to the ground-based flight surgeon immediately — do not wait for symptoms to worsen.'
+        ];
+        level3 = 'critical'; label3 = 'Suspected DCS';
+        logMsg3 = 'Triage protocol initiated for ' + c.name + ': suspected decompression sickness following EVA.';
+      } else {
+        headHtml3 = '<div class="triage-header">Triage protocol — MET ' + metEl.textContent + ' — ' + c.name + '</div>' +
+          '<div class="triage-lead">Findings consistent with CO2 scrubber saturation inside the suit loop, compounded by early hypercapnia. Treat as time-critical.</div>' +
+          '<div class="triage-alert"><span class="ta-tag">EVA suit reference — PLSS / CO2 scrubbing</span>The PLSS’s contaminant control cartridge removes CO2 chemically (historically lithium hydroxide); a rising suit CO2 reading typically means that cartridge is saturated, not a suit leak.</div>';
+        steps3 = [
+          'Instruct the crew member to terminate all non-essential EVA tasks and translate directly to the airlock.',
+          'Confirm suit O2 flow rate is at the commanded setting, not manually reduced.',
+          'Monitor for headache, confusion, and rapid breathing en route to the airlock.',
+          'On repress, remove the helmet immediately and reassess mental status in shirtsleeve air.',
+          'Swap the PLSS contaminant control cartridge before the next EVA is scheduled.'
+        ];
+        level3 = 'critical'; label3 = 'Suit CO2 Alarm';
+        logMsg3 = 'Triage protocol initiated for ' + c.name + ': suit CO2 scrubber saturation during EVA.';
+      }
+      currentTriage = {
+        crew:c, headHtml:headHtml3,
+        steps:steps3,
+        state:new Array(steps3.length).fill(false),
+        activeLevel:level3, activeLabel:label3
+      };
+      setModuleAlert('t3', level3, c.name + ' — ' + label3);
+      logIncident('T3', 'critical', logMsg3);
+      renderTriageBody();
+    } else if(text.indexOf('laceration') !== -1 || text.indexOf('swelling') !== -1 || text.indexOf('confusion') !== -1){
       var headHtml = '<div class="triage-header">Triage protocol — MET ' + metEl.textContent + ' — ' + c.name + '</div>' +
         '<div class="triage-lead">Stage 2 wound infection paired with mild shock. Treat as time-critical.</div>';
       var kitForInjection = 'A';
       if(c.allergy.indexOf('penicillin') !== -1){
         kitForInjection = 'B';
         headHtml += '<div class="triage-alert"><span class="ta-tag">Allergy alert — cross-checked against crew file</span>Do NOT use Kit A. ' + c.name + ' has a documented penicillin-class allergy with an anaphylaxis history. Use Kit B instead.</div>';
-        headHtml += '<div class="triage-alert"><span class="ta-tag">Supply risk — Module 03</span>' + c.name + ' is Kit-A-contraindicated, so this treatment draws exclusively on Kit B. Confirming this step below will decrement Kit B stock on the Supply &amp; Rationing card in real time.</div>';
+        headHtml += '<div class="triage-alert"><span class="ta-tag">Supply risk — Module 03</span>' + c.name + ' is Kit-A-contraindicated, so this treatment draws exclusively on Kit B. Confirming this step below will decrement Kit B stock on the Module 03 card in real time.</div>';
       }
       currentTriage = {
         crew:c, headHtml:headHtml,
@@ -3137,9 +3530,9 @@
   document.getElementById('btn-run-triage').addEventListener('click', runTriage);
  
   /* ============================================================ */
-  /* TAB 4 — SUPPLY CHAIN, RESOURCE SCARCITY & RATIONING PREDICTOR  */
+  /* TAB 3 — GROWING PLANTS IN SPACE (self-contained)               */
   /* ============================================================ */
- 
+
   var months = ['Now','+1','+2','+3','+4','+5','+6','+7','+8','+9','+10','+11'];
  
   function lineChartSVG(id, series, opts){
@@ -3179,15 +3572,16 @@
     return '<svg viewBox="0 0 ' + w + ' ' + h + '" width="' + w + '" height="' + h + '">' + grid + marker + paths + xlabels + '</svg>';
   }
  
-  // Side resources (water, medicine, spare parts) — each card is now backed by real
+  // Side resources (water, medicine, spare parts) — each card is backed by real
   // state instead of a hand-set decorative slope:
   //  - Water's depletion rate is derived live from Module 01's water recycler sector,
   //    so a degrading recycler in Module 01's telemetry section visibly steepens this
-  //    line on tab 03.
+  //    line on tab 03. A Veggie failure also raises irrigation draw on the recycler
+  //    (extraLoss below), same coupling the old rationing version of this tab used.
   //  - Medicine is a discrete Kit A / Kit B dose count, coupled to Module 02: checking
   //    off a kit-tagged triage step decrements that kit and recalculates the card.
   //  - Spare parts is a discrete cartridge count whose draw rate still runs off the
-  //    same extraLoss crop-failure coupling used elsewhere on this tab.
+  //    same extraLoss Veggie-failure coupling used elsewhere on this tab.
   function computeCurve(monthlyLossPct){
     return months.map(function(m,i){ return Math.max(0, 100 - monthlyLossPct * i); });
   }
@@ -3214,7 +3608,7 @@
   }
 
   var sideResources = [
-    { id:'water', name:'Water', extraLoss:0, normalNote:'Recycling loop tracking normal usage.', elevatedNote:'Recalculated — hydroponics failure has increased load on the water recycler.' },
+    { id:'water', name:'Water', extraLoss:0, normalNote:'Recycling loop tracking normal irrigation draw from active Veggie pillows.', elevatedNote:'Recalculated — Veggie failure has increased load on the water recycler.' },
     { id:'medicine', name:'Medicine', extraLoss:0 },
     { id:'spareParts', name:'Spare Parts', extraLoss:0, cartridgeRemaining:6, cartridgeTotal:6 }
   ];
@@ -3337,210 +3731,270 @@
   }
   renderSideResources();
  
-  // Food chart + rationing simulator.
-  var foodChartWrap = document.getElementById('food-chart-wrap');
-  var cropFailureTriggered = false;
-  var foodEnergyNominal = 1650000;     // kcal on hand with hydroponics operating normally
-  var foodEnergyPostFailure = 320000;  // kcal remaining once the crop failure hits — well under the ~450,000 an unrationed crew burns in 45 days, so the default view shows a real deficit
-  var totalFoodEnergy = foodEnergyNominal;
-  var crewSize = 4;
-  var standardDailyKcal = 2500;
- 
-  var simDaysInput = document.getElementById('sim-days');
-  var simDaysValue = document.getElementById('sim-days-value');
-  var simRationInput = document.getElementById('sim-ration');
-  var simRationValue = document.getElementById('sim-ration-value');
-  var metricStock = document.getElementById('metric-stock');
-  var metricCalories = document.getElementById('metric-calories');
-  var metricBuffer = document.getElementById('metric-buffer');
-  var metricSurvival = document.getElementById('metric-survival');
+  // Growing Plants in Space — Veggie grow-chamber simulator. Entirely
+  // client-side (no fetch/backend call anywhere in this block), matching
+  // Module 05/06's "Try It Yourself" pattern rather than the RAG-grounded
+  // pattern the console's other modules use. The diagnosis/light/water
+  // logic below is hand-authored from NASA's documented Veggie findings —
+  // in particular the real Scott Kelly zinnia incident (overwatering +
+  // poor airflow let fungus take hold) — the same accuracy discipline the
+  // grounded modules get from retrieval, just authored once here instead
+  // of retrieved per request.
+  var growChamberWrap = document.getElementById('grow-chamber-wrap');
+  var PLANT_SLOTS = 6;
+  var failureTriggered = false;
+
+  var simDiagnosisInput = document.getElementById('sim-diagnosis');
+  var simLightInput = document.getElementById('sim-light');
+  var simLightValue = document.getElementById('sim-light-value');
+  var simWaterInput = document.getElementById('sim-water');
+  var metricCropStatus = document.getElementById('metric-crop-status');
+  var metricLight = document.getElementById('metric-light');
+  var metricWater = document.getElementById('metric-water');
+  var metricHealth = document.getElementById('metric-health');
   var simOutput = document.getElementById('sim-output');
   var simQuestionEl = document.getElementById('sim-question');
   var btnTriggerCrop = document.getElementById('btn-trigger-crop-failure');
   var btnResetSupply = document.getElementById('btn-reset-supply');
   var btnRunSim = document.getElementById('btn-run-sim');
-  var btnAutoRation = document.getElementById('btn-auto-ration');
- 
-  metricStock.textContent = totalFoodEnergy.toLocaleString() + ' kcal';
- 
-  function nominalFoodCurve(){
-    // Hydroponics operating normally — mild, expected decline, same shape as the other resource lines.
-    return [100,99,99,98,98,97,97,96,96,95,95,94];
+  var btnAutoFix = document.getElementById('btn-auto-ration');
+
+  // Answer key grounded in the documented Veggie failure: Scott Kelly's
+  // zinnias were overwatered with insufficient airflow, and fungus took
+  // hold — he cleaned and nursed them back to flower by hand. The other
+  // three options are plausible-sounding but not what NASA's account
+  // describes, same "grounded, not guessed" discipline the rest of the
+  // console applies via retrieval.
+  var DIAGNOSIS_INFO = {
+    overwatering: { label:'Overwatering + poor airflow', correct:true,
+      detail:'Matches the documented Veggie failure — Scott Kelly’s zinnias were overwatered with poor airflow, and fungus took hold on the ISS.' },
+    light: { label:'Insufficient light', correct:false,
+      detail:'The LED bank was operating within spec in the documented incident — light was not the cause.' },
+    nutrient: { label:'Nutrient deficiency', correct:false,
+      detail:'The clay-based growth media’s controlled-release fertilizer was within spec in the documented incident — nutrients were not the cause.' },
+    pest: { label:'Pest infestation', correct:false,
+      detail:'No pest activity was logged in the documented incident — the real cause was fungal growth from excess moisture, not pests.' }
+  };
+
+  function waterLabelFor(method){
+    return method === 'ponds' ? 'a PONDS reservoir' : 'hand-watered pillows';
   }
- 
-  function drawFoodChartNominal(daysUntilResupply){
-    var markerIndex = Math.min(months.length-1, Math.round(daysUntilResupply/30));
-    var series = [{ data: nominalFoodCurve() }];
-    foodChartWrap.innerHTML = lineChartSVG('food', series, { maxVal:100, markerIndex: markerIndex });
+
+  // Plants grow on red + blue wavelengths; green is only added so produce
+  // looks normal to the crew, and Veggie's real chamber glows magenta-pink
+  // at a red/blue-dominant mix. 60-85% is the "matches the real chamber"
+  // band; the extremes are cosmetically white/green (too little red/blue)
+  // or oversaturated (too much).
+  function lightQuality(pct){
+    if(pct >= 60 && pct <= 85) return 'good';
+    if((pct >= 40 && pct < 60) || (pct > 85 && pct <= 95)) return 'fair';
+    return 'poor';
   }
- 
-  function unmitigatedCurve(){
-    // Reference line: crew keeps eating at the standard rate regardless of ration choice.
-    var daysToZero = totalFoodEnergy / (standardDailyKcal * crewSize);
-    var monthsToZero = daysToZero / 30;
-    return months.map(function(m,i){
-      var pct = 100 - (i / monthsToZero) * 100;
-      return Math.max(pct, 0);
-    });
+
+  // PONDS' passive reservoir is the documented fix for overwatering risk;
+  // hand-watered pillows need careful, disciplined watering to avoid the
+  // same failure. So the "right" water delivery choice depends on whether
+  // overwatering was correctly diagnosed as the cause.
+  function waterQuality(method, diagnosisCorrect){
+    if(method === 'ponds') return diagnosisCorrect ? 'good' : 'fair';
+    return diagnosisCorrect ? 'fair' : 'poor';
   }
- 
-  // Computed directly from stock arithmetic, so a ration that's too high for the
-  // chosen resupply window will visibly hit zero before the resupply marker —
-  // and a conservative ration will visibly end with a surplus.
-  function rationedCurve(rationKcal, daysUntilResupply){
-    var dailyBurn = rationKcal * crewSize;
-    var monthsUntilResupply = daysUntilResupply / 30;
-    return months.map(function(m,i){
-      if(i <= monthsUntilResupply){
-        var daysElapsed = i * 30;
-        var pct = ((totalFoodEnergy - dailyBurn * daysElapsed) / totalFoodEnergy) * 100;
-        return Math.max(pct, 0);
-      }
-      return 100; // resupply arrives, stock is restored
-    });
+
+  // Deterministic arithmetic, not a random number or a model output — a
+  // direct client-side analog of the old computeSurvivalProbability(),
+  // just scored on diagnosis correctness + light/water quality tiers
+  // instead of a ration/day calculation.
+  function computeCropRecovery(){
+    var diag = DIAGNOSIS_INFO[simDiagnosisInput.value];
+    var lq = lightQuality(Number(simLightInput.value));
+    var wq = waterQuality(simWaterInput.value, diag.correct);
+    var score = (diag.correct ? 50 : 10) +
+      (lq === 'good' ? 25 : lq === 'fair' ? 12 : 0) +
+      (wq === 'good' ? 25 : wq === 'fair' ? 12 : 0);
+    return Math.max(5, Math.min(99, score));
   }
- 
-  function computeSurvivalProbability(rationKcal, bufferKcal, dailyBurn){
-    var base = rationKcal >= 2000 ? 99 : rationKcal >= 1800 ? 95 : rationKcal >= 1500 ? 85 : rationKcal >= 1200 ? 65 : 40;
-    if(bufferKcal >= 0) return base;
-    // Running out before resupply overrides the ration tier — but scales with how
-    // early the stock-out hits rather than dropping straight to a flat floor.
-    var shortfallDays = dailyBurn > 0 ? Math.ceil(Math.abs(bufferKcal) / dailyBurn) : 1;
-    return Math.max(5, Math.min(60, base - shortfallDays * 4));
+
+  function healthColor(pct){
+    return pct >= 70 ? '#3f9142' : pct >= 40 ? '#c9a227' : '#8a5a34';
   }
- 
-  function formatBuffer(bufferKcal, dailyBurn){
-    var rounded = Math.round(bufferKcal).toLocaleString();
-    if(bufferKcal >= 0){
-      var spareDays = dailyBurn > 0 ? Math.floor(bufferKcal / dailyBurn) : 0;
-      return '+' + rounded + ' kcal (~' + spareDays + ' days spare)';
+  function ledColor(quality){
+    return quality === 'good' ? '#ff3fa8' : quality === 'fair' ? '#f0b6d8' : '#eef2df';
+  }
+
+  function plantGlyphSVG(cx, baseY, healthPct){
+    var color = healthColor(healthPct);
+    var h = 10 + (healthPct / 100) * 26;
+    var droop = healthPct >= 70 ? 0 : healthPct >= 40 ? 14 : 32;
+    var topY = baseY - 4 - h;
+    var svg = '<rect x="' + (cx - 14) + '" y="' + (baseY - 4) + '" width="28" height="10" fill="var(--panel-3)" stroke="var(--line-strong)" stroke-width="1" />' +
+      '<line x1="' + cx + '" y1="' + (baseY - 4) + '" x2="' + cx + '" y2="' + topY.toFixed(1) + '" stroke="' + color + '" stroke-width="2.2" />' +
+      '<g transform="rotate(' + droop + ' ' + cx + ' ' + topY.toFixed(1) + ')">' +
+      '<ellipse cx="' + (cx - 8) + '" cy="' + (topY + 3).toFixed(1) + '" rx="9.5" ry="4.5" fill="' + color + '" transform="rotate(-28 ' + (cx - 8) + ' ' + (topY + 3).toFixed(1) + ')" />' +
+      '<ellipse cx="' + (cx + 8) + '" cy="' + (topY + 3).toFixed(1) + '" rx="9.5" ry="4.5" fill="' + color + '" transform="rotate(28 ' + (cx + 8) + ' ' + (topY + 3).toFixed(1) + ')" />' +
+      '</g>';
+    if(healthPct < 40){
+      svg += '<circle cx="' + (cx - 5) + '" cy="' + (baseY - 7) + '" r="1.6" fill="#7a5230" opacity="0.75" />' +
+        '<circle cx="' + (cx + 6) + '" cy="' + (baseY - 9) + '" r="1.3" fill="#7a5230" opacity="0.75" />';
     }
-    var shortDays = dailyBurn > 0 ? Math.ceil(Math.abs(bufferKcal) / dailyBurn) : 0;
-    return rounded + ' kcal (stock-out ~' + shortDays + ' days early)';
+    return svg;
   }
- 
-  function drawFoodChart(rationKcal, daysUntilResupply){
-    var markerIndex = Math.min(months.length-1, Math.round(daysUntilResupply/30));
-    var series = [
-      { data: unmitigatedCurve(), dashed:true },
-      { data: rationedCurve(rationKcal, daysUntilResupply), strong:true }
-    ];
-    foodChartWrap.innerHTML = lineChartSVG('food', series, { maxVal:100, markerIndex: markerIndex });
+
+  function drawGrowChamber(healthPct, lightPct){
+    var quality = lightQuality(lightPct);
+    var w = 520, h = 190;
+    var chamberX = 20, chamberY = 34, chamberW = 480, chamberH = 130;
+    var cols = [chamberX + chamberW * (1/6), chamberX + chamberW * (3/6), chamberX + chamberW * (5/6)];
+    var rows = [chamberY + chamberH * 0.32, chamberY + chamberH * 0.78];
+    var plants = '';
+    var slot = 0;
+    rows.forEach(function(rowY){
+      cols.forEach(function(colX){
+        plants += plantGlyphSVG(colX, rowY, healthPct);
+        slot++;
+      });
+    });
+    var svg = '<svg viewBox="0 0 ' + w + ' ' + h + '" width="' + w + '" height="' + h + '">' +
+      '<rect x="' + chamberX + '" y="14" width="' + chamberW + '" height="14" fill="' + ledColor(quality) + '" stroke="var(--line-strong)" stroke-width="1" />' +
+      '<rect x="' + chamberX + '" y="' + chamberY + '" width="' + chamberW + '" height="' + chamberH + '" fill="none" stroke="var(--line-strong)" stroke-width="1.5" />' +
+      plants +
+      '<text x="' + chamberX + '" y="' + (chamberY + chamberH + 16) + '" font-family="var(--mono)" font-size="9.5" fill="var(--ink-faint)">LED bank — ' + Math.round(lightPct) + '% red/blue mix (' + quality + ')</text>' +
+      '</svg>';
+    growChamberWrap.innerHTML = svg;
   }
- 
-  // Live preview: recalculates on every slider move, for both sliders, so the
-  // chart and every metric visibly respond as soon as you touch a control —
-  // "Run simulation" below only locks in the written strategy and the alert state.
+
+  // Live preview: recalculates on every control change so the chamber and
+  // every metric visibly respond immediately — "Run simulation" below only
+  // locks in the written outcome, the alert state, and the spare-parts
+  // mitigation, same asymmetry the old rationing sim used.
   function recomputeSimMetrics(){
-    var days = Number(simDaysInput.value);
-    var ration = Number(simRationInput.value);
-    simDaysValue.textContent = days;
-    simRationValue.textContent = ration.toLocaleString();
-    if(!cropFailureTriggered){
-      drawFoodChartNominal(days);
+    var lightPct = Number(simLightInput.value);
+    simLightValue.textContent = lightPct;
+    var lq = lightQuality(lightPct);
+    metricLight.textContent = lightPct + '% (' + lq + ')';
+
+    if(!failureTriggered){
+      metricCropStatus.textContent = PLANT_SLOTS + ' plants nominal';
+      metricWater.textContent = '—';
+      metricHealth.textContent = '—';
+      drawGrowChamber(100, lightPct);
       return;
     }
-    var dailyBurn = ration * crewSize;
-    var bufferKcal = totalFoodEnergy - dailyBurn * days;
-    metricCalories.textContent = ration.toLocaleString() + ' kcal';
-    metricBuffer.textContent = formatBuffer(bufferKcal, dailyBurn);
-    metricSurvival.textContent = computeSurvivalProbability(ration, bufferKcal, dailyBurn) + '%';
-    drawFoodChart(ration, days);
+
+    var diag = DIAGNOSIS_INFO[simDiagnosisInput.value];
+    var wq = waterQuality(simWaterInput.value, diag.correct);
+    var health = computeCropRecovery();
+    metricWater.textContent = (simWaterInput.value === 'ponds' ? 'PONDS reservoir' : 'Pillow') + ' (' + wq + ')';
+    metricHealth.textContent = health + '%';
+    metricCropStatus.textContent = health >= 70 ? PLANT_SLOTS + ' plants recovering' : health >= 40 ? PLANT_SLOTS + ' plants stressed' : PLANT_SLOTS + ' plants wilting';
+    drawGrowChamber(health, lightPct);
   }
- 
-  simDaysInput.addEventListener('input', recomputeSimMetrics);
-  simRationInput.addEventListener('input', recomputeSimMetrics);
- 
-  btnAutoRation.addEventListener('click', function(){
-    if(!cropFailureTriggered) return;
-    var days = Number(simDaysInput.value);
-    var optimal = totalFoodEnergy / (days * crewSize);
-    // Round down so the suggested ration leaves a small surplus rather than an
-    // immediate rounding-induced deficit.
-    optimal = Math.max(1200, Math.min(2500, Math.floor(optimal / 10) * 10));
-    simRationInput.value = optimal;
+
+  simDiagnosisInput.addEventListener('change', recomputeSimMetrics);
+  simLightInput.addEventListener('input', recomputeSimMetrics);
+  simWaterInput.addEventListener('change', recomputeSimMetrics);
+
+  btnAutoFix.addEventListener('click', function(){
+    if(!failureTriggered) return;
+    // The NASA-documented fix for the Kelly zinnia incident: correct
+    // diagnosis, a red/blue-dominant LED mix, and the passive PONDS
+    // reservoir instead of hand-watered pillows.
+    simDiagnosisInput.value = 'overwatering';
+    simLightInput.value = 72;
+    simWaterInput.value = 'ponds';
     recomputeSimMetrics();
   });
- 
-  btnRunSim.addEventListener('click', function(){
-    if(!cropFailureTriggered) return;
-    var days = Number(simDaysInput.value);
-    var ration = Number(simRationInput.value);
-    var dailyBurn = ration * crewSize;
-    var bufferKcal = totalFoodEnergy - dailyBurn * days;
-    var survival = computeSurvivalProbability(ration, bufferKcal, dailyBurn);
-    logIncident('T4', bufferKcal < 0 ? 'critical' : 'info', 'Rationing plan locked: ' + ration.toLocaleString() + ' kcal/day for ' + days + ' days — ' + formatBuffer(bufferKcal, dailyBurn) + ', modeled survival ' + survival + '%.');
 
-    if(bufferKcal < 0){
-      simOutput.innerHTML =
-        '<p class="sim-output-lead">At ' + ration.toLocaleString() + ' calories per person, stock runs out roughly ' + Math.ceil(Math.abs(bufferKcal)/dailyBurn) + ' days before the resupply vehicle arrives.</p>' +
-        '<p class="sim-output-detail">This ration is too high for a ' + days + '-day window. Lower the daily ration or use "Auto-set optimal ration" to find the highest ration that still lasts until resupply.</p>';
-      setModuleAlert('t4', 'critical', 'Food Supply Shortfall Risk');
+  btnRunSim.addEventListener('click', function(){
+    if(!failureTriggered) return;
+    var diag = DIAGNOSIS_INFO[simDiagnosisInput.value];
+    var lightPct = Number(simLightInput.value);
+    var health = computeCropRecovery();
+    var waterMethod = simWaterInput.value;
+
+    logIncident('T4', health < 55 ? 'critical' : 'info', 'Recovery configuration locked: diagnosis "' + diag.label + '", LED ' + lightPct + '% red/blue, ' + waterLabelFor(waterMethod) + ' — projected crop health ' + health + '%.');
+
+    var lead, detail;
+    if(health >= 85){
+      lead = 'The crop recovers. Plants regreen across all six pillows within about two weeks.';
+      detail = 'Diagnosis confirmed: ' + diag.detail + ' Correcting the LED spectrum to a red/blue-dominant mix and switching to ' + waterLabelFor(waterMethod) + ' brought the bay back in line with NASA’s documented Veggie operating parameters — the same fix that saved Scott Kelly’s zinnias.';
+      setModuleAlert('t4', 'nominal', 'Crop Recovered — Veggie Bay Nominal');
+    } else if(health >= 55){
+      lead = 'Partial recovery. Some plants stabilize, but the bay is not fully healthy.';
+      detail = diag.correct ?
+        'Diagnosis is correct, but the LED spectrum and/or water delivery still need tuning — aim for a 60-85% red/blue LED mix and confirm the water delivery method matches the failure cause.' :
+        (diag.detail + ' Reconsider the diagnosis before adjusting light and water further.');
+      setModuleAlert('t4', 'caution', 'Crop Recovery In Progress');
     } else {
-      simOutput.innerHTML =
-        '<p class="sim-output-lead">Hold daily caloric intake to ' + ration.toLocaleString() + ' calories per person for the next ' + days + ' days.</p>' +
-        '<p class="sim-output-detail">Suspend high-exertion spacewalks and heavy maintenance tasks to minimize metabolic burn. Prioritize protein and micronutrient rations over caloric bulk. This plan leaves a projected surplus of ' + Math.round(bufferKcal).toLocaleString() + ' kcal at resupply and models a ' + survival + '% probability of maintaining crew health and function until the resupply vehicle arrives.</p>';
-      setModuleAlert('t4', survival < 70 ? 'critical' : 'caution', survival < 70 ? 'Food Supply Shortfall Risk' : 'Rationing Active — Resupply Pending');
+      lead = 'Plants continue declining. This configuration does not address the documented failure.';
+      detail = diag.correct ?
+        'The diagnosis is right, but the LED spectrum and water delivery settings are undermining the fix — try a 60-85% red/blue LED mix and a water delivery method matched to the cause.' :
+        (diag.detail + ' The real Veggie incident this scenario is based on was caused by overwatering and poor airflow, not ' + diag.label.toLowerCase() + '.');
+      setModuleAlert('t4', 'critical', 'Crop Failure — Recovery Ineffective');
     }
- 
-    // Suspending EVAs and heavy maintenance (per the plan above) measurably reduces
-    // the draw on spare parts versus the unmitigated crop-failure spike.
+    simOutput.innerHTML = '<p class="sim-output-lead">' + lead + '</p><p class="sim-output-detail">' + detail + '</p>';
+
+    // Stabilizing the bay (switching to a passive PONDS reservoir, correcting
+    // the LED spectrum) measurably reduces the draw on spare parts versus the
+    // unmitigated crop-failure spike, same coupling the old rationing sim used.
     sideResources[2].extraLoss = 1.0;
     renderSideResources();
   });
- 
+
   function triggerCropFailure(){
-    if(cropFailureTriggered) return;
-    cropFailureTriggered = true;
-    totalFoodEnergy = foodEnergyPostFailure;
-    metricStock.textContent = totalFoodEnergy.toLocaleString() + ' kcal';
-    logIncident('T4', 'warning', 'Hydroponics crop failure triggered — food energy on hand reduced to ' + totalFoodEnergy.toLocaleString() + ' kcal.');
-    simQuestionEl.textContent = '"How do we stretch our remaining food supplies until the next Earth resupply rocket arrives?"';
-    simDaysInput.disabled = false;
-    simRationInput.disabled = false;
-    simRationInput.value = 2500; // starts at the unmitigated rate so the deficit is visible immediately
+    if(failureTriggered) return;
+    failureTriggered = true;
+    logIncident('T4', 'warning', 'Veggie crop failure triggered — plants across all six pillows show wilting and early fungal growth.');
+    simQuestionEl.textContent = '"What caused the Veggie bay failure, and how do we recover the crop before it’s a total loss?"';
+    // Starts on a plausible-but-wrong diagnosis and a borderline light/water
+    // setting, same "starts on a real deficit" design the old ration slider
+    // used (it defaulted to the unmitigated 2,500 kcal rate) — the user has
+    // to actually diagnose and correct it, not just press Run.
+    simDiagnosisInput.value = 'light';
+    simLightInput.value = 50;
+    simWaterInput.value = 'pillow';
+    simDiagnosisInput.disabled = false;
+    simLightInput.disabled = false;
+    simWaterInput.disabled = false;
     btnRunSim.disabled = false;
-    btnAutoRation.disabled = false;
+    btnAutoFix.disabled = false;
     btnTriggerCrop.disabled = true;
-    btnTriggerCrop.textContent = 'Crop failure active';
-    simOutput.innerHTML = '<p class="sim-output-placeholder">Crop failure confirmed — hydroponics yield lost. Adjust the ration slider or press "Auto-set optimal ration," then run the simulation.</p>';
-    setModuleAlert('t4', 'critical', 'Hydroponics Crop Failure');
- 
-    // Water recycling absorbs extra load with hydroponics offline; spare-parts draw
-    // spikes from emergency repair activity — both recalculate immediately.
+    btnTriggerCrop.textContent = 'Veggie failure active';
+    simOutput.innerHTML = '<p class="sim-output-placeholder">Veggie failure confirmed — diagnose the cause, tune the LED spectrum and water delivery, then run the simulation.</p>';
+    setModuleAlert('t4', 'critical', 'Veggie Crop Failure');
+
+    // Water recycling absorbs extra load with Veggie irrigation disrupted;
+    // spare-parts draw spikes from emergency repair activity — both
+    // recalculate immediately.
     sideResources[0].extraLoss = 0.35;
     sideResources[2].extraLoss = 3.5;
     renderSideResources();
- 
+
     recomputeSimMetrics();
   }
- 
+
   function resetSupply(){
-    cropFailureTriggered = false;
-    totalFoodEnergy = foodEnergyNominal;
-    metricStock.textContent = totalFoodEnergy.toLocaleString() + ' kcal';
-    metricCalories.textContent = '— kcal';
-    metricBuffer.textContent = '—';
-    metricSurvival.textContent = '—';
-    simQuestionEl.textContent = 'Hydroponics bay nominal. Trigger a crop failure to run the rationing scenario.';
-    simDaysInput.disabled = true;
-    simRationInput.disabled = true;
-    simRationInput.value = 2500;
-    simRationValue.textContent = '2,500';
+    failureTriggered = false;
+    simQuestionEl.textContent = 'Veggie bay nominal. Trigger a failure to run the grow-chamber recovery scenario.';
+    simDiagnosisInput.value = 'overwatering';
+    simDiagnosisInput.disabled = true;
+    simLightInput.value = 50;
+    simLightInput.disabled = true;
+    simWaterInput.value = 'pillow';
+    simWaterInput.disabled = true;
     btnRunSim.disabled = true;
-    btnAutoRation.disabled = true;
+    btnAutoFix.disabled = true;
     btnTriggerCrop.disabled = false;
-    btnTriggerCrop.textContent = 'Trigger crop failure';
-    simOutput.innerHTML = '<p class="sim-output-placeholder">Trigger the hydroponics crop failure to begin the rationing simulation.</p>';
-    setModuleAlert('t4', 'nominal', 'Supply nominal');
- 
+    btnTriggerCrop.textContent = 'Trigger Veggie failure';
+    simOutput.innerHTML = '<p class="sim-output-placeholder">Trigger the Veggie failure to begin the grow-chamber recovery scenario.</p>';
+    setModuleAlert('t4', 'nominal', 'Veggie bay nominal');
+
     sideResources[0].extraLoss = 0;
     sideResources[2].extraLoss = 0;
     renderSideResources();
- 
+
     recomputeSimMetrics();
   }
- 
+
   btnTriggerCrop.addEventListener('click', triggerCropFailure);
   btnResetSupply.addEventListener('click', resetSupply);
 

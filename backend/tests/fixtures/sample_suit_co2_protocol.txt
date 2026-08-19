@@ -1,0 +1,24 @@
+TREATMENT PROTOCOL: EVA SUIT CO2 SCRUBBER SATURATION
+
+Overview
+A rising CO2 reading on the suit display, helmet fogging, and early signs of
+hypercapnia (headache, confusion, rapid breathing) during an EVA indicate the
+Portable Life Support System's contaminant control cartridge is saturated,
+not a suit leak. The cartridge removes exhaled CO2 chemically (historically
+lithium hydroxide, LiOH) rather than mechanically, so saturation degrades
+gradually rather than failing suddenly. Treat as time-critical.
+
+Treatment Sequence
+1. Instruct the crew member to terminate all non-essential EVA tasks and translate directly to the airlock.
+2. Confirm suit O2 flow rate is at the commanded setting (approximately 0.8 cubic feet per minute), not manually reduced.
+3. Monitor for headache, confusion, and rapid breathing en route to the airlock.
+1.2 percent CO2 partial pressure was logged at alarm onset, per the suit telemetry readout.
+4. On repress, remove the helmet immediately and reassess mental status in shirtsleeve air.
+
+Escalation
+Step 1: Escalate to the ground-based flight surgeon if symptoms persist after repress.
+Step 2: Swap the PLSS contaminant control cartridge before the next EVA is scheduled.
+
+Follow-Up Checks
+- Confirm CO2 alarm clears and does not recur on the replacement cartridge.
+- Log the incident in the mission log for post-event review.

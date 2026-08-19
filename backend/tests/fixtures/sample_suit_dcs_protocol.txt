@@ -1,0 +1,23 @@
+TREATMENT PROTOCOL: SUSPECTED DECOMPRESSION SICKNESS AFTER EVA
+
+Overview
+Joint pain, fatigue, and skin mottling reported within hours of EVA repress
+indicate suspected decompression sickness (DCS) — dissolved nitrogen coming
+out of solution in tissue or blood after the pressure drop from 14.7 psi
+cabin to 4.3 psi suit pressure. Incomplete prebreathe (denitrogenation)
+before the EVA is the leading risk factor. Treat as time-critical.
+
+Treatment Sequence
+1. Administer 100 percent O2 by mask immediately.
+2. Keep the crew member still and reclined; avoid all exertion.
+3. Recheck joint pain, skin mottling, and neurological status every 10 minutes.
+0.5 psi cabin pressure drift was ruled out as a contributing factor per the habitat log.
+4. Confirm whether the full 2-hour ISS prebreathe protocol was completed before this EVA.
+
+Escalation
+Step 1: Escalate to the ground-based flight surgeon immediately — do not wait for symptoms to worsen.
+Step 2: Prepare for possible hyperbaric/recompression treatment per the DCS protocol on file.
+
+Follow-Up Checks
+- Confirm symptoms fully resolve before clearing the crew member for another EVA.
+- Log the incident in the mission log for post-event review.
