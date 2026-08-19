@@ -917,23 +917,27 @@
     <div class="module-head">
       <span class="label-eyebrow">Module 03 · Interactive</span>
       <h2 class="module-title">Growing Plants in Space</h2>
-      <p class="module-desc">Diagnose and recover a Veggie grow-chamber failure, tuning LED spectrum and water delivery against NASA's real Veggie/APH plant-research findings.</p>
+      <p class="module-desc">Diagnose and recover a Veggie or APH grow-chamber failure, tuning LED spectrum and nutrient/water delivery against NASA's real Veggie/APH plant-research findings.</p>
     </div>
 
-    <p class="t5-proto-note"><b>How to play —</b> this module is a hands-on simulation, not backed by live telemetry or the retrieval pipeline the rest of this console uses. Trigger the Veggie failure, diagnose the cause, then tune the LED spectrum and water delivery method to recover the crop.</p>
+    <p class="t5-proto-note"><b>How to play —</b> this module is a hands-on simulation, not backed by live telemetry or the retrieval pipeline the rest of this console uses. Pick a scenario, trigger the failure, diagnose the cause, then tune the LED spectrum and delivery method to recover the crop.</p>
 
     <div class="t4-top-grid" id="t4-resource-grid"></div>
 
     <div class="sim-panel">
       <div class="panel-head">
-        <h3>Veggie grow-chamber simulation — crop failure</h3>
+        <h3 id="sim-panel-title">Grow-chamber simulation — select a scenario</h3>
         <div class="feed-controls">
-          <button class="btn small" id="btn-trigger-crop-failure">Trigger Veggie failure</button>
+          <select class="intake-select" id="sim-scenario-select">
+            <option value="zinnia">Veggie — zinnia overwatering</option>
+            <option value="aph_nutrient">APH — nutrient depletion</option>
+          </select>
+          <button class="btn small" id="btn-trigger-crop-failure">Trigger failure</button>
           <button class="btn small" id="btn-reset-supply">Reset</button>
         </div>
       </div>
       <div class="sim-body">
-        <p class="sim-question" id="sim-question">Veggie bay nominal. Trigger a failure to run the grow-chamber recovery scenario.</p>
+        <p class="sim-question" id="sim-question">Grow bay nominal. Select a scenario and trigger a failure to run the grow-chamber recovery exercise.</p>
 
         <div class="resource-chart-wrap" id="grow-chamber-wrap"></div>
 
@@ -952,7 +956,7 @@
             <input type="range" id="sim-light" min="0" max="100" step="1" value="50" disabled>
           </div>
           <div class="sim-control">
-            <label for="sim-water">Water delivery</label>
+            <label for="sim-water" id="sim-water-label">Water delivery</label>
             <select class="intake-select" id="sim-water" disabled>
               <option value="pillow">Pillow (Veggie, hand-watered)</option>
               <option value="ponds">PONDS reservoir (passive)</option>
@@ -982,8 +986,30 @@
         </div>
 
         <div class="sim-output" id="sim-output">
-          <p class="sim-output-placeholder">Trigger the Veggie failure to begin the grow-chamber recovery scenario.</p>
+          <p class="sim-output-placeholder">Select a scenario and trigger a failure to begin the grow-chamber recovery exercise.</p>
         </div>
+      </div>
+    </div>
+
+    <div class="sim-panel" style="margin-top:16px;">
+      <div class="panel-head">
+        <h3>Grow journal</h3>
+      </div>
+      <div class="sim-body">
+        <div class="aar-timeline" id="t4-grow-journal" style="max-height:220px;">
+          <p class="sim-output-placeholder">No grow-chamber activity logged yet.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="sim-panel" style="margin-top:16px;">
+      <div class="panel-head">
+        <h3>Harvest lots</h3>
+      </div>
+      <div class="sim-body">
+        <ul class="triage-steps" id="t4-harvest-lots">
+          <li><span class="ts-num">—</span><span>No harvest lots recorded yet. A lot is stamped each time a crop fully recovers (projected health ≥ 85%).</span></li>
+        </ul>
       </div>
     </div>
   </section>
@@ -3825,23 +3851,29 @@
   }
   renderSideResources();
  
-  // Growing Plants in Space — Veggie grow-chamber simulator. Entirely
+  // Growing Plants in Space — Veggie/APH grow-chamber simulator. Entirely
   // client-side (no fetch/backend call anywhere in this block), matching
   // Module 05/06's "Try It Yourself" pattern rather than the RAG-grounded
-  // pattern the console's other modules use. The diagnosis/light/water
-  // logic below is hand-authored from NASA's documented Veggie findings —
-  // in particular the real Scott Kelly zinnia incident (overwatering +
-  // poor airflow let fungus take hold) — the same accuracy discipline the
-  // grounded modules get from retrieval, just authored once here instead
-  // of retrieved per request.
+  // pattern the console's other modules use. Two selectable scenarios:
+  // (1) the real, documented Scott Kelly zinnia incident (overwatering +
+  // poor airflow let fungus take hold on Veggie), and (2) a modeled APH
+  // nutrient-depletion scenario grounded in APH's real documented hardware
+  // (porous clay substrate, controlled-release fertilizer cartridge,
+  // six-color LED array) rather than a single named incident — each
+  // scenario's `methodNote` says so explicitly on trigger, same "grounded,
+  // not guessed, and honest about which is which" discipline the rest of
+  // the console applies via retrieval.
   var growChamberWrap = document.getElementById('grow-chamber-wrap');
   var PLANT_SLOTS = 6;
   var failureTriggered = false;
 
+  var simScenarioSelect = document.getElementById('sim-scenario-select');
   var simDiagnosisInput = document.getElementById('sim-diagnosis');
   var simLightInput = document.getElementById('sim-light');
   var simLightValue = document.getElementById('sim-light-value');
   var simWaterInput = document.getElementById('sim-water');
+  var simWaterLabel = document.getElementById('sim-water-label');
+  var simPanelTitle = document.getElementById('sim-panel-title');
   var metricCropStatus = document.getElementById('metric-crop-status');
   var metricLight = document.getElementById('metric-light');
   var metricWater = document.getElementById('metric-water');
@@ -3852,33 +3884,120 @@
   var btnResetSupply = document.getElementById('btn-reset-supply');
   var btnRunSim = document.getElementById('btn-run-sim');
   var btnAutoFix = document.getElementById('btn-auto-ration');
+  var growJournalEl = document.getElementById('t4-grow-journal');
+  var harvestLotsEl = document.getElementById('t4-harvest-lots');
 
-  // Answer key grounded in the documented Veggie failure: Scott Kelly's
-  // zinnias were overwatered with insufficient airflow, and fungus took
-  // hold — he cleaned and nursed them back to flower by hand. The other
-  // three options are plausible-sounding but not what NASA's account
-  // describes, same "grounded, not guessed" discipline the rest of the
-  // console applies via retrieval.
-  var DIAGNOSIS_INFO = {
-    overwatering: { label:'Overwatering + poor airflow', correct:true,
-      detail:'Matches the documented Veggie failure — Scott Kelly’s zinnias were overwatered with poor airflow, and fungus took hold on the ISS.' },
-    light: { label:'Insufficient light', correct:false,
-      detail:'The LED bank was operating within spec in the documented incident — light was not the cause.' },
-    nutrient: { label:'Nutrient deficiency', correct:false,
-      detail:'The clay-based growth media’s controlled-release fertilizer was within spec in the documented incident — nutrients were not the cause.' },
-    pest: { label:'Pest infestation', correct:false,
-      detail:'No pest activity was logged in the documented incident — the real cause was fungal growth from excess moisture, not pests.' }
+  // Each scenario carries its own answer key (diagnosisInfo), its own
+  // delivery-control labels (Veggie's pillow/PONDS choice vs. APH's
+  // cartridge choice — same two internal values, 'pillow'/'ponds', reused
+  // as "unmitigated"/"mitigated" so computeCropRecovery()/waterQuality()
+  // don't need scenario-specific branches), and its own outcome copy.
+  var FAILURE_SCENARIOS = {
+    zinnia: {
+      unit: 'Veggie',
+      cropNoun: 'zinnias',
+      panelTitle: 'Veggie grow-chamber simulation — crop failure',
+      deliveryLabel: 'Water delivery',
+      deliveryOptions: [
+        { label:'Pillow (Veggie, hand-watered)', shortLabel:'hand-watered pillows' },
+        { label:'PONDS reservoir (passive)', shortLabel:'a PONDS reservoir' }
+      ],
+      correctDiagnosis: 'overwatering',
+      // Answer key grounded in the documented Veggie failure: Scott Kelly's
+      // zinnias were overwatered with insufficient airflow, and fungus took
+      // hold — he cleaned and nursed them back to flower by hand.
+      diagnosisInfo: {
+        overwatering: { label:'Overwatering + poor airflow', correct:true,
+          detail:'Matches the documented Veggie failure — Scott Kelly’s zinnias were overwatered with poor airflow, and fungus took hold on the ISS.' },
+        light: { label:'Insufficient light', correct:false,
+          detail:'The LED bank was operating within spec in the documented incident — light was not the cause.' },
+        nutrient: { label:'Nutrient deficiency', correct:false,
+          detail:'The clay-based growth media’s controlled-release fertilizer was within spec in the documented incident — nutrients were not the cause.' },
+        pest: { label:'Pest infestation', correct:false,
+          detail:'No pest activity was logged in the documented incident — the real cause was fungal growth from excess moisture, not pests.' }
+      },
+      triggerLogMsg: 'Veggie crop failure triggered — plants across all six pillows show wilting and early fungal growth.',
+      startQuestion: '"What caused the Veggie bay failure, and how do we recover the crop before it’s a total loss?"',
+      confirmedMsg: 'Veggie failure confirmed — diagnose the cause, tune the LED spectrum and water delivery, then run the simulation.',
+      methodNote: null,
+      triggerAlertLabel: 'Veggie Crop Failure',
+      resourceImpact: { water:0.35, spareParts:3.5 },
+      mitigatedSpareParts: 1.0,
+      recoveredLead: 'The crop recovers. Plants regreen across all six pillows within about two weeks.',
+      recoveredFixNote: 'Correcting the LED spectrum to a red/blue-dominant mix and switching to a PONDS reservoir brought the bay back in line with NASA’s documented Veggie operating parameters — the same fix that saved Scott Kelly’s zinnias.',
+      recoveredAlertLabel: 'Crop Recovered — Veggie Bay Nominal',
+      trueCauseNote: function(diagLabelLower){
+        return 'The real Veggie incident this scenario is based on was caused by overwatering and poor airflow, not ' + diagLabelLower + '.';
+      }
+    },
+    aph_nutrient: {
+      unit: 'APH',
+      cropNoun: 'wheat plants',
+      panelTitle: 'APH grow-chamber simulation — nutrient alarm',
+      deliveryLabel: 'Nutrient delivery',
+      deliveryOptions: [
+        { label:'Depleted cartridge (unchanged)', shortLabel:'the depleted cartridge, unchanged' },
+        { label:'Fresh controlled-release cartridge (swapped)', shortLabel:'a fresh controlled-release cartridge' }
+      ],
+      correctDiagnosis: 'nutrient',
+      // Modeled scenario, not a specific logged NASA incident — grounded in
+      // APH's real documented hardware (porous clay substrate + controlled-
+      // release fertilizer cartridge, six-color LED array, sealed automated
+      // enclosure) so each detail line is defensible even without a named
+      // incident behind it. `methodNote` says this explicitly on trigger.
+      diagnosisInfo: {
+        overwatering: { label:'Overwatering + poor airflow', correct:false,
+          detail:'APH is a sealed, automated system that holds moisture within a tight controlled band — the alarm shows no moisture deviation, so overwatering doesn’t match this readout.' },
+        light: { label:'Insufficient light', correct:false,
+          detail:'APH’s six-color LED array (red/green/blue/white/far-red/infrared) is reporting nominal output — light is not driving this alarm.' },
+        nutrient: { label:'Nutrient deficiency', correct:true,
+          detail:'Matches APH’s documented design: its porous clay substrate depends on a controlled-release fertilizer cartridge that depletes over a long-duration grow — this alarm is consistent with a depleted cartridge, not a hardware fault.' },
+        pest: { label:'Pest infestation', correct:false,
+          detail:'No pest activity is logged against this alarm — APH is a sealed, automated chamber with no documented pest vector here.' }
+      },
+      triggerLogMsg: 'APH nutrient alarm triggered — the controlled-release fertilizer readout has dropped below the wheat crop’s expected uptake curve.',
+      startQuestion: '"What’s driving the APH nutrient alarm, and how do we get the wheat crop back on a healthy nutrient curve?"',
+      confirmedMsg: 'APH nutrient alarm confirmed — diagnose the cause, tune the LED spectrum and nutrient delivery, then run the simulation.',
+      methodNote: 'This scenario is modeled from APH’s real documented hardware (porous clay substrate, controlled-release fertilizer, six-color LED array) rather than a specific named NASA incident — unlike the Veggie zinnia scenario above, it isn’t a logged event.',
+      triggerAlertLabel: 'APH Nutrient Alarm',
+      resourceImpact: { water:0.1, spareParts:2.0 },
+      mitigatedSpareParts: 0.5,
+      recoveredLead: 'The crop recovers. The wheat canopy returns to its expected growth curve within about two weeks.',
+      recoveredFixNote: 'Correcting the LED spectrum and swapping in a fresh controlled-release fertilizer cartridge brought the nutrient curve back in line with APH’s designed operating parameters.',
+      recoveredAlertLabel: 'Crop Recovered — APH Bay Nominal',
+      trueCauseNote: function(diagLabelLower){
+        return 'This modeled APH scenario is driven by a depleted controlled-release fertilizer cartridge, not ' + diagLabelLower + '.';
+      }
+    }
   };
 
-  function waterLabelFor(method){
-    return method === 'ponds' ? 'a PONDS reservoir' : 'hand-watered pillows';
+  var activeScenarioId = 'zinnia';
+  function getScenario(){ return FAILURE_SCENARIOS[activeScenarioId]; }
+
+  // Reflects the active scenario's chrome (panel title, delivery-control
+  // label/option text) without touching sim state — called on scenario
+  // pick (pre-trigger preview), on trigger (locks it in), and on reset
+  // (reverts to the default scenario's chrome before the neutral title
+  // override below).
+  function applyScenarioChrome(scenario){
+    if(simPanelTitle) simPanelTitle.textContent = scenario.panelTitle;
+    if(simWaterLabel) simWaterLabel.textContent = scenario.deliveryLabel;
+    if(simWaterInput.options.length >= 2){
+      simWaterInput.options[0].textContent = scenario.deliveryOptions[0].label;
+      simWaterInput.options[1].textContent = scenario.deliveryOptions[1].label;
+    }
+  }
+
+  function waterLabelFor(method, scenario){
+    return scenario.deliveryOptions[method === 'ponds' ? 1 : 0].shortLabel;
   }
 
   // Plants grow on red + blue wavelengths; green is only added so produce
   // looks normal to the crew, and Veggie's real chamber glows magenta-pink
   // at a red/blue-dominant mix. 60-85% is the "matches the real chamber"
   // band; the extremes are cosmetically white/green (too little red/blue)
-  // or oversaturated (too much).
+  // or oversaturated (too much). Reused as-is for APH — both scenarios
+  // share the same red/blue-dominant target band.
   function lightQuality(pct){
     if(pct >= 60 && pct <= 85) return 'good';
     if((pct >= 40 && pct < 60) || (pct > 85 && pct <= 95)) return 'fair';
@@ -3887,8 +4006,10 @@
 
   // PONDS' passive reservoir is the documented fix for overwatering risk;
   // hand-watered pillows need careful, disciplined watering to avoid the
-  // same failure. So the "right" water delivery choice depends on whether
-  // overwatering was correctly diagnosed as the cause.
+  // same failure. In the APH scenario the same two internal values stand
+  // in for "depleted cartridge, unchanged" vs. "fresh cartridge, swapped."
+  // Either way, the "right" delivery choice depends on whether the
+  // scenario's own cause was correctly diagnosed.
   function waterQuality(method, diagnosisCorrect){
     if(method === 'ponds') return diagnosisCorrect ? 'good' : 'fair';
     return diagnosisCorrect ? 'fair' : 'poor';
@@ -3897,15 +4018,74 @@
   // Deterministic arithmetic, not a random number or a model output — a
   // direct client-side analog of the old computeSurvivalProbability(),
   // just scored on diagnosis correctness + light/water quality tiers
-  // instead of a ration/day calculation.
+  // instead of a ration/day calculation. Same formula for both scenarios.
   function computeCropRecovery(){
-    var diag = DIAGNOSIS_INFO[simDiagnosisInput.value];
+    var scenario = getScenario();
+    var diag = scenario.diagnosisInfo[simDiagnosisInput.value];
     var lq = lightQuality(Number(simLightInput.value));
     var wq = waterQuality(simWaterInput.value, diag.correct);
     var score = (diag.correct ? 50 : 10) +
       (lq === 'good' ? 25 : lq === 'fair' ? 12 : 0) +
       (wq === 'good' ? 25 : wq === 'fair' ? 12 : 0);
     return Math.max(5, Math.min(99, score));
+  }
+
+  // ---- Grow journal (in-module log, mirrors the unified incident log but
+  // scoped to this module so a player can see the sequence of attempts —
+  // wrong diagnoses, retried settings — that led to the eventual fix,
+  // without leaving the tab). Every entry also flows into the global
+  // incidentLog via logIncident(), so it still reaches the after-action
+  // report the same way the module's events always have. ----
+  var growJournalEntries = [];
+  function logGrowEvent(sev, msg){
+    logIncident('T4', sev, msg);
+    growJournalEntries.push({ sev: sev, msg: msg, metStr: metEl.textContent });
+    renderGrowJournal();
+  }
+  function renderGrowJournal(){
+    if(!growJournalEl) return;
+    if(growJournalEntries.length === 0){
+      growJournalEl.innerHTML = '<p class="sim-output-placeholder">No grow-chamber activity logged yet.</p>';
+      return;
+    }
+    growJournalEl.innerHTML = growJournalEntries.map(function(e){
+      return '<div class="feed-entry sev-' + e.sev + '">' +
+        '<div class="feed-sev mono">' + e.sev + '</div>' +
+        '<div class="feed-body">' +
+          '<div class="feed-meta">MET ' + e.metStr + '</div>' +
+          '<div class="feed-msg">' + e.msg + '</div>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  // ---- Harvest lots (in-module traceability record — stamped once per
+  // full recovery, not a live document store, same "hand-written record,
+  // not fabricated" discipline as the rest of this module). ----
+  var harvestLots = [];
+  function recordHarvestLot(scenario, health, diagLabel, lightPct, waterMethod){
+    var lotId = scenario.unit.toUpperCase() + '-' + (harvestLots.length + 1);
+    harvestLots.push({
+      id: lotId,
+      crop: scenario.cropNoun,
+      health: health,
+      diagLabel: diagLabel,
+      lightPct: lightPct,
+      delivery: waterLabelFor(waterMethod, scenario),
+      metStr: metEl.textContent
+    });
+    renderHarvestLots();
+    logGrowEvent('info', 'Harvest lot ' + lotId + ' recorded — ' + scenario.cropNoun + ', ' + health + '% crop health, diagnosis "' + diagLabel + '".');
+  }
+  function renderHarvestLots(){
+    if(!harvestLotsEl) return;
+    if(harvestLots.length === 0){
+      harvestLotsEl.innerHTML = '<li><span class="ts-num">—</span><span>No harvest lots recorded yet. A lot is stamped each time a crop fully recovers (projected health ≥ 85%).</span></li>';
+      return;
+    }
+    harvestLotsEl.innerHTML = harvestLots.map(function(lot){
+      return '<li><span class="ts-num">' + lot.id + '</span><span>' + lot.crop + ' — ' + lot.health + '% crop health — diagnosis: ' + lot.diagLabel + ' — LED ' + lot.lightPct + '%, ' + lot.delivery + ' — logged MET ' + lot.metStr + '</span></li>';
+    }).join('');
   }
 
   function healthColor(pct){
@@ -3966,33 +4146,43 @@
     var lq = lightQuality(lightPct);
     metricLight.textContent = lightPct + '% (' + lq + ')';
 
+    var scenario = getScenario();
+
     if(!failureTriggered){
-      metricCropStatus.textContent = PLANT_SLOTS + ' plants nominal';
+      metricCropStatus.textContent = PLANT_SLOTS + ' ' + scenario.cropNoun + ' nominal';
       metricWater.textContent = '—';
       metricHealth.textContent = '—';
       drawGrowChamber(100, lightPct);
       return;
     }
 
-    var diag = DIAGNOSIS_INFO[simDiagnosisInput.value];
+    var diag = scenario.diagnosisInfo[simDiagnosisInput.value];
     var wq = waterQuality(simWaterInput.value, diag.correct);
     var health = computeCropRecovery();
-    metricWater.textContent = (simWaterInput.value === 'ponds' ? 'PONDS reservoir' : 'Pillow') + ' (' + wq + ')';
+    var deliveryIdx = simWaterInput.value === 'ponds' ? 1 : 0;
+    metricWater.textContent = scenario.deliveryOptions[deliveryIdx].shortLabel + ' (' + wq + ')';
     metricHealth.textContent = health + '%';
-    metricCropStatus.textContent = health >= 70 ? PLANT_SLOTS + ' plants recovering' : health >= 40 ? PLANT_SLOTS + ' plants stressed' : PLANT_SLOTS + ' plants wilting';
+    metricCropStatus.textContent = health >= 70 ? PLANT_SLOTS + ' ' + scenario.cropNoun + ' recovering' : health >= 40 ? PLANT_SLOTS + ' ' + scenario.cropNoun + ' stressed' : PLANT_SLOTS + ' ' + scenario.cropNoun + ' wilting';
     drawGrowChamber(health, lightPct);
   }
 
+  simScenarioSelect.addEventListener('change', function(){
+    if(failureTriggered) return;
+    activeScenarioId = simScenarioSelect.value;
+    applyScenarioChrome(getScenario());
+  });
   simDiagnosisInput.addEventListener('change', recomputeSimMetrics);
   simLightInput.addEventListener('input', recomputeSimMetrics);
   simWaterInput.addEventListener('change', recomputeSimMetrics);
 
   btnAutoFix.addEventListener('click', function(){
     if(!failureTriggered) return;
-    // The NASA-documented fix for the Kelly zinnia incident: correct
-    // diagnosis, a red/blue-dominant LED mix, and the passive PONDS
-    // reservoir instead of hand-watered pillows.
-    simDiagnosisInput.value = 'overwatering';
+    // The NASA-documented fix for the Kelly zinnia case, or the modeled
+    // fix for the APH nutrient case: correct diagnosis, a red/blue-
+    // dominant LED mix, and the mitigated delivery option (PONDS
+    // reservoir / fresh cartridge) instead of the unmitigated one.
+    var scenario = getScenario();
+    simDiagnosisInput.value = scenario.correctDiagnosis;
     simLightInput.value = 72;
     simWaterInput.value = 'ponds';
     recomputeSimMetrics();
@@ -4000,49 +4190,57 @@
 
   btnRunSim.addEventListener('click', function(){
     if(!failureTriggered) return;
-    var diag = DIAGNOSIS_INFO[simDiagnosisInput.value];
+    var scenario = getScenario();
+    var diag = scenario.diagnosisInfo[simDiagnosisInput.value];
     var lightPct = Number(simLightInput.value);
     var health = computeCropRecovery();
     var waterMethod = simWaterInput.value;
 
-    logIncident('T4', health < 55 ? 'critical' : 'info', 'Recovery configuration locked: diagnosis "' + diag.label + '", LED ' + lightPct + '% red/blue, ' + waterLabelFor(waterMethod) + ' — projected crop health ' + health + '%.');
+    logGrowEvent(health < 55 ? 'critical' : 'info', 'Recovery configuration locked: diagnosis "' + diag.label + '", LED ' + lightPct + '% red/blue, ' + waterLabelFor(waterMethod, scenario) + ' — projected crop health ' + health + '%.');
 
     var lead, detail;
     if(health >= 85){
-      lead = 'The crop recovers. Plants regreen across all six pillows within about two weeks.';
-      detail = 'Diagnosis confirmed: ' + diag.detail + ' Correcting the LED spectrum to a red/blue-dominant mix and switching to ' + waterLabelFor(waterMethod) + ' brought the bay back in line with NASA’s documented Veggie operating parameters — the same fix that saved Scott Kelly’s zinnias.';
-      setModuleAlert('t4', 'nominal', 'Crop Recovered — Veggie Bay Nominal');
+      lead = scenario.recoveredLead;
+      detail = 'Diagnosis confirmed: ' + diag.detail + ' ' + scenario.recoveredFixNote;
+      setModuleAlert('t4', 'nominal', scenario.recoveredAlertLabel);
+      recordHarvestLot(scenario, health, diag.label, lightPct, waterMethod);
     } else if(health >= 55){
       lead = 'Partial recovery. Some plants stabilize, but the bay is not fully healthy.';
       detail = diag.correct ?
-        'Diagnosis is correct, but the LED spectrum and/or water delivery still need tuning — aim for a 60-85% red/blue LED mix and confirm the water delivery method matches the failure cause.' :
-        (diag.detail + ' Reconsider the diagnosis before adjusting light and water further.');
+        ('Diagnosis is correct, but the LED spectrum and/or ' + scenario.deliveryLabel.toLowerCase() + ' still need tuning — aim for a 60-85% red/blue LED mix and confirm the delivery setting matches the failure cause.') :
+        (diag.detail + ' Reconsider the diagnosis before adjusting light and delivery further.');
       setModuleAlert('t4', 'caution', 'Crop Recovery In Progress');
     } else {
-      lead = 'Plants continue declining. This configuration does not address the documented failure.';
+      lead = 'Plants continue declining. This configuration does not address the failure.';
       detail = diag.correct ?
-        'The diagnosis is right, but the LED spectrum and water delivery settings are undermining the fix — try a 60-85% red/blue LED mix and a water delivery method matched to the cause.' :
-        (diag.detail + ' The real Veggie incident this scenario is based on was caused by overwatering and poor airflow, not ' + diag.label.toLowerCase() + '.');
+        ('The diagnosis is right, but the LED spectrum and ' + scenario.deliveryLabel.toLowerCase() + ' settings are undermining the fix — try a 60-85% red/blue LED mix and a delivery setting matched to the cause.') :
+        (diag.detail + ' ' + scenario.trueCauseNote(diag.label.toLowerCase()));
       setModuleAlert('t4', 'critical', 'Crop Failure — Recovery Ineffective');
     }
     simOutput.innerHTML = '<p class="sim-output-lead">' + lead + '</p><p class="sim-output-detail">' + detail + '</p>';
 
-    // Stabilizing the bay (switching to a passive PONDS reservoir, correcting
-    // the LED spectrum) measurably reduces the draw on spare parts versus the
-    // unmitigated crop-failure spike, same coupling the old rationing sim used.
-    sideResources[2].extraLoss = 1.0;
+    // Stabilizing the bay (switching to the mitigated delivery option,
+    // correcting the LED spectrum) measurably reduces the draw on spare
+    // parts versus the unmitigated crop-failure spike — the reduction
+    // amount is scenario-specific (a cartridge swap is a lighter repair
+    // load than the zinnia case's manual cleanup), same coupling the old
+    // rationing sim used.
+    sideResources[2].extraLoss = scenario.mitigatedSpareParts;
     renderSideResources();
   });
 
   function triggerCropFailure(){
     if(failureTriggered) return;
+    var scenario = getScenario();
     failureTriggered = true;
-    logIncident('T4', 'warning', 'Veggie crop failure triggered — plants across all six pillows show wilting and early fungal growth.');
-    simQuestionEl.textContent = '"What caused the Veggie bay failure, and how do we recover the crop before it’s a total loss?"';
-    // Starts on a plausible-but-wrong diagnosis and a borderline light/water
-    // setting, same "starts on a real deficit" design the old ration slider
-    // used (it defaulted to the unmitigated 2,500 kcal rate) — the user has
-    // to actually diagnose and correct it, not just press Run.
+    applyScenarioChrome(scenario);
+    simScenarioSelect.disabled = true;
+    logGrowEvent('warning', scenario.triggerLogMsg);
+    simQuestionEl.textContent = scenario.startQuestion;
+    // Starts on a plausible-but-wrong diagnosis and a borderline light/
+    // delivery setting, same "starts on a real deficit" design the old
+    // ration slider used — the user has to actually diagnose and correct
+    // it, not just press Run.
     simDiagnosisInput.value = 'light';
     simLightInput.value = 50;
     simWaterInput.value = 'pillow';
@@ -4052,15 +4250,17 @@
     btnRunSim.disabled = false;
     btnAutoFix.disabled = false;
     btnTriggerCrop.disabled = true;
-    btnTriggerCrop.textContent = 'Veggie failure active';
-    simOutput.innerHTML = '<p class="sim-output-placeholder">Veggie failure confirmed — diagnose the cause, tune the LED spectrum and water delivery, then run the simulation.</p>';
-    setModuleAlert('t4', 'critical', 'Veggie Crop Failure');
+    btnTriggerCrop.textContent = scenario.unit + ' failure active';
+    simOutput.innerHTML = '<p class="sim-output-placeholder">' + scenario.confirmedMsg + '</p>' +
+      (scenario.methodNote ? '<p class="sim-output-detail">' + scenario.methodNote + '</p>' : '');
+    setModuleAlert('t4', 'critical', scenario.triggerAlertLabel);
 
-    // Water recycling absorbs extra load with Veggie irrigation disrupted;
-    // spare-parts draw spikes from emergency repair activity — both
-    // recalculate immediately.
-    sideResources[0].extraLoss = 0.35;
-    sideResources[2].extraLoss = 3.5;
+    // Water recycling and spare-parts draw both respond to the active
+    // scenario's own resourceImpact figures — the zinnia case leans harder
+    // on both (manual cleanup, disrupted irrigation) than the APH cartridge
+    // swap does.
+    sideResources[0].extraLoss = scenario.resourceImpact.water;
+    sideResources[2].extraLoss = scenario.resourceImpact.spareParts;
     renderSideResources();
 
     recomputeSimMetrics();
@@ -4068,7 +4268,12 @@
 
   function resetSupply(){
     failureTriggered = false;
-    simQuestionEl.textContent = 'Veggie bay nominal. Trigger a failure to run the grow-chamber recovery scenario.';
+    activeScenarioId = 'zinnia';
+    simScenarioSelect.value = 'zinnia';
+    simScenarioSelect.disabled = false;
+    applyScenarioChrome(getScenario());
+    if(simPanelTitle) simPanelTitle.textContent = 'Grow-chamber simulation — select a scenario';
+    simQuestionEl.textContent = 'Grow bay nominal. Select a scenario and trigger a failure to run the grow-chamber recovery exercise.';
     simDiagnosisInput.value = 'overwatering';
     simDiagnosisInput.disabled = true;
     simLightInput.value = 50;
@@ -4078,13 +4283,18 @@
     btnRunSim.disabled = true;
     btnAutoFix.disabled = true;
     btnTriggerCrop.disabled = false;
-    btnTriggerCrop.textContent = 'Trigger Veggie failure';
-    simOutput.innerHTML = '<p class="sim-output-placeholder">Trigger the Veggie failure to begin the grow-chamber recovery scenario.</p>';
-    setModuleAlert('t4', 'nominal', 'Veggie bay nominal');
+    btnTriggerCrop.textContent = 'Trigger failure';
+    simOutput.innerHTML = '<p class="sim-output-placeholder">Select a scenario and trigger a failure to begin the grow-chamber recovery exercise.</p>';
+    setModuleAlert('t4', 'nominal', 'Grow bay nominal');
 
     sideResources[0].extraLoss = 0;
     sideResources[2].extraLoss = 0;
     renderSideResources();
+
+    growJournalEntries = [];
+    harvestLots = [];
+    renderGrowJournal();
+    renderHarvestLots();
 
     recomputeSimMetrics();
   }
