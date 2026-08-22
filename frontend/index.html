@@ -1,1 +1,352 @@
-mission-console.html
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Talkback — grounded space Q&amp;A</title>
+<style>
+  :root {
+    --bg: #0b0e14;
+    --panel: #12161f;
+    --panel-2: #171c28;
+    --line: #232a3a;
+    --ink: #e7ebf3;
+    --ink-dim: #9aa4b8;
+    --ink-faint: #5d6579;
+    --accent-baseline: #5fb0c9;
+    --accent-baseline-wash: rgba(95, 176, 201, 0.16);
+    --accent-banter: #e0a458;
+    --accent-banter-wash: rgba(224, 164, 88, 0.16);
+    --radius: 10px;
+    --shadow-md: 0 4px 16px rgb(0 0 0 / 0.35);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", Inter, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px 16px 64px;
+  }
+  .shell { width: 100%; max-width: 720px; }
+  header { text-align: center; margin-bottom: 24px; }
+  header h1 { font-size: 1.7rem; margin: 0 0 6px; letter-spacing: 0.02em; }
+  header p { color: var(--ink-dim); margin: 0; font-size: 0.95rem; line-height: 1.5; }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 18px;
+    box-shadow: var(--shadow-md);
+  }
+  .controls-row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  .persona-toggle {
+    display: inline-flex;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .persona-toggle button {
+    background: transparent;
+    border: none;
+    color: var(--ink-dim);
+    padding: 8px 16px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .persona-toggle button[aria-pressed="true"][data-persona="baseline"] {
+    background: var(--accent-baseline-wash);
+    color: var(--accent-baseline);
+  }
+  .persona-toggle button[aria-pressed="true"][data-persona="banter"] {
+    background: var(--accent-banter-wash);
+    color: var(--accent-banter);
+  }
+  .humor-row { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 200px; }
+  .humor-row label { font-size: 0.8rem; color: var(--ink-dim); white-space: nowrap; }
+  .humor-row input[type="range"] { flex: 1; accent-color: var(--accent-banter); }
+  .humor-row output { font-size: 0.8rem; color: var(--ink-dim); width: 30px; text-align: right; }
+  .humor-row[data-disabled="true"] { opacity: 0.35; pointer-events: none; }
+
+  #log {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-bottom: 18px;
+    max-height: 55vh;
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+  .msg-question {
+    align-self: flex-end;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    max-width: 85%;
+    font-size: 0.92rem;
+  }
+  .msg-answer {
+    align-self: flex-start;
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    max-width: 90%;
+    font-size: 0.94rem;
+    line-height: 1.5;
+    border: 1px solid var(--line);
+  }
+  .msg-answer[data-persona="baseline"] { border-left: 3px solid var(--accent-baseline); }
+  .msg-answer[data-persona="banter"] { border-left: 3px solid var(--accent-banter); }
+  .msg-answer[data-grounded="false"] {
+    border-left-color: var(--ink-faint);
+    color: var(--ink-dim);
+    font-style: italic;
+  }
+  .msg-meta {
+    margin-top: 8px;
+    font-size: 0.72rem;
+    color: var(--ink-faint);
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .confidence-badge {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+  }
+
+  form { display: flex; gap: 8px; }
+  input[type="text"] {
+    flex: 1;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 10px 12px;
+    color: var(--ink);
+    font-size: 0.95rem;
+  }
+  input[type="text"]:focus-visible, button:focus-visible {
+    outline: 2px solid var(--accent-baseline);
+    outline-offset: 1px;
+  }
+  button.send {
+    background: var(--accent-baseline);
+    border: none;
+    color: #08131a;
+    font-weight: 700;
+    border-radius: 8px;
+    padding: 0 18px;
+    cursor: pointer;
+  }
+  button.send:disabled { opacity: 0.5; cursor: default; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 0; }
+  .chips button {
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    color: var(--ink-dim);
+    border-radius: 999px;
+    padding: 6px 12px;
+    font-size: 0.78rem;
+    cursor: pointer;
+  }
+  .chips button:hover { color: var(--ink); border-color: var(--accent-baseline); }
+
+  footer {
+    text-align: center;
+    color: var(--ink-faint);
+    font-size: 0.72rem;
+    margin-top: 28px;
+    line-height: 1.6;
+  }
+</style>
+</head>
+<body>
+  <div class="shell">
+    <header>
+      <h1>Talkback</h1>
+      <p>Ask a NASA Earth-science question — tropical cyclones, dust storms, drought, wildfires, and more. Grounded in real NASA source material, every time, never a guess.</p>
+    </header>
+
+    <div class="panel">
+      <div class="controls-row">
+        <div class="persona-toggle" role="group" aria-label="Choose a persona">
+          <button type="button" data-persona="baseline" aria-pressed="true">Baseline</button>
+          <button type="button" data-persona="banter" aria-pressed="false">Banter</button>
+        </div>
+        <div class="humor-row" data-disabled="true" id="humorRow">
+          <label for="humor">Humor</label>
+          <input type="range" id="humor" min="0" max="100" value="50" />
+          <output id="humorVal">50</output>
+        </div>
+      </div>
+
+      <div id="log" aria-live="polite"></div>
+
+      <form id="askForm">
+        <label for="question" class="sr-only" style="position:absolute;left:-9999px;">Your question</label>
+        <input type="text" id="question" placeholder="e.g. What ocean conditions intensify a tropical cyclone?" autocomplete="off" />
+        <button type="submit" class="send" id="sendBtn">Ask</button>
+      </form>
+
+      <div class="chips" id="chips"></div>
+    </div>
+
+    <footer>
+      Answers are grounded in the NASA SMD Q&amp;A benchmark corpus, retrieved with
+      IBM Granite embeddings and generated by a watsonx.ai instruct model. When
+      nothing in the corpus supports an answer, Talkback says so instead of guessing.
+    </footer>
+  </div>
+
+<script>
+  const API_BASE_URL = "http://localhost:8000"; // update this when deployed
+
+  // Matched to what's actually in the ingested corpus (NASA SMD Earth
+  // Science Q&A — tropical cyclones, dust storms, drought, wildfires,
+  // pollution) rather than spacecraft/astronaut topics that aren't there.
+  const SUGGESTED_QUESTIONS = [
+    "What ocean heat conditions favor tropical cyclone intensification?",
+    "How does airborne Saharan dust affect tropical cyclone development?",
+    "How are historical droughts reconstructed from climate data?",
+    "What environmental factors drive wildland fire risk?",
+    "What causes severe mesoscale thunderstorm systems?",
+  ];
+
+  const state = { persona: "baseline", humor: 50 };
+
+  const logEl = document.getElementById("log");
+  const form = document.getElementById("askForm");
+  const questionInput = document.getElementById("question");
+  const sendBtn = document.getElementById("sendBtn");
+  const humorRow = document.getElementById("humorRow");
+  const humorInput = document.getElementById("humor");
+  const humorVal = document.getElementById("humorVal");
+  const chipsEl = document.getElementById("chips");
+
+  document.querySelectorAll(".persona-toggle button").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.persona = btn.dataset.persona;
+      document.querySelectorAll(".persona-toggle button").forEach((b) => {
+        b.setAttribute("aria-pressed", String(b === btn));
+      });
+      humorRow.dataset.disabled = state.persona === "baseline" ? "true" : "false";
+    });
+  });
+
+  humorInput.addEventListener("input", () => {
+    state.humor = Number(humorInput.value);
+    humorVal.textContent = String(state.humor);
+  });
+
+  SUGGESTED_QUESTIONS.forEach((q) => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.textContent = q;
+    chip.addEventListener("click", () => {
+      questionInput.value = q;
+      form.requestSubmit();
+    });
+    chipsEl.appendChild(chip);
+  });
+
+  function addQuestionBubble(text) {
+    const el = document.createElement("div");
+    el.className = "msg-question";
+    el.textContent = text;
+    logEl.appendChild(el);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  function addAnswerBubble({ answer, persona, grounded, confidence, source }) {
+    const el = document.createElement("div");
+    el.className = "msg-answer";
+    el.dataset.persona = persona;
+    el.dataset.grounded = String(grounded);
+    el.textContent = answer;
+
+    const meta = document.createElement("div");
+    meta.className = "msg-meta";
+
+    const personaTag = document.createElement("span");
+    personaTag.textContent = persona === "banter" ? "Banter" : "Baseline";
+    meta.appendChild(personaTag);
+
+    if (confidence !== null && confidence !== undefined) {
+      const badge = document.createElement("span");
+      badge.className = "confidence-badge";
+      badge.textContent = `confidence ${Math.round(confidence * 100)}%`;
+      meta.appendChild(badge);
+    }
+
+    if (source) {
+      const src = document.createElement("span");
+      src.textContent = `source: ${source}`;
+      meta.appendChild(src);
+    }
+
+    el.appendChild(meta);
+    logEl.appendChild(el);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  function addErrorBubble(text) {
+    const el = document.createElement("div");
+    el.className = "msg-answer";
+    el.dataset.grounded = "false";
+    el.textContent = text;
+    logEl.appendChild(el);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  async function askTalkback(question) {
+    const response = await fetch(`${API_BASE_URL}/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question, persona: state.persona, humor: state.humor }),
+    });
+    if (!response.ok) {
+      throw new Error(`Request failed (${response.status})`);
+    }
+    return response.json();
+  }
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const question = questionInput.value.trim();
+    if (!question) return;
+
+    addQuestionBubble(question);
+    questionInput.value = "";
+    sendBtn.disabled = true;
+
+    try {
+      const data = await askTalkback(question);
+      addAnswerBubble(data);
+    } catch (err) {
+      addErrorBubble(
+        "Couldn't reach the Talkback backend, is the server running on " + API_BASE_URL + "?"
+      );
+      console.error(err);
+    } finally {
+      sendBtn.disabled = false;
+      questionInput.focus();
+    }
+  });
+</script>
+</body>
+</html>

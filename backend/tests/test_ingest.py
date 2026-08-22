@@ -35,14 +35,14 @@ class _FakeUpsert:
 TWO_DOCUMENTS_PAYLOAD = {
     "documents": [
         {
-            "id": "hull-breach-sector-4",
-            "type": "procedure",
-            "text": "Sound the compartment alarm. Seal the primary bulkhead door.",
+            "id": "nasa-smd-veggie-001",
+            "type": "science_reference",
+            "text": "Veggie is a deployable plant growth chamber used on the ISS.",
         },
         {
-            "id": "sector-2-spec",
-            "type": "sector_spec",
-            "text": "Nominal O2 saturation band is 30-60%.",
+            "id": "nasa-smd-dart-001",
+            "type": "science_reference",
+            "text": "DART tested kinetic impact as a planetary defense technique.",
         },
     ]
 }
@@ -65,10 +65,13 @@ def test_ingest_endpoint_returns_total_chunk_count_and_upserts_every_document(mo
     assert len(call["texts"]) == 2
     assert len(call["metadatas"]) == 2
     assert [m["doc_id"] for m in call["metadatas"]] == [
-        "hull-breach-sector-4",
-        "sector-2-spec",
+        "nasa-smd-veggie-001",
+        "nasa-smd-dart-001",
     ]
-    assert [m["doc_type"] for m in call["metadatas"]] == ["procedure", "sector_spec"]
+    assert [m["doc_type"] for m in call["metadatas"]] == [
+        "science_reference",
+        "science_reference",
+    ]
 
 
 def test_ingest_endpoint_empty_documents_returns_zero_without_calling_upsert(monkeypatch):
@@ -87,10 +90,10 @@ def test_ingest_endpoint_empty_documents_returns_zero_without_calling_upsert(mon
     "payload",
     [
         {},  # missing documents
-        {"documents": [{"type": "procedure", "text": "Some text."}]},  # missing id
+        {"documents": [{"type": "science_reference", "text": "Some text."}]},  # missing id
         {"documents": [{"id": "doc-1", "text": "Some text."}]},  # missing type
-        {"documents": [{"id": "doc-1", "type": "procedure"}]},  # missing text
-        {"documents": [{"id": "doc-1", "type": "procedure", "text": ""}]},  # empty text
+        {"documents": [{"id": "doc-1", "type": "science_reference"}]},  # missing text
+        {"documents": [{"id": "doc-1", "type": "science_reference", "text": ""}]},  # empty text
         {"documents": [{"id": "doc-1", "type": "not_a_real_type", "text": "Some text."}]},  # invalid type
     ],
 )

@@ -75,21 +75,21 @@ def test_invalid_chunk_size_or_overlap_raises(chunk_size, overlap):
 
 def test_chunk_document_tags_each_chunk_with_its_source():
     document = MissionDocument(
-        id="proc-1",
-        type=DocumentType.PROCEDURE,
+        id="nasa-smd-001",
+        type=DocumentType.SCIENCE_REFERENCE,
         text="Step one. Step two. Step three.",
     )
     chunks = chunk_document(document, chunk_size=800, overlap=100)
 
     assert len(chunks) == 1
     chunk = chunks[0]
-    assert chunk.doc_id == "proc-1"
-    assert chunk.doc_type == "procedure"
+    assert chunk.doc_id == "nasa-smd-001"
+    assert chunk.doc_type == "science_reference"
     assert chunk.chunk_index == 0
     assert chunk.doc_text == document.text
     assert chunk.metadata() == {
-        "doc_id": "proc-1",
-        "doc_type": "procedure",
+        "doc_id": "nasa-smd-001",
+        "doc_type": "science_reference",
         "chunk_index": 0,
         "doc_text": document.text,
     }
@@ -103,7 +103,7 @@ def test_chunk_document_carries_full_doc_text_on_every_chunk():
     # extraction (see app.services.crisis and Chunk's docstring), without
     # a second lookup for the other chunks.
     text = " ".join(f"word{i}" for i in range(300))
-    document = MissionDocument(id="proc-long", type=DocumentType.PROCEDURE, text=text)
+    document = MissionDocument(id="nasa-smd-long", type=DocumentType.SCIENCE_REFERENCE, text=text)
     chunks = chunk_document(document, chunk_size=100, overlap=20)
 
     assert len(chunks) > 2
@@ -116,8 +116,8 @@ def test_chunk_document_carries_full_doc_text_on_every_chunk():
 
 def test_chunk_documents_processes_a_batch_in_order():
     documents = [
-        MissionDocument(id="a", type=DocumentType.PROCEDURE, text="alpha content"),
-        MissionDocument(id="b", type=DocumentType.SECTOR_SPEC, text="beta content"),
+        MissionDocument(id="a", type=DocumentType.SCIENCE_REFERENCE, text="alpha content"),
+        MissionDocument(id="b", type=DocumentType.SCIENCE_REFERENCE, text="beta content"),
     ]
     chunks = chunk_documents(documents, chunk_size=800, overlap=100)
 

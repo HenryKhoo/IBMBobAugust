@@ -1,10 +1,18 @@
-"""Base Pydantic schemas shared across the API.
+"""Pydantic schemas for the Talkback API.
 
-Endpoint-specific request/response models for the five module endpoints
-(telemetry, crisis, triage, rationing, query) are added alongside their
-respective endpoints per the day-by-day build plan. This module also holds
-the POST /ingest schemas, since ingestion is shared infrastructure feeding
-every module's retrieval step rather than a single module's endpoint.
+Talkback answers real space-science questions, grounded in the ingested
+NASA SMD Q&A corpus — see `app.services.talkback` for the engine and
+`backend/scripts/fetch_talkback_corpus.py` /
+`backend/scripts/ingest_talkback_corpus.py` for how that corpus gets in.
+
+This is a deliberately small surface: `GET /health`, `POST /ingest`,
+`POST /query` (raw passage search, for transparency), and `POST /ask`
+(the actual product). Earlier iterations of this repo carried five
+habitat-crisis-console endpoints (telemetry, crisis, triage, rationing)
+built around a fictional deep-space-habitat scenario; those schemas were
+removed in the revamp to a single-objective product rather than kept
+around unused — see the project's `revamp/talkback` branch history for
+that decision.
 """
 
 from enum import Enum
@@ -15,26 +23,14 @@ from pydantic import BaseModel, Field
 class HealthResponse(BaseModel):
     """Response body for GET /health.
 
-    `status` is `"ok"` only when every upstream this service needs to
-    answer a request is actually configured, and `"degraded"` otherwise —
-    it is not a fixed string. It previously reported `"ok"` unconditionally
-    alongside a `backend` field that echoed `BACKEND_MODE` straight back,
-    which meant a deployment missing its watsonx/Zilliz credentials
-    advertised itself as healthy while all five module endpoints raised
-    (see `app.main.health` for the full account).
-
-    `backend` names the provider actually serving requests. There is only
-    one — `"watsonx"` — so it is now derived rather than read from config:
-    `BACKEND_MODE=mock` was documented in `.env.example` and `RAILWAY.md`
-    as a credential-free mode, but no mock provider was ever implemented
-    (no `app/services/providers.py`, and `app.mock_data` holds no
-    fixtures), so nothing branched on it and reporting it was reporting a
-    mode that did not exist.
-
-    `missing_config` names the specific unset settings behind a
-    `"degraded"` status, so the answer to "why is the deployed console
-    falling back to hand-authored data?" is in the health response itself
-    rather than only in the container logs. Empty when `status` is `"ok"`.
+    `status` is `"ok"` only when every upstream credential Talkback needs
+    to actually serve a request is configured, and `"degraded"` otherwise
+    — derived from the same credential checks a real `/ask` or `/query`
+    call would run (`missing_credentials()` in both service modules is the
+    shared source of truth), so this can never disagree with what a real
+    request would do. `missing_config` names the specific unset settings
+    behind a `"degraded"` status. This checks configuration completeness,
+    not live upstream reachability, so it stays cheap enough to poll.
     """
 
     status: str
@@ -43,16 +39,19 @@ class HealthResponse(BaseModel):
 
 
 class DocumentType(str, Enum):
-    """Kinds of mission documents accepted by POST /ingest."""
+    """Kinds of documents accepted by POST /ingest.
 
-    PROCEDURE = "procedure"
-    SECTOR_SPEC = "sector_spec"
-    CREW_FILE = "crew_file"
-    INCIDENT_RECORD = "incident_record"
+    A single member today (`science_reference`, the NASA SMD Q&A corpus
+    Talkback is grounded in) — kept as an enum rather than inlined as a
+    literal string so a second corpus can be added later without changing
+    the request/response shape.
+    """
+
+    SCIENCE_REFERENCE = "science_reference"
 
 
 class MissionDocument(BaseModel):
-    """A single raw mission document submitted for ingestion."""
+    """A single raw document submitted for ingestion."""
 
     id: str
     type: DocumentType
@@ -71,225 +70,13 @@ class IngestResponse(BaseModel):
     chunks_ingested: int
 
 
-class TelemetryInterpretRequest(BaseModel):
-    """Request body for POST /telemetry/interpret.
-
-    `metrics` is a flat map of raw metric name to reading, e.g.
-    `{"eff": 85, "o2pp": 158, "humidity": 34}` for the oxygen sector — see
-    the per-sector `state` shapes in `mission-console.html`'s Module 02.
-    """
-
-    sector_id: str = Field(min_length=1)
-    metrics: dict[str, float] = Field(min_length=1)
-
-
-class TelemetryInterpretResponse(BaseModel):
-    """Response body for POST /telemetry/interpret.
-
-    `confidence` is derived from retrieval strength and distance from the
-    nominal band the readings are checked against (see
-    `app.services.telemetry._combine_confidence`), never a random or
-    fabricated placeholder number. It stays optional (`float | None`)
-    rather than a required `float`: a future retrieval implementation that
-    can't produce a relevance score should be able to omit it honestly
-    instead of forcing a number, the same reasoning that left it `None`
-    before confidence scoring existed at all.
-    """
-
-    summary: str
-    confidence: float | None = None
-    source: str
-
-
-class CrisisEvent(BaseModel):
-    """A single entry from Module 01's live event feed."""
-
-    timestamp: str = Field(min_length=1)
-    sector: str = Field(min_length=1)
-    description: str = Field(min_length=1)
-
-
-class CrisisAnalyzeRequest(BaseModel):
-    """Request body for POST /crisis/analyze."""
-
-    events: list[CrisisEvent] = Field(min_length=1)
-
-
-class CrisisAnalyzeResponse(BaseModel):
-    """Response body for POST /crisis/analyze.
-
-    `root_cause` is generated by the instruct model, grounded strictly in
-    the retrieved procedure chunks' excerpts (see
-    `app.services.crisis.analyze_crisis`) — never in the event feed alone.
-    `steps` comes from `app.services.extraction.extract_procedure_steps`,
-    not from the model, so the step list is exactly what the procedure
-    document says rather than a generated paraphrase of it — but it's run
-    against each retrieved chunk's `doc_text` metadata (the full source
-    document `app.services.ingestion.Chunk` carries), not the chunk's own
-    excerpt text. That's dev plan Aug 20 Task 2 ("Ground the procedure
-    steps in the retrieved procedure document"): a chunk's own text lost
-    its line structure during chunking (see `Chunk`'s docstring), so
-    `steps` reflects each matched source document as a whole rather than
-    whatever fragment of it a single embedded chunk happens to contain.
-
-    Compound scenarios: `app.services.crisis.analyze_crisis` groups the
-    request's events by sector and retrieves up to one procedure match per
-    distinct sector (see that module's docstring), so a feed spanning more
-    than one concurrent failure point can ground `root_cause` in more than
-    one procedure document at once. `steps` is the concatenation of every
-    matched sector's extracted steps, in the order those sectors first
-    appeared in the feed. `sources` (plural, replacing the single-string
-    `source` this field used to be) carries one citation line per matched
-    procedure document, same `doc_type:doc_id#chunkN` format as before.
-    `contributing_causes` pairs each of those citations with the sector it
-    was retrieved for (`"{sector}: {source line}"`), a deterministic label
-    — not model output — so the frontend can group or label a compound
-    checklist by which failure point each step and citation came from.
-    `step_counts` carries, in the same order as `sources`/
-    `contributing_causes`, how many of `steps` came from each matched
-    sector — `steps` itself stays one flat, continuously-ordered list
-    (not nested per source) so existing step-index-based UI state, like
-    which steps are checked off and out-of-order detection, keeps working
-    unchanged across a compound response. `sum(step_counts) == len(steps)`
-    and `len(sources) == len(contributing_causes) == len(step_counts)`
-    always hold. For a single-failure feed (today's default demo scenario)
-    every one of these lists has length 1, so this is a strict superset of
-    the previous single-cause shape rather than a different one.
-    """
-
-    root_cause: str
-    steps: list[str]
-    step_counts: list[int] = Field(min_length=1)
-    sources: list[str] = Field(min_length=1)
-    contributing_causes: list[str] = Field(min_length=1)
-
-
-class TriageRequest(BaseModel):
-    """Request body for POST /triage.
-
-    `crew_member_id` is looked up as an exact match against an ingested
-    crew file's `doc_id` (see `app.services.triage.run_triage`), not
-    matched semantically the way `sector_id`/event feeds are — it gets
-    interpolated into a Milvus boolean `expr` filter, so the pattern
-    constraint below also doubles as expr-injection protection: only
-    lowercase-slug ids (matching the existing crew ids in
-    `mission-console.html`, e.g. `kim`, `okafor`) are accepted, which rules
-    out a stray `'` breaking or widening the filter.
-    """
-
-    crew_member_id: str = Field(min_length=1, pattern=r"^[a-z0-9_-]+$")
-    symptom_report: str = Field(min_length=1)
-
-
-class TriageResponse(BaseModel):
-    """Response body for POST /triage.
-
-    `triage_lead` is generated by the instruct model, grounded in the
-    single retrieved treatment protocol chunk's excerpt plus the retrieved
-    crew file's full text (see `app.services.triage.run_triage`) — never in
-    the symptom report alone. `instructions` comes from
-    `app.services.extraction.extract_procedure_steps`, not from the model,
-    read off the protocol chunk's `doc_text` metadata rather than its own
-    excerpt text — the same chunk-boundary/line-structure grounding fix dev
-    plan Aug 20 Task 2 had to add to `/crisis/analyze`'s `steps` after the
-    fact (see `CrisisAnalyzeResponse`'s docstring), applied here from the
-    start instead of repeated as a follow-up.
-
-    `allergy_check` is populated by `app.services.triage._check_allergies`
-    (dev plan Aug 21 Task 2, "Add the allergy cross check and the source
-    reference line to the triage response"): a deterministic, non-LLM
-    comparison of the retrieved crew file's allergy list (see
-    `app.services.extraction.extract_allergies`) against the retrieved
-    protocol's full text — a safety-relevant field is built from what the
-    documents literally say, not a model paraphrase, the same discipline
-    `instructions` already follows. It's typed `str | None` because
-    `_check_allergies` always returns a string once both documents are
-    retrieved (including a "no known allergies on file" case) — `None`
-    only occurs if a caller builds the schema directly without going
-    through `run_triage`.
-
-    `source` cites both retrieved documents, not just one: unlike
-    telemetry/crisis, which each retrieve a single document, `/triage`
-    grounds its response in two (the crew file and the protocol), so a
-    single-document source line would misrepresent where the response came
-    from. See `app.services.triage._source_line` for the exact format.
-
-    `confidence` is computed from retrieval strength on the protocol match
-    (see `app.services.triage._retrieval_strength`) rather than left
-    `None`, since the dev plan gives triage no dedicated confidence-scoring
-    task the way telemetry (Aug 19 Task 2) and crisis (Aug 20 Task 2) got —
-    leaving it `None` here would orphan the field with no task to fill it.
-    Still `float | None` rather than a required `float`, matching
-    `TelemetryInterpretResponse.confidence`'s reasoning: a retrieval
-    implementation that can't produce a relevance score should be able to
-    omit it honestly.
-    """
-
-    triage_lead: str
-    instructions: list[str]
-    allergy_check: str | None = None
-    confidence: float | None = None
-    source: str
-
-
-class RationingSimulateRequest(BaseModel):
-    """Request body for POST /rationing/simulate.
-
-    `ration_amount` is per-person daily kcal, matching Module 04's "Daily
-    ration per person" slider in `mission-console.html` — not a crew-wide
-    total. `stock_level` is total food energy on hand (kcal), matching the
-    frontend's `totalFoodEnergy`. `days_until_resupply` matches the
-    frontend's `daysUntilResupply`.
-
-    `ration_amount` and `days_until_resupply` are constrained strictly
-    positive (`gt=0`) rather than `>= 0`: both are multipliers/divisors in
-    `app.services.rationing.simulate_rationing`'s daily-burn and shortfall
-    math, where zero would make "daily burn" meaningless or divide by zero.
-    """
-
-    stock_level: float = Field(ge=0)
-    ration_amount: float = Field(gt=0)
-    days_until_resupply: int = Field(gt=0)
-
-
-class RationingSimulateResponse(BaseModel):
-    """Response body for POST /rationing/simulate.
-
-    `narrative` is generated by the instruct model, grounded in the single
-    retrieved rationing/supply-procedure chunk's excerpt (see
-    `app.services.rationing.simulate_rationing`) plus the computed rationing
-    state — never in the raw request numbers alone.
-
-    `survival_probability` is computed deterministically from `stock_level`,
-    `ration_amount`, and `days_until_resupply` (dev plan Aug 22 Task 1:
-    "Compute survival probability from stock, ration, and days") — it is
-    not derived from retrieval strength the way `TelemetryInterpretResponse
-    .confidence`/`TriageResponse.confidence` are, and this endpoint has no
-    separate confidence field. It's a direct port of
-    `mission-console.html`'s existing `computeSurvivalProbability` formula
-    (see `app.services.rationing._survival_probability`), so it stays on
-    that function's original 0-100 scale rather than the `[0, 1]` scale
-    `confidence` uses elsewhere in this API — a deliberate choice to reuse
-    tested logic unchanged, not an oversight; see `_survival_probability`'s
-    docstring for the ration-tier breakpoints and shortfall penalty.
-
-    `source` cites the single retrieved procedure document, same format as
-    `TelemetryInterpretResponse.source`/`CrisisAnalyzeResponse.source`.
-    """
-
-    narrative: str
-    survival_probability: float
-    source: str
-
-
 class QueryRequest(BaseModel):
     """Request body for POST /query.
 
     `top_k` caps how many passages `app.services.query.run_query` returns.
-    Bounded (`ge=1, le=20`) rather than left an unconstrained int: this
-    endpoint has no downstream generation step to keep a runaway value in
-    check the way the other four endpoints' single-chunk retrieval
-    implicitly does, so the bound is enforced here instead.
+    Bounded (`ge=1, le=20`) since this endpoint has no downstream
+    generation step to keep a runaway value in check the way `/ask`'s
+    single-chunk retrieval implicitly does.
     """
 
     question: str = Field(min_length=1)
@@ -300,13 +87,8 @@ class QueryResult(BaseModel):
     """One retrieved passage in a POST /query response.
 
     `relevance` is the raw retrieval relevance score for this passage
-    alone (see `app.services.query._relevance`), clamped to `[0, 1]` the
-    same way `app.services.telemetry._retrieval_strength` clamps its
-    input. Unlike `TelemetryInterpretResponse.confidence`/
-    `TriageResponse.confidence`, it is never combined with a second
-    signal — /query does no generation and has no nominal band or
-    allergy list to check a passage against, so retrieval strength is the
-    whole story here, not a component of it.
+    alone, clamped to `[0, 1]`. /query does no generation and blends in no
+    second signal, so retrieval strength is the whole story here.
     """
 
     text: str
@@ -317,14 +99,64 @@ class QueryResult(BaseModel):
 class QueryResponse(BaseModel):
     """Response body for POST /query.
 
-    `results` is ordered most-relevant-first, exactly as
-    `similarity_search_with_relevance_scores` returns it — see
-    `app.services.query.run_query`. An empty list is a valid response (a
-    question that matches nothing in the corpus), not an error: /query has
-    no generated claim that would otherwise go ungrounded, unlike the
-    other four endpoints, which raise `LookupError` on empty retrieval
-    rather than let the model generate from nothing (see e.g.
-    `app.services.crisis.analyze_crisis`).
+    Exposed alongside /ask as a transparency tool — "see the actual source
+    passages Talkback's answers are grounded in" — not as Talkback's main
+    interface. `results` is ordered most-relevant-first. An empty list is a
+    valid response (nothing in the corpus matches), not an error: unlike
+    /ask, there's no generated claim here that would otherwise go
+    ungrounded.
     """
 
     results: list[QueryResult]
+
+
+class AskPersona(str, Enum):
+    """Which voice answers a Talkback question.
+
+    Persona changes only how a true thing is said, never whether it's
+    said, or what it claims — see `app.services.talkback` for how that's
+    enforced structurally, not just by prompting convention.
+    """
+
+    BASELINE = "baseline"
+    BANTER = "banter"
+
+
+class AskRequest(BaseModel):
+    """Request body for POST /ask.
+
+    `humor` only affects `AskPersona.BANTER` — Baseline ignores it
+    entirely, since Baseline has no humor dial to turn. Bounded `[0, 100]`
+    to match the frontend's slider range.
+    """
+
+    question: str = Field(min_length=1)
+    persona: AskPersona = AskPersona.BASELINE
+    humor: int = Field(default=50, ge=0, le=100)
+
+
+class AskResponse(BaseModel):
+    """Response body for POST /ask.
+
+    `grounded` is `False` whenever `answer` is the honest no-match
+    fallback rather than a generated, source-backed answer — the frontend
+    uses this (not string-matching `answer`'s text) to decide whether to
+    show a citation/confidence badge or the muted "no grounded answer"
+    treatment. `confidence` is retrieval strength on the matched passage,
+    `None` only when nothing was retrieved at all (an empty/uningested
+    corpus) rather than a low-but-real score. `source` is `None` whenever
+    `grounded` is `False`, and a real `doc_type:doc_id#chunkN` citation
+    otherwise, same format the rest of this API's retrieval-backed
+    responses use.
+
+    Never a 404: an unmatched question is a valid, honest response (see
+    `app.services.talkback.ask_talkback`), not a failure to protect
+    against generating an ungrounded guess — the protection already
+    happened, that *is* what the fallback response is.
+    """
+
+    answer: str
+    persona: AskPersona
+    grounded: bool
+    confidence: float | None = None
+    source: str | None = None

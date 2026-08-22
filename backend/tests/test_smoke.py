@@ -2,14 +2,12 @@ from fastapi.testclient import TestClient
 
 from app import main
 from app.main import app
-from app.services import telemetry
+from app.services import talkback
 
 client = TestClient(app)
 
 # `main` imports these two under aliases, so they are patched on `main`
-# itself rather than on their defining modules — the same "patch the name
-# where it is used" pattern the telemetry test below applies to
-# `telemetry.get_vector_store`.
+# itself rather than on their defining modules.
 
 
 def test_health_ok_when_every_credential_is_configured(monkeypatch):
@@ -28,15 +26,9 @@ def test_health_ok_when_every_credential_is_configured(monkeypatch):
 def test_health_reports_degraded_when_credentials_are_missing(monkeypatch):
     """Regression test for the deployment bug this endpoint used to hide.
 
-    /health returned a hardcoded `{"status": "ok", "backend":
-    settings.BACKEND_MODE}`. BACKEND_MODE defaulted to "mock" and nothing
-    in the codebase branched on it — no mock provider was ever built — so a
-    Railway service deployed without watsonx/Zilliz credentials answered
-    /health with a healthy-looking `ok`/`mock` while every module endpoint
-    raised from `_require_credentials` and returned a 500. The frontend
-    swallows those failures by design (each fetch falls back to
-    hand-authored copy), so nothing on screen revealed it either.
-
+    /health used to return a hardcoded healthy status regardless of
+    whether watsonx/Zilliz were actually configured, so a deployment
+    missing credentials looked healthy while every real endpoint failed.
     Status now derives from the same credential check a real request runs.
     """
     monkeypatch.setattr(main, "watsonx_missing_credentials", lambda: ["WATSONX_API_KEY"])
@@ -52,41 +44,33 @@ def test_health_reports_degraded_when_credentials_are_missing(monkeypatch):
 
 
 def test_unhandled_exception_still_carries_cors_headers(monkeypatch):
-    """Regression test for the production bug report: the browser saw
-    "/telemetry/interpret ... blocked by CORS policy" even though CORS is
-    configured to allow all origins (see app.main's CORSMiddleware setup).
-
-    The real cause was that an *uncaught* exception's fallback 500 response
-    is sent by Starlette's ServerErrorMiddleware, which sits outside every
+    """Regression test: an *uncaught* exception's fallback 500 response is
+    sent by Starlette's ServerErrorMiddleware, which sits outside every
     middleware added via `add_middleware` — including CORSMiddleware — so
-    it carried no Access-Control-Allow-Origin header at all. The browser
+    it carries no Access-Control-Allow-Origin header at all. A browser
     can't tell that apart from an actual CORS misconfiguration.
     app.main._UnhandledExceptionToJSON fixes this: it's a middleware added
     *before* CORSMiddleware (so it ends up inside it), which catches the
     exception itself and returns a normal Response, letting it flow back up
-    through CORSMiddleware like any other response. This forces a
-    *generic* exception the ValueError-specific fix in vector_store.py
-    doesn't handle, to prove this fallback covers whatever's left.
+    through CORSMiddleware like any other response.
     """
 
     def _boom():
         raise RuntimeError("simulated unexpected failure")
 
-    monkeypatch.setattr(telemetry, "get_vector_store", _boom)
+    monkeypatch.setattr(talkback, "get_vector_store", _boom)
 
     response = client.post(
-        "/telemetry/interpret",
-        json={"sector_id": "oxygen", "metrics": {"eff": 85}},
-        headers={"Origin": "https://thenorthstars.up.railway.app"},
+        "/ask",
+        json={"question": "What is Veggie?"},
+        headers={"Origin": "https://talkback.up.railway.app"},
     )
 
     assert response.status_code == 500
     # allow_credentials=True means CORSMiddleware echoes back the actual
-    # request Origin rather than "*" (the wildcard is invalid alongside
-    # credentialed responses) — what matters here is that the header is
-    # present at all on an error response, which is the bug being guarded
-    # against.
+    # request Origin rather than "*" — what matters here is that the
+    # header is present at all on an error response.
     assert (
         response.headers.get("access-control-allow-origin")
-        == "https://thenorthstars.up.railway.app"
+        == "https://talkback.up.railway.app"
     )
