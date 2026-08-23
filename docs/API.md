@@ -1,7 +1,6 @@
-# API Contract — The North Star
+# API Contract — Talkback
 
-Short-form endpoint reference for judges and contributors. The longer,
-detailed version of this contract lives in `docs/API_CONTRACT.md`.
+Short-form endpoint reference for judges and contributors.
 
 Base URL for local development: `http://localhost:8000`
 
@@ -10,17 +9,16 @@ together whenever the contract changes.
 
 ## Endpoints
 
-This version of the contract covers all seven endpoints, including the
-Module 05 semantic search endpoint (`POST /query`).
+Five endpoints: `GET /health`, `POST /ingest`, `POST /query`, `POST /ask`,
+and `GET /conversation/history`.
 
 ### GET /health
 
 Reports whether the service is actually able to serve requests.
 
-`status` is `"ok"` only when every upstream credential the five module
-endpoints need is configured, and `"degraded"` otherwise — with HTTP
-`503` and the specific unset settings named in `missing_config`. It is
-not a constant.
+`status` is `"ok"` only when every watsonx/Zilliz credential `/ask` and
+`/query` need is configured, and `"degraded"` otherwise — with HTTP `503`
+and the specific unset settings named in `missing_config`.
 
 **Response — healthy (HTTP 200)**
 ```json
@@ -40,13 +38,6 @@ not a constant.
 }
 ```
 
-There is one backend, `watsonx`. An earlier version of this contract
-listed `mock` as the alternative, but no mock provider was ever
-implemented — `backend` echoed a `BACKEND_MODE` env var that nothing else
-read, so a deployment with no credentials returned `{"status": "ok",
-"backend": "mock"}` while all five module endpoints returned 500.
-`BACKEND_MODE` has been removed.
-
 This checks configuration completeness, not live upstream reachability —
 it does not round-trip to watsonx or Zilliz, so it stays cheap to poll.
 Credentials that are present but *invalid* still report `"ok"` here and
@@ -54,15 +45,17 @@ fail at the endpoint.
 
 ### POST /ingest
 
-Ingests mission documents — emergency procedures, sector specifications,
-crew medical files, and prior incident records. Chunks the text, embeds it
-with Granite, and upserts it into Zilliz.
+Chunks, embeds with Granite, and upserts documents into Zilliz. Today the
+only accepted `type` is `science_reference` (the NASA SMD Q&A corpus
+Talkback is grounded in — see `backend/scripts/fetch_talkback_corpus.py`
+and `backend/scripts/ingest_talkback_corpus.py` for the dev-time path that
+already populates this).
 
 **Request**
 ```json
 {
   "documents": [
-    { "id": "string", "type": "procedure | sector_spec | crew_file | incident_record", "text": "string" }
+    { "id": "string", "type": "science_reference", "text": "string" }
   ]
 }
 ```
@@ -74,137 +67,15 @@ with Granite, and upserts it into Zilliz.
 }
 ```
 
-### POST /telemetry/interpret
-
-Takes raw sector metrics for Module 02. Retrieves the matching sector
-documentation and returns a plain language read on sector status.
-
-**Request**
-```json
-{
-  "sector_id": "string",
-  "metrics": { "key": "value" }
-}
-```
-
-**Response**
-```json
-{
-  "summary": "string",
-  "confidence": 0.0,
-  "source": "string"
-}
-```
-
-### POST /crisis/analyze
-
-Takes the live event feed for Module 01. The feed can span more than one
-concurrent failure point — events are grouped by `sector`, and one
-procedure match is retrieved per distinct sector (capped at 4 per
-request), rather than a single blended match for the whole feed. Returns
-one synthesized root cause statement grounded across every matched
-procedure, plus the merged, ordered response steps.
-
-**Request**
-```json
-{
-  "events": [
-    { "timestamp": "string", "sector": "string", "description": "string" }
-  ]
-}
-```
-
-**Response**
-```json
-{
-  "root_cause": "string",
-  "steps": ["string"],
-  "step_counts": [0],
-  "sources": ["string"],
-  "contributing_causes": ["string"]
-}
-```
-
-`sources` carries one citation line per matched procedure document. For a
-feed with a single failure point (the default demo scenario), this is
-always a length-1 list — the same shape as before this endpoint supported
-compound scenarios, just pluralized. `step_counts` gives, in the same
-order as `sources`, how many of the concatenated `steps` came from each
-matched sector — `steps` itself stays one flat, continuously-ordered list
-so step-index-based UI state (which steps are checked off, out-of-order
-detection) doesn't need to change shape for a compound response.
-`contributing_causes` pairs each source with the sector it was retrieved
-for (`"{sector}: {source line}"`), a deterministic label rather than model
-output, so a caller can group or label a compound checklist by which
-failure point each step and citation came from.
-
-A sector in the feed that matches no procedure documentation is dropped
-rather than failing the whole request — this endpoint 404s only if *no*
-sector in the feed matched anything at all, so a compound feed where only
-some of the concurrent failures have ingested procedure docs still
-returns a grounded (if partial) response for the ones that do.
-
-### POST /triage
-
-Takes a crew member id and a plain English symptom report for Module 03.
-Retrieves crew file data and protocol documents, and returns a grounded
-triage recommendation.
-
-**Request**
-```json
-{
-  "crew_member_id": "string",
-  "symptom_report": "string"
-}
-```
-
-**Response**
-```json
-{
-  "triage_lead": "string",
-  "instructions": ["string"],
-  "allergy_check": "string",
-  "confidence": 0.0,
-  "source": "string"
-}
-```
-
-`source` cites both retrieved documents (crew file and treatment protocol),
-separated by `"; "` — the only endpoint here grounded in two documents
-rather than one.
-
-### POST /rationing/simulate
-
-Takes stock level, ration amount, and days until resupply for Module 04.
-Returns a rationing narrative and a survival probability.
-
-**Request**
-```json
-{
-  "stock_level": 0,
-  "ration_amount": 0,
-  "days_until_resupply": 0
-}
-```
-
-**Response**
-```json
-{
-  "narrative": "string",
-  "survival_probability": 0.0,
-  "source": "string"
-}
-```
-
 ### POST /query
 
-Optional Module 05. Takes a natural language question for the mission log
-search widget. Searches the full embedded mission document corpus in
-Zilliz — no document-type filter, unlike the other five endpoints above —
-and returns the best-matching passages with source references. Unlike
-every other endpoint here, this one does no generation: the retrieved
-passages are the answer, so an empty `results` list is a valid response
-rather than a 404.
+Retrieval only, no generation — a transparency tool alongside `/ask` for
+inspecting the actual source passages a question matches, not Talkback's
+main interface. Searches the full ingested corpus with no `doc_type`
+filter and returns the best-matching passages with source references. An
+empty `results` list is a valid response (nothing in the corpus matches),
+not an error — there's no generated claim here that would otherwise go
+ungrounded.
 
 **Request**
 ```json
@@ -225,13 +96,115 @@ rather than a 404.
 }
 ```
 
+### POST /ask
+
+The main Q&A endpoint. Retrieves the single best-matching
+`science_reference` passage and, above a confidence threshold, generates a
+grounded answer exactly once (always in Baseline's voice); Banter re-tells
+that already-generated, already-grounded answer in its own tone rather
+than answering the question itself. Below threshold, or with nothing
+ingested yet, both personas return an honest no-match response instead of
+guessing. Never 404s — an unmatched question is a valid response, not a
+failure.
+
+**Request**
+```json
+{
+  "question": "string",
+  "persona": "baseline | banter",
+  "humor": 50,
+  "session_id": "string | null"
+}
+```
+
+`persona` defaults to `baseline`; `humor` (0–100) is only used by Banter.
+`session_id` is optional — omit it on the first question of a
+conversation, then send back whatever the previous response's
+`session_id` was on every follow-up. See "Conversational memory" below.
+
+**Response**
+```json
+{
+  "answer": "string",
+  "persona": "baseline | banter",
+  "grounded": true,
+  "confidence": 0.0,
+  "source": "string | null",
+  "session_id": "string",
+  "history_source": "none | session_memory | history_retrieval"
+}
+```
+
+`session_id` is always populated — server-generated when the request
+didn't send one, echoed back unchanged otherwise. `confidence` and
+`source` are `null` whenever `grounded` is `false`. `history_source`
+reports how (if at all) prior turns shaped the interpretation of this
+question — see "Conversational memory" below; it is informational only
+and never changes what `confidence`/`grounded` mean, since the answer
+itself is always generated fresh from a retrieved passage regardless of
+where the surrounding context came from.
+
+### GET /conversation/history
+
+Returns the transcript for one conversation, for a Conversation History
+browse panel. Never 404s: an unrecognized `session_id` — mistyped,
+expired, or simply never issued — returns an empty `turns` list with
+`source: "none"` rather than an error.
+
+**Request** — query parameter
+
+```
+GET /conversation/history?session_id=string
+```
+
+**Response**
+```json
+{
+  "session_id": "string",
+  "turns": [
+    { "role": "user | assistant", "content": "string", "persona": "baseline | banter | null", "source": "string | null" }
+  ],
+  "source": "none | session_memory | history_retrieval"
+}
+```
+
+`turns` is ordered oldest-first. `persona`/`source` are only ever set on
+an `assistant` turn. See "Conversational memory" below for what `source`
+means and its limitations.
+
+## Conversational memory
+
+`/ask` is stateful across calls that share a `session_id`, in two layers:
+
+- **Short-term session memory** — an in-process sliding window of the most
+  recent turns for that `session_id`, replayed into the next prompt as
+  context so a follow-up ("what does it eat?") can be understood without
+  restating the whole question. Fast and exact, but doesn't survive a
+  server restart and is capped to the last few turns.
+- **Long-term history** — once an exchange is grounded, it's additionally
+  persisted to Zilliz, tagged with that same `session_id`. This is what
+  lets a conversation's context survive a restart, an evicted in-process
+  session, or a window that's trimmed the earlier turns away: if the
+  short-term window is empty for a `session_id` a caller sends, `/ask`
+  falls back to searching this session's own long-term history instead. A
+  fallback "no grounded answer" turn is never persisted here — only
+  grounded exchanges are recallable later.
+
+Recall is always scoped to the caller's own `session_id` — never a
+cross-session search — so one visitor's questions can never surface as
+context in another visitor's conversation. Either way, memory only ever
+shapes what a question is *interpreted to mean*; it is never a source of
+facts and never substitutes for the current question's own retrieval — see
+the grounding discipline under "Conventions" below, which is otherwise
+completely unaffected by any of this.
+
 ## Conventions
 
-Every response is grounded in retrieved documents, never a hand-written
-guess. Confidence values are derived from real signals, such as retrieval
-strength or distance from a nominal band, not random numbers. Every
-endpoint that generates a claim carries a source reference line back to the
-document it came from. `POST /query` is the one exception to "generates a
-claim": it returns retrieved passages verbatim rather than generating
-anything, so its `relevance` field is a retrieval strength score, not a
-generation confidence score.
+Every generated answer is grounded in a retrieved document, never a
+hand-written guess. Confidence values are derived from real signals (retrieval
+strength), not random numbers. Every endpoint that generates a claim
+carries a source reference line back to the document it came from.
+`POST /query` is the one exception to "generates a claim": it returns
+retrieved passages verbatim rather than generating anything, so its
+`relevance` field is a retrieval strength score, not a generation
+confidence score.

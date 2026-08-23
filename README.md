@@ -38,7 +38,11 @@ NASA SMD Q&A benchmark passages are chunked and embedded with IBM's Granite embe
 
 ### API surface
 
-`GET /health` — reports whether the required watsonx/Zilliz credentials are actually configured, not just that the process is running. `POST /ingest` — chunk, embed, and upsert documents into Zilliz. `POST /query` — retrieval only, for inspecting the actual source passages a question matches. `POST /ask` — the main Q&A endpoint described above.
+`GET /health` — reports whether the required watsonx/Zilliz credentials are actually configured, not just that the process is running. `POST /ingest` — chunk, embed, and upsert documents into Zilliz. `POST /query` — retrieval only, for inspecting the actual source passages a question matches. `POST /ask` — the main Q&A endpoint described above. `GET /conversation/history` — the transcript for one conversation, for the console's Conversation History panel.
+
+### Conversational memory
+
+`/ask` remembers a conversation across calls that share a `session_id`: an in-process sliding window handles the common case of an active back-and-forth, and grounded exchanges are additionally persisted to Zilliz so that context survives a restart or a window that's trimmed older turns away. Memory only ever shapes what a follow-up question is *interpreted to mean* — every answer is still generated fresh from a retrieved passage, never from a remembered claim — and recall is always scoped to the caller's own session, never a cross-session search. See `docs/API.md` for the full contract.
 
 ## Quickstart
 

@@ -12,15 +12,18 @@ from app.config import settings
 from app.schemas import (
     AskRequest,
     AskResponse,
+    ConversationHistoryResponse,
     HealthResponse,
     IngestRequest,
     IngestResponse,
     QueryRequest,
     QueryResponse,
 )
+from app.services import memory
 from app.services.ingestion import ingest_and_upsert
 from app.services.query import run_query
 from app.services.talkback import ask_talkback
+from app.services.vector_store import get_vector_store
 from app.services.vector_store import missing_credentials as zilliz_missing_credentials
 from app.services.watsonx import missing_credentials as watsonx_missing_credentials
 
@@ -143,8 +146,25 @@ def ask(request: AskRequest) -> AskResponse:
     endpoints get from a 404 is already built into that fallback response
     itself here.
 
-    `request.session_id` opts into short-term conversational memory across
-    calls to this endpoint — see `AskRequest.session_id` and
-    `app.services.memory`.
+    `request.session_id` opts into conversational memory across calls to
+    this endpoint — see `AskRequest.session_id` and `app.services.memory`.
     """
     return ask_talkback(request.question, request.persona, request.humor, request.session_id)
+
+
+@app.get("/conversation/history", response_model=ConversationHistoryResponse)
+def conversation_history(session_id: str) -> ConversationHistoryResponse:
+    """Return the transcript for one conversation, for the Conversation History panel.
+
+    Prefers the live in-process session for `session_id` if one exists,
+    falling back to Zilliz-persisted long-term history (grounded exchanges
+    only) once that's gone — see `app.services.memory.get_conversation_history`
+    for exactly how those two sources are chosen between.
+
+    Never 404s: an unrecognized `session_id` — mistyped, expired, or simply
+    never issued — returns an empty `turns` list with `source: "none"`
+    rather than an error, the same "unknown id degrades to nothing"
+    behavior `POST /ask` already has for a stale `session_id`.
+    """
+    turns, source = memory.get_conversation_history(get_vector_store, session_id)
+    return ConversationHistoryResponse(session_id=session_id, turns=turns, source=source)

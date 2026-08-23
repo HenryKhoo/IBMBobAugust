@@ -19,18 +19,38 @@ If nothing in the corpus scores as a confident match, both personas say so
 plainly instead of guessing — same no-hallucination discipline the rest of
 this API's retrieval-backed endpoints already follow.
 
-Short-term conversational memory (`app.services.memory`) sits on top of
-this: prior turns in the same session are rendered into the Baseline
-prompt as a "Conversation so far" block so a follow-up question can be
-understood in context. This changes what a question is interpreted to
-*mean* only — the grounding rules above are otherwise untouched. See
-`_history_block` and `app.services.memory`'s module docstring.
+Conversational memory (`app.services.memory`) sits on top of this in two
+stages, tried in order:
+
+1. Short-term session memory: prior turns still in the in-process sliding
+   window for this session are rendered into the Baseline prompt as a
+   "Conversation so far" block, so a follow-up question can be understood
+   in context. This is the common case for an active conversation.
+2. Long-term history retrieval: only when that window is empty for this
+   `session_id` (an unrecognized/evicted id, or a fresh process after a
+   restart) does Talkback fall back to searching Zilliz for this same
+   session's own grounded exchanges from earlier — see
+   `app.services.memory.recall_relevant_history`.
+
+Either way this changes what a question is interpreted to *mean* only —
+the grounding rules above are otherwise untouched: memory is never a
+source of facts and never substitutes for the current question's own
+retrieval. `AskResponse.history_source` reports which of the two stages
+(if either) actually contributed, purely as transparency — see
+`app.schemas.HistorySource`. See `_history_block`, `_recalled_history_block`,
+and `app.services.memory`'s module docstring.
 """
 
 from __future__ import annotations
 
-from app.schemas import AskPersona, AskResponse, ConversationRole, ConversationTurn
-from app.services.memory import get_or_create_session
+from app.schemas import (
+    AskPersona,
+    AskResponse,
+    ConversationRole,
+    ConversationTurn,
+    HistorySource,
+)
+from app.services.memory import get_or_create_session, persist_grounded_exchange, recall_relevant_history
 from app.services.vector_store import get_vector_store, relevance_score_hits_or_empty
 from app.services.watsonx import get_instruct_model
 
@@ -121,6 +141,23 @@ def _history_block(turns: list[ConversationTurn]) -> str:
     return "\nConversation so far:\n" + "\n".join(lines) + "\n"
 
 
+def _recalled_history_block(chunks: list) -> str:
+    """Render Zilliz-recovered past exchanges as a "Conversation so far" block.
+
+    Same shape and same empty-string-when-nothing convention as
+    `_history_block`, so the Baseline prompt looks identical to the model
+    regardless of whether history came from the live session window or was
+    recovered from long-term storage. Each chunk's `page_content` is
+    already a "Question: ...\\nAnswer: ..." block (see
+    `app.services.memory.persist_grounded_exchange`), so this just joins
+    them — no reparsing needed.
+    """
+    if not chunks:
+        return ""
+    body = "\n".join(chunk.page_content for chunk in chunks)
+    return "\nConversation so far:\n" + body + "\n"
+
+
 def _retrieval_strength(relevance_score: float) -> float:
     """Normalize a retrieval relevance score to a [0, 1] confidence signal.
 
@@ -133,7 +170,10 @@ def _retrieval_strength(relevance_score: float) -> float:
 
 
 def _fallback_response(
-    persona: AskPersona, confidence: float | None, session_id: str
+    persona: AskPersona,
+    confidence: float | None,
+    session_id: str,
+    history_source: HistorySource,
 ) -> AskResponse:
     return AskResponse(
         answer=_FALLBACK_BASELINE if persona == AskPersona.BASELINE else _FALLBACK_BANTER,
@@ -142,6 +182,7 @@ def _fallback_response(
         confidence=confidence,
         source=None,
         session_id=session_id,
+        history_source=history_source,
     )
 
 
@@ -158,31 +199,62 @@ def ask_talkback(
     that finished, already-true answer rather than generating its own, so
     the humor dial can never change what is actually claimed.
 
-    `session_id` opts into short-term conversational memory
-    (`app.services.memory`): the prior turns of that session (if any) are
-    rendered into the Baseline prompt as context before this question's
-    turn is recorded, and this question's turn plus whatever answer gets
-    returned are recorded afterward, regardless of whether that answer was
-    grounded or a fallback. `None` starts a brand-new session. Either way
-    the returned `AskResponse.session_id` is what a caller sends back on
-    the next turn to keep continuity.
+    `session_id` opts into conversational memory (`app.services.memory`):
+    prior context for this question is resolved in two stages — the
+    in-process session window first, then (only if that's empty for this
+    `session_id`) a Zilliz search scoped to this same session's own
+    long-term history — and rendered into the Baseline prompt before this
+    question's turn is recorded. This question's turn plus whatever answer
+    gets returned are recorded in the short-term window afterward,
+    regardless of whether that answer was grounded or a fallback; a
+    grounded answer is additionally persisted to long-term storage (see
+    `app.services.memory.persist_grounded_exchange`). `None` starts a
+    brand-new session. Either way the returned `AskResponse.session_id` is
+    what a caller sends back on the next turn to keep continuity, and
+    `AskResponse.history_source` reports which stage (if either) actually
+    contributed context for this question.
     """
+    store = get_vector_store()
     session = get_or_create_session(session_id)
-    history = _history_block(session.recent_turns())
+    in_window = session.recent_turns()
+
+    if in_window:
+        history = _history_block(in_window)
+        history_source = HistorySource.SESSION_MEMORY
+    elif session_id is not None:
+        # `session_id is not None` — a caller only ever passes an id it
+        # already got back from a prior response, so a fresh `None` call
+        # (see `test_ask_without_session_id_starts_a_fresh_session_each_time`)
+        # skips this Zilliz round-trip entirely: `get_or_create_session`
+        # guarantees a brand-new, never-issued id in that case, so nothing
+        # could possibly be recoverable for it.
+        recalled_chunks = recall_relevant_history(store, session_id, question)
+        history = _recalled_history_block(recalled_chunks)
+        history_source = (
+            HistorySource.HISTORY_RETRIEVAL if recalled_chunks else HistorySource.NONE
+        )
+    else:
+        history = ""
+        history_source = HistorySource.NONE
+
     session.add_turn(ConversationRole.USER, question)
 
     hits = relevance_score_hits_or_empty(
-        get_vector_store(), question, k=1, expr="doc_type == 'science_reference'"
+        store, question, k=1, expr="doc_type == 'science_reference'"
     )
     if not hits:
-        response = _fallback_response(persona, confidence=None, session_id=session.session_id)
+        response = _fallback_response(
+            persona, confidence=None, session_id=session.session_id, history_source=history_source
+        )
         session.add_turn(ConversationRole.ASSISTANT, response.answer, persona=persona)
         return response
 
     chunk, relevance_score = hits[0]
     confidence = _retrieval_strength(relevance_score)
     if confidence < _CONFIDENCE_THRESHOLD:
-        response = _fallback_response(persona, confidence=confidence, session_id=session.session_id)
+        response = _fallback_response(
+            persona, confidence=confidence, session_id=session.session_id, history_source=history_source
+        )
         session.add_turn(ConversationRole.ASSISTANT, response.answer, persona=persona)
         return response
 
@@ -203,6 +275,9 @@ def ask_talkback(
 
     source = _source_line(chunk.metadata)
     session.add_turn(ConversationRole.ASSISTANT, final_answer, persona=persona, source=source)
+    persist_grounded_exchange(
+        store, session.session_id, session.turn_count, question, final_answer, persona, source
+    )
 
     return AskResponse(
         answer=final_answer,
@@ -211,4 +286,5 @@ def ask_talkback(
         confidence=confidence,
         source=source,
         session_id=session.session_id,
+        history_source=history_source,
     )
