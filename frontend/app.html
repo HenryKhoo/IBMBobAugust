@@ -1,0 +1,780 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<!-- Deploy config: this repo runs frontend and backend as separate services
+     (see RAILWAY.md), so the backend's public URL isn't knowable at build
+     time from a single static file. Set this to that URL before deploying —
+     e.g. content="https://your-backend.up.railway.app". Leave it empty to
+     fall back to same-origin (correct if the backend is reverse-proxied
+     onto the same host as this page). Localhost dev always uses :8000
+     regardless of this tag. -->
+<meta name="talkback-api-base-url" content="" />
+<title>Talkback — grounded space Q&amp;A</title>
+<style>
+  :root {
+    /* Light system, matched to index.html's landing palette so the console
+       doesn't jump into a visually unrelated product on launch. */
+    --bg: #eef1f5;
+    --panel: #ffffff;
+    --panel-2: #f4f6f9;
+    --line: #dde2ea;
+    --ink: #12151c;
+    --ink-dim: #565f70;
+    --ink-faint: #5f6b7d;
+    --footer-band-bg: #06070a;
+    --footer-ink: #e7ebf3;
+    --footer-ink-dim: #9aa4b8;
+    /* Brand accents — kept at index.html's exact hues for washes, dots, native
+       control theming, and decorative borders (all checked at the 3:1
+       non-text minimum against the surfaces they sit on). Neither raw accent
+       clears 4.5:1 as literal text on a light surface, so anywhere the accent
+       colors the text itself (persona toggle labels, confidence badges,
+       the grounding checkmark, focus rings) uses the darker *-text pair
+       below instead — those clear 5.3:1+ on both --panel and --panel-2. */
+    --accent-baseline: #5fb0c9;
+    --accent-baseline-wash: rgba(95, 176, 201, 0.16);
+    --accent-baseline-text: #1f6478;
+    --accent-banter: #e0a458;
+    --accent-banter-wash: rgba(224, 164, 88, 0.16);
+    --accent-banter-text: #875a19;
+    /* Confidence bands — color-codes the confidence badge instead of a neutral pill.
+       Wash + border stay at the brand hue; badge text uses the -text variant. */
+    --confidence-high: #5ecb8a;
+    --confidence-high-wash: rgba(94, 203, 138, 0.16);
+    --confidence-high-text: #0c7343;
+    --confidence-med: #d4b23f;
+    --confidence-med-wash: rgba(212, 178, 63, 0.16);
+    --confidence-med-text: #7d6019;
+    --confidence-low: #e88576;
+    --confidence-low-wash: rgba(232, 133, 118, 0.16);
+    --confidence-low-text: #b03d2b;
+    --radius: 18px;
+    /* Elevation scale re-tuned for a light surface — index.html's tile shadow
+       (0 20px 40px rgba(20,30,50,0.08)) is the reference point, so panels read
+       as lifted paper instead of the heavier near-black glow the dark theme used. */
+    --shadow-xs: 0 1px 2px rgba(20, 30, 50, 0.06);
+    --shadow-sm: 0 1px 2px rgba(20, 30, 50, 0.05), 0 3px 6px rgba(20, 30, 50, 0.06);
+    --shadow-md: 0 2px 4px rgba(20, 30, 50, 0.04), 0 8px 16px rgba(20, 30, 50, 0.06),
+      0 16px 32px rgba(20, 30, 50, 0.05);
+    --shadow-lg: 0 4px 8px rgba(20, 30, 50, 0.05), 0 12px 24px rgba(20, 30, 50, 0.07),
+      0 24px 48px rgba(20, 30, 50, 0.06);
+    /* Type scale — replaces eight ad hoc font-size values with five steps */
+    --text-xs: 0.75rem;
+    --text-sm: 0.8125rem;
+    --text-base: 0.875rem;
+    --text-md: 0.9375rem;
+    --text-display: 3.2rem;
+    /* Spacing scale, 4px base (matches talkback-proposal.md §6) */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-6: 24px;
+    --space-7: 28px;
+    --space-8: 32px;
+    --space-16: 64px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    /* Horizontal padding lives on .shell, not here, so footer (a body-level
+       sibling of .shell) can be a plain width:100% full-bleed band with no
+       viewport-unit math — that math is what caused the mis-centered band. */
+    padding: var(--space-8) 0 var(--space-16);
+  }
+  .shell { width: 100%; max-width: 720px; padding: 0 var(--space-4); }
+  header {
+    position: relative;
+    text-align: center;
+    margin-bottom: var(--space-6);
+    padding-top: var(--space-3);
+  }
+  header::before {
+    content: "";
+    position: absolute;
+    top: -60px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 480px;
+    height: 260px;
+    max-width: 140vw;
+    background: radial-gradient(
+      circle,
+      var(--accent-baseline-wash) 0%,
+      var(--accent-banter-wash) 45%,
+      transparent 72%
+    );
+    filter: blur(36px);
+    opacity: 0.65;
+    pointer-events: none;
+    z-index: 0;
+  }
+  header h1 {
+    position: relative;
+    z-index: 1;
+    font-size: var(--text-display);
+    font-weight: 800;
+    margin: 0 0 var(--space-3);
+    letter-spacing: -0.03em;
+    text-transform: uppercase;
+    line-height: 1;
+  }
+  header p {
+    position: relative;
+    z-index: 1;
+    color: var(--ink-dim);
+    margin: 0;
+    font-size: var(--text-md);
+    line-height: 1.5;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: var(--space-4);
+    box-shadow: var(--shadow-md);
+  }
+  .controls-row {
+    display: flex;
+    gap: var(--space-3);
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: var(--space-4);
+  }
+  .persona-toggle {
+    display: inline-flex;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    /* No overflow:hidden here — it used to clip the focus-visible ring on the
+       first/last button. Corners are rounded on the buttons themselves instead. */
+  }
+  .persona-toggle button {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    background: transparent;
+    border: none;
+    color: var(--ink-dim);
+    padding: var(--space-2) var(--space-4);
+    font-size: var(--text-base);
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .persona-toggle button:first-child { border-radius: 999px 0 0 999px; }
+  .persona-toggle button:last-child { border-radius: 0 999px 999px 0; }
+  .persona-icon {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    fill: none;
+  }
+  .persona-toggle button[aria-pressed="true"][data-persona="baseline"] {
+    background: var(--accent-baseline-wash);
+    color: var(--accent-baseline-text);
+  }
+  .persona-toggle button[aria-pressed="true"][data-persona="banter"] {
+    background: var(--accent-banter-wash);
+    color: var(--accent-banter-text);
+  }
+  .humor-row { display: flex; align-items: center; gap: var(--space-2); flex: 1; min-width: 200px; }
+  .humor-row label { font-size: var(--text-sm); color: var(--ink-dim); white-space: nowrap; }
+  .humor-row input[type="range"] { flex: 1; accent-color: var(--accent-banter); }
+  .humor-row output { font-size: var(--text-sm); color: var(--ink-dim); width: 30px; text-align: right; }
+  .humor-row[data-disabled="true"] { opacity: 0.35; pointer-events: none; }
+
+  .clear-btn {
+    margin-left: auto;
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--ink-dim);
+    border-radius: var(--radius);
+    padding: var(--space-2) var(--space-3);
+    font-size: var(--text-sm);
+    cursor: pointer;
+  }
+  .clear-btn:hover:not(:disabled) { color: var(--ink); border-color: var(--ink-dim); }
+  .clear-btn:disabled { opacity: 0.35; cursor: default; }
+
+  #log {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    margin-bottom: var(--space-4);
+    max-height: 55vh;
+    overflow-y: auto;
+    padding-right: var(--space-1);
+  }
+  .msg-question {
+    align-self: flex-end;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: var(--space-3) var(--space-4);
+    max-width: 85%;
+    font-size: var(--text-md);
+    box-shadow: var(--shadow-md);
+  }
+  .msg-answer {
+    align-self: flex-start;
+    background: var(--panel-2);
+    border-radius: var(--radius);
+    padding: var(--space-3) var(--space-4);
+    max-width: 90%;
+    font-size: var(--text-md);
+    line-height: 1.5;
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow-md);
+  }
+  .msg-answer[data-persona="baseline"] { border-left: 3px solid var(--accent-baseline); }
+  .msg-answer[data-persona="banter"] { border-left: 3px solid var(--accent-banter); }
+  .msg-answer[data-grounded="false"] {
+    border-left-color: var(--ink-faint);
+  }
+  .empty-state {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  .empty-state-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    color: var(--ink-faint);
+    font-size: var(--text-sm);
+    line-height: 1;
+  }
+  .empty-state-text {
+    color: var(--ink-dim);
+  }
+  .retry-btn {
+    display: inline-block;
+    margin-top: var(--space-2);
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--ink-dim);
+    border-radius: var(--radius);
+    padding: var(--space-1) var(--space-3);
+    font-size: var(--text-sm);
+    cursor: pointer;
+  }
+  .retry-btn:hover { color: var(--ink); border-color: var(--ink-dim); }
+  .typing-indicator { padding: var(--space-3) var(--space-4); }
+  .typing-dots { display: inline-flex; gap: var(--space-1); align-items: center; }
+  .typing-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--ink-faint);
+    animation: typing-bounce 1.2s infinite ease-in-out;
+  }
+  .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes typing-bounce {
+    0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
+    30% { transform: translateY(-4px); opacity: 1; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .typing-dot { animation: none; opacity: 0.7; }
+  }
+  .msg-meta {
+    margin-top: var(--space-2);
+    font-size: var(--text-xs);
+    color: var(--ink-faint);
+    display: flex;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+  }
+  .confidence-badge {
+    display: inline-block;
+    padding: 1px var(--space-2); /* 1px vertical is a hairline, not part of the spacing rhythm */
+    border-radius: 999px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    font-weight: 600;
+  }
+  .confidence-badge[data-level="high"] {
+    background: var(--confidence-high-wash);
+    border-color: var(--confidence-high);
+    color: var(--confidence-high-text);
+  }
+  .confidence-badge[data-level="medium"] {
+    background: var(--confidence-med-wash);
+    border-color: var(--confidence-med);
+    color: var(--confidence-med-text);
+  }
+  .confidence-badge[data-level="low"] {
+    background: var(--confidence-low-wash);
+    border-color: var(--confidence-low);
+    color: var(--confidence-low-text);
+  }
+
+  .grounding-strip {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    margin-bottom: var(--space-4);
+    border-radius: var(--radius);
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    color: var(--ink-dim);
+    font-size: var(--text-xs);
+    line-height: 1.4;
+  }
+  .grounding-strip-icon {
+    flex-shrink: 0;
+    color: var(--accent-baseline-text);
+  }
+
+  form { display: flex; gap: var(--space-2); }
+  input[type="text"] {
+    flex: 1;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: var(--space-3);
+    color: var(--ink);
+    font-size: var(--text-md);
+  }
+  input[type="text"]:focus-visible, button:focus-visible {
+    outline: 2px solid var(--accent-baseline-text);
+    outline-offset: 1px;
+  }
+  button.send {
+    background: var(--accent-baseline);
+    border: none;
+    color: #08131a;
+    font-weight: 700;
+    border-radius: 8px;
+    padding: 0 var(--space-4);
+    cursor: pointer;
+  }
+  button.send:disabled { opacity: 0.5; cursor: default; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: var(--space-3); margin: var(--space-4) 0 0; }
+  .chips button {
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-top: 3px solid var(--accent-baseline);
+    color: var(--ink-dim);
+    border-radius: var(--radius);
+    padding: var(--space-3) var(--space-4);
+    font-size: var(--text-sm);
+    text-align: left;
+    cursor: pointer;
+    box-shadow: var(--shadow-md);
+    transition: transform 0.15s ease, box-shadow 0.15s ease, color 0.15s ease;
+  }
+  .chips button:hover {
+    color: var(--ink);
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-lg);
+  }
+  .chips button:focus-visible {
+    outline: 2px solid var(--accent-baseline-text);
+    outline-offset: 2px;
+  }
+
+  footer {
+    /* Full-bleed band: body has no horizontal padding (it lives on .shell
+       instead), so a plain 100% width already reaches both viewport edges —
+       no vw-unit/negative-margin trick needed. */
+    width: 100%;
+    margin-top: var(--space-8);
+    background: var(--footer-band-bg);
+    border-top: 1px solid rgba(231, 235, 243, 0.12);
+  }
+  .footer-inner {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: var(--space-6) var(--space-4);
+    text-align: center;
+    /* Footer stays on index.html's dark tokens on purpose — the one
+       deliberate dark note in an otherwise light console, matching the
+       dark band index.html closes on. */
+    color: var(--footer-ink-dim);
+    font-size: var(--text-xs);
+    line-height: 1.6;
+  }
+
+  /* Mobile pass: stack controls instead of relying on incidental wrapping,
+     shrink the display headline so it can't overflow a narrow viewport. */
+  @media (max-width: 480px) {
+    body { padding: var(--space-6) 0 var(--space-8); }
+    .shell { padding: 0 var(--space-3); }
+    .footer-inner { padding: var(--space-6) var(--space-3); }
+    header h1 { font-size: 2.25rem; }
+    .controls-row { flex-direction: column; align-items: stretch; }
+    .humor-row { min-width: 0; }
+    .clear-btn { margin-left: 0; }
+    .chips { flex-direction: column; }
+    .chips button { width: 100%; }
+    .msg-question, .msg-answer { max-width: 95%; }
+  }
+</style>
+</head>
+<body>
+  <div class="shell">
+    <header>
+      <h1>Talkback</h1>
+      <p>Ask a NASA Earth-science question — tropical cyclones, dust storms, drought, wildfires, and more. Grounded in real NASA source material, every time, never a guess.</p>
+    </header>
+
+    <div class="panel">
+      <div class="controls-row">
+        <div class="persona-toggle" role="group" aria-label="Choose a persona">
+          <button type="button" data-persona="baseline" aria-pressed="true">
+            <svg class="persona-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+              <line x1="3" y1="8" x2="13" y2="8" />
+            </svg>
+            Baseline
+          </button>
+          <button type="button" data-persona="banter" aria-pressed="false">
+            <svg class="persona-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+              <path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h9A1.5 1.5 0 0 1 14 4.5v5A1.5 1.5 0 0 1 12.5 11H6l-3 2.5V11H3.5A1.5 1.5 0 0 1 2 9.5z" />
+            </svg>
+            Banter
+          </button>
+        </div>
+        <div class="humor-row" data-disabled="true" id="humorRow">
+          <label for="humor">Humor</label>
+          <input type="range" id="humor" min="0" max="100" value="50" />
+          <output id="humorVal">50</output>
+        </div>
+        <button type="button" class="clear-btn" id="clearBtn" disabled>Clear conversation</button>
+      </div>
+
+      <!-- aria-atomic="false" + aria-relevant="additions" makes explicit what
+           the append-only DOM updates already do: only the newly appended
+           bubble is announced, never the full history or removals (e.g. Clear). -->
+      <div id="log" aria-live="polite" aria-atomic="false" aria-relevant="additions"></div>
+
+      <div class="grounding-strip">
+        <span class="grounding-strip-icon" aria-hidden="true">&#10003;</span>
+        <span>Grounded in the NASA SMD Q&amp;A benchmark corpus — if nothing in it supports an answer, Talkback says so instead of guessing.</span>
+      </div>
+
+      <form id="askForm">
+        <label for="question" class="sr-only" style="position:absolute;left:-9999px;">Your question</label>
+        <input type="text" id="question" placeholder="e.g. What ocean conditions intensify a tropical cyclone?" autocomplete="off" />
+        <button type="submit" class="send" id="sendBtn">Ask</button>
+      </form>
+
+      <div class="chips" id="chips"></div>
+    </div>
+  </div>
+
+  <footer>
+    <div class="footer-inner">
+      Answers are retrieved with IBM Granite embeddings and generated by a
+      watsonx.ai instruct model.
+    </div>
+  </footer>
+
+<script>
+  // Environment-aware backend URL — no hardcoded localhost in production.
+  // Resolution order: localhost dev port -> <meta name="talkback-api-base-url">
+  // (set at deploy time, see the tag in <head>) -> same-origin fallback.
+  const API_BASE_URL = (() => {
+    const { hostname, protocol, host } = window.location;
+    if (hostname === "localhost" || hostname === "127.0.0.1") {
+      return "http://localhost:8000";
+    }
+    const configured = document
+      .querySelector('meta[name="talkback-api-base-url"]')
+      ?.content?.trim();
+    if (configured) {
+      return configured.replace(/\/$/, "");
+    }
+    return `${protocol}//${host}`;
+  })();
+
+  // Matched to what's actually in the ingested corpus (NASA SMD Earth
+  // Science Q&A — tropical cyclones, dust storms, drought, wildfires,
+  // pollution) rather than spacecraft/astronaut topics that aren't there.
+  const SUGGESTED_QUESTIONS = [
+    "What ocean heat conditions favor tropical cyclone intensification?",
+    "How does airborne Saharan dust affect tropical cyclone development?",
+    "How are historical droughts reconstructed from climate data?",
+    "What environmental factors drive wildland fire risk?",
+    "What causes severe mesoscale thunderstorm systems?",
+  ];
+
+  const STORAGE_KEY_PERSONA = "talkback:persona";
+  const STORAGE_KEY_HUMOR = "talkback:humor";
+
+  const state = { persona: "baseline", humor: 50 };
+  let isLoading = false;
+
+  const logEl = document.getElementById("log");
+  const form = document.getElementById("askForm");
+  const questionInput = document.getElementById("question");
+  const sendBtn = document.getElementById("sendBtn");
+  const humorRow = document.getElementById("humorRow");
+  const humorInput = document.getElementById("humor");
+  const humorVal = document.getElementById("humorVal");
+  const chipsEl = document.getElementById("chips");
+  const clearBtn = document.getElementById("clearBtn");
+
+  function loadPersistedSettings() {
+    try {
+      const storedPersona = localStorage.getItem(STORAGE_KEY_PERSONA);
+      const storedHumor = localStorage.getItem(STORAGE_KEY_HUMOR);
+      if (storedPersona === "baseline" || storedPersona === "banter") {
+        state.persona = storedPersona;
+      }
+      if (storedHumor !== null && !Number.isNaN(Number(storedHumor))) {
+        state.humor = Number(storedHumor);
+      }
+    } catch (err) {
+      // localStorage unavailable (private browsing, disabled storage) — defaults stand
+    }
+  }
+
+  function persistSettings() {
+    try {
+      localStorage.setItem(STORAGE_KEY_PERSONA, state.persona);
+      localStorage.setItem(STORAGE_KEY_HUMOR, String(state.humor));
+    } catch (err) {
+      // ignore — nothing to persist to
+    }
+  }
+
+  function applyPersistedSettings() {
+    document.querySelectorAll(".persona-toggle button").forEach((b) => {
+      b.setAttribute("aria-pressed", String(b.dataset.persona === state.persona));
+    });
+    humorRow.dataset.disabled = state.persona === "baseline" ? "true" : "false";
+    humorInput.value = String(state.humor);
+    humorVal.textContent = String(state.humor);
+  }
+
+  loadPersistedSettings();
+  applyPersistedSettings();
+
+  function updateSendButtonState() {
+    sendBtn.disabled = isLoading || questionInput.value.trim().length === 0;
+  }
+
+  function updateClearButtonState() {
+    clearBtn.disabled = logEl.children.length === 0;
+  }
+
+  questionInput.addEventListener("input", updateSendButtonState);
+  updateSendButtonState();
+
+  document.querySelectorAll(".persona-toggle button").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.persona = btn.dataset.persona;
+      document.querySelectorAll(".persona-toggle button").forEach((b) => {
+        b.setAttribute("aria-pressed", String(b === btn));
+      });
+      humorRow.dataset.disabled = state.persona === "baseline" ? "true" : "false";
+      persistSettings();
+    });
+  });
+
+  humorInput.addEventListener("input", () => {
+    state.humor = Number(humorInput.value);
+    humorVal.textContent = String(state.humor);
+    persistSettings();
+  });
+
+  clearBtn.addEventListener("click", () => {
+    logEl.innerHTML = "";
+    updateClearButtonState();
+    questionInput.focus();
+  });
+
+  SUGGESTED_QUESTIONS.forEach((q) => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.textContent = q;
+    chip.addEventListener("click", () => {
+      questionInput.value = q;
+      questionInput.dispatchEvent(new Event("input"));
+      form.requestSubmit();
+    });
+    chipsEl.appendChild(chip);
+  });
+
+  function addQuestionBubble(text) {
+    const el = document.createElement("div");
+    el.className = "msg-question";
+    el.textContent = text;
+    logEl.appendChild(el);
+    logEl.scrollTop = logEl.scrollHeight;
+    updateClearButtonState();
+  }
+
+  function showTypingIndicator() {
+    const el = document.createElement("div");
+    el.className = "msg-answer typing-indicator";
+    el.setAttribute("aria-hidden", "true");
+    const dots = document.createElement("span");
+    dots.className = "typing-dots";
+    for (let i = 0; i < 3; i++) {
+      const dot = document.createElement("span");
+      dot.className = "typing-dot";
+      dots.appendChild(dot);
+    }
+    el.appendChild(dots);
+    logEl.appendChild(el);
+    logEl.scrollTop = logEl.scrollHeight;
+    return el;
+  }
+
+  function confidenceLevel(confidence) {
+    if (confidence >= 0.7) return "high";
+    if (confidence >= 0.4) return "medium";
+    return "low";
+  }
+
+  function addAnswerBubble({ answer, persona, grounded, confidence, source }) {
+    const el = document.createElement("div");
+    el.className = "msg-answer";
+    el.dataset.persona = persona;
+    el.dataset.grounded = String(grounded);
+
+    if (grounded) {
+      el.textContent = answer;
+    } else {
+      const empty = document.createElement("div");
+      empty.className = "empty-state";
+
+      const icon = document.createElement("span");
+      icon.className = "empty-state-icon";
+      icon.setAttribute("aria-hidden", "true");
+      icon.textContent = "∅";
+      empty.appendChild(icon);
+
+      const text = document.createElement("span");
+      text.className = "empty-state-text";
+      text.textContent = answer;
+      empty.appendChild(text);
+
+      el.appendChild(empty);
+    }
+
+    const meta = document.createElement("div");
+    meta.className = "msg-meta";
+
+    const personaTag = document.createElement("span");
+    personaTag.textContent = persona === "banter" ? "Banter" : "Baseline";
+    meta.appendChild(personaTag);
+
+    if (confidence !== null && confidence !== undefined) {
+      const badge = document.createElement("span");
+      badge.className = "confidence-badge";
+      badge.dataset.level = confidenceLevel(confidence);
+      badge.textContent = `confidence ${Math.round(confidence * 100)}%`;
+      meta.appendChild(badge);
+    }
+
+    if (source) {
+      const src = document.createElement("span");
+      src.textContent = `source: ${source}`;
+      meta.appendChild(src);
+    }
+
+    el.appendChild(meta);
+    logEl.appendChild(el);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  function addErrorBubble(text, onRetry) {
+    const el = document.createElement("div");
+    el.className = "msg-answer";
+    el.dataset.grounded = "false";
+
+    const message = document.createElement("div");
+    message.textContent = text;
+    el.appendChild(message);
+
+    if (onRetry) {
+      const retryBtn = document.createElement("button");
+      retryBtn.type = "button";
+      retryBtn.className = "retry-btn";
+      retryBtn.textContent = "Retry";
+      retryBtn.addEventListener("click", () => {
+        el.remove();
+        onRetry();
+      });
+      el.appendChild(retryBtn);
+    }
+
+    logEl.appendChild(el);
+    logEl.scrollTop = logEl.scrollHeight;
+    updateClearButtonState();
+  }
+
+  async function askTalkback(question) {
+    const response = await fetch(`${API_BASE_URL}/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question, persona: state.persona, humor: state.humor }),
+    });
+    if (!response.ok) {
+      throw new Error(`Request failed (${response.status})`);
+    }
+    return response.json();
+  }
+
+  // Shared by the initial send and by the error bubble's Retry button — retry
+  // re-runs the same question without re-adding a question bubble, since the
+  // original one is already in the log.
+  async function submitQuestion(question) {
+    isLoading = true;
+    updateSendButtonState();
+
+    const typingEl = showTypingIndicator();
+
+    try {
+      const data = await askTalkback(question);
+      typingEl.remove();
+      addAnswerBubble(data);
+    } catch (err) {
+      typingEl.remove();
+      addErrorBubble(
+        "Couldn't reach the Talkback backend, is the server running on " + API_BASE_URL + "?",
+        () => submitQuestion(question)
+      );
+      console.error(err);
+    } finally {
+      isLoading = false;
+      updateSendButtonState();
+      questionInput.focus();
+    }
+  }
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const question = questionInput.value.trim();
+    if (!question) return;
+
+    addQuestionBubble(question);
+    questionInput.value = "";
+    await submitQuestion(question);
+  });
+</script>
+</body>
+</html>
