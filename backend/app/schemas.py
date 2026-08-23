@@ -122,17 +122,65 @@ class AskPersona(str, Enum):
     BANTER = "banter"
 
 
+class ConversationRole(str, Enum):
+    """Who said a given turn in a Talkback conversation.
+
+    Only ever set by the server — `POST /ask` accepts a `session_id`, never
+    a `role`, on the way in. Kept as a schema type rather than an inlined
+    raw string so the wire shape and the in-process store
+    (`app.services.memory`) can't drift into disagreeing about what values
+    are valid.
+    """
+
+    USER = "user"
+    ASSISTANT = "assistant"
+
+
+class ConversationTurn(BaseModel):
+    """One turn of a Talkback conversation, held in short-term session memory.
+
+    `persona` and `source` are only ever set on an `ASSISTANT` turn — `None`
+    on every `USER` turn, since a question has no persona or citation of its
+    own, and `None` on an `ASSISTANT` turn that fell back to the honest
+    no-match response, since there's no source to cite there either. This
+    is the same information `AskResponse` already returns for a single
+    answer, plus which side of the conversation said it. `app.services.memory`
+    is what actually holds a list of these per session; this is a schema
+    even though no endpoint returns a list of turns directly yet, so the
+    shape has one definition shared by both.
+    """
+
+    role: ConversationRole
+    content: str = Field(min_length=1)
+    persona: AskPersona | None = None
+    source: str | None = None
+
+
 class AskRequest(BaseModel):
     """Request body for POST /ask.
 
     `humor` only affects `AskPersona.BANTER` — Baseline ignores it
     entirely, since Baseline has no humor dial to turn. Bounded `[0, 100]`
     to match the frontend's slider range.
+
+    `session_id` is how a caller opts into conversational memory
+    (`app.services.memory`): omit it on the first question, then send back
+    whatever `AskResponse.session_id` returned on every follow-up. This
+    lets a later question like "what does it eat?" resolve "it" against
+    what was actually asked and answered before, without the caller
+    re-stating the whole question. An unrecognized or expired `session_id`
+    silently starts a fresh session under that id rather than erroring —
+    see `app.services.memory.get_or_create_session`. Memory only ever
+    changes what a follow-up question is understood to *mean*; it never
+    supplies a fact — every answer is still generated strictly from
+    whatever the current question retrieves, exactly as before this field
+    existed.
     """
 
     question: str = Field(min_length=1)
     persona: AskPersona = AskPersona.BASELINE
     humor: int = Field(default=50, ge=0, le=100)
+    session_id: str | None = None
 
 
 class AskResponse(BaseModel):
@@ -149,6 +197,12 @@ class AskResponse(BaseModel):
     otherwise, same format the rest of this API's retrieval-backed
     responses use.
 
+    `session_id` is always populated — server-generated (`uuid4`) when the
+    request didn't send one, echoed back unchanged otherwise — telling the
+    caller what to send on the next turn to keep continuity. A caller can
+    never set an arbitrary conversation's identity from scratch this way;
+    they can only ever hand back an id this API already issued.
+
     Never a 404: an unmatched question is a valid, honest response (see
     `app.services.talkback.ask_talkback`), not a failure to protect
     against generating an ungrounded guess — the protection already
@@ -160,3 +214,4 @@ class AskResponse(BaseModel):
     grounded: bool
     confidence: float | None = None
     source: str | None = None
+    session_id: str
