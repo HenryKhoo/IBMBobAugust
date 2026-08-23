@@ -401,6 +401,8 @@
   }
   .history-close-btn:hover { color: var(--ink); border-color: var(--ink-dim); }
   .history-close-btn:focus-visible { outline: 2px solid var(--accent-baseline-text); outline-offset: 1px; }
+  .history-close-btn:disabled { opacity: 0.35; cursor: default; }
+  .history-panel-actions { display: flex; gap: var(--space-2); }
   .history-log {
     display: flex;
     flex-direction: column;
@@ -409,6 +411,49 @@
     overflow-y: auto;
     padding-right: var(--space-1);
   }
+  /* Past-conversations list — each row is a real <button> (not a div with a
+     click handler) so the whole row is keyboard-focusable and reachable
+     without extra tabindex plumbing. The per-row delete control is a nested
+     button; its click handler stops propagation so deleting never also
+     opens the row it just removed. */
+  .past-conv-entry {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    width: 100%;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: var(--space-3);
+    text-align: left;
+    cursor: pointer;
+    font: inherit;
+    color: inherit;
+  }
+  .past-conv-entry:hover { border-color: var(--ink-dim); }
+  .past-conv-entry:focus-visible { outline: 2px solid var(--accent-baseline-text); outline-offset: 1px; }
+  .past-conv-entry-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .past-conv-entry-title {
+    font-weight: 600;
+    font-size: var(--text-sm);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .past-conv-entry-meta { font-size: var(--text-xs); color: var(--ink-faint); display: flex; gap: var(--space-2); }
+  .past-conv-delete-btn {
+    flex-shrink: 0;
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--ink-faint);
+    border-radius: 999px;
+    width: 24px;
+    height: 24px;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .past-conv-delete-btn:hover { color: var(--ink); border-color: var(--ink-dim); }
   .recalled-tag {
     display: inline-block;
     padding: 1px var(--space-2);
@@ -559,6 +604,7 @@
           <output id="humorVal">50</output>
         </div>
         <button type="button" class="clear-btn" id="historyBtn" disabled aria-expanded="false">Conversation history</button>
+        <button type="button" class="clear-btn" id="pastConvBtn" aria-expanded="false">Past conversations</button>
         <button type="button" class="clear-btn" id="clearBtn" disabled>Clear conversation</button>
       </div>
 
@@ -574,6 +620,36 @@
           <button type="button" class="history-close-btn" id="closeHistoryBtn">Close</button>
         </div>
         <div class="history-log" id="historyLog" aria-live="polite"></div>
+      </div>
+
+      <!-- Personal conversation list — a device-local index of past sessions
+           (see STORAGE_KEY_CONVERSATIONS below), not a server-side feature:
+           there's no auth here, so a global "all sessions" list would leak
+           across visitors. This only ever lists session ids this browser
+           itself received from a prior /ask response. Two sub-views inside
+           one panel: a list, and a read-only transcript for whichever entry
+           was opened (loaded via the same GET /conversation/history the
+           "Conversation history" panel already uses). -->
+      <div class="history-panel" id="pastConvPanel" hidden>
+        <div class="history-panel-header">
+          <h2>Past conversations</h2>
+          <div class="history-panel-actions">
+            <button type="button" class="history-close-btn" id="clearAllConvBtn">Clear all</button>
+            <button type="button" class="history-close-btn" id="closePastConvBtn">Close</button>
+          </div>
+        </div>
+        <div id="pastConvListView">
+          <div class="history-log past-conv-list" id="pastConvList"></div>
+        </div>
+        <div id="pastConvDetailView" hidden>
+          <div class="history-panel-actions" style="margin-bottom: var(--space-3); flex-wrap: wrap;">
+            <button type="button" class="history-close-btn" id="backToConvListBtn">&larr; Back to list</button>
+            <button type="button" class="history-close-btn" id="resumeConvBtn">Resume this conversation</button>
+            <button type="button" class="history-close-btn" id="deleteConvBtn">Delete</button>
+          </div>
+          <span class="history-source-tag" id="pastConvSourceTag"></span>
+          <div class="history-log" id="pastConvDetailLog" aria-live="polite"></div>
+        </div>
       </div>
 
       <!-- aria-atomic="false" + aria-relevant="additions" makes explicit what
@@ -662,11 +738,189 @@
   const historySourceTag = document.getElementById("historySourceTag");
   const closeHistoryBtn = document.getElementById("closeHistoryBtn");
 
+  const pastConvBtn = document.getElementById("pastConvBtn");
+  const pastConvPanel = document.getElementById("pastConvPanel");
+  const pastConvListView = document.getElementById("pastConvListView");
+  const pastConvList = document.getElementById("pastConvList");
+  const pastConvDetailView = document.getElementById("pastConvDetailView");
+  const pastConvDetailLog = document.getElementById("pastConvDetailLog");
+  const pastConvSourceTag = document.getElementById("pastConvSourceTag");
+  const closePastConvBtn = document.getElementById("closePastConvBtn");
+  const clearAllConvBtn = document.getElementById("clearAllConvBtn");
+  const backToConvListBtn = document.getElementById("backToConvListBtn");
+  const resumeConvBtn = document.getElementById("resumeConvBtn");
+  const deleteConvBtn = document.getElementById("deleteConvBtn");
+
   const HISTORY_SOURCE_LABELS = {
     session_memory: "Live session",
     history_retrieval: "Recovered from earlier",
     none: "No history yet",
   };
+
+  // Device-local index of past conversations — session ids plus enough
+  // metadata to show a readable list, never the transcripts themselves
+  // (those are re-fetched from GET /conversation/history on open, same
+  // source of truth the "Conversation history" panel already uses). This
+  // is a deliberate reversal of sessionId's own "not persisted" comment
+  // above: that decision was about the *live* sessionId variable driving
+  // the active conversation, not about whether a browser may remember
+  // which session ids it has already seen. Capped at
+  // MAX_STORED_CONVERSATIONS so a long-running tab doesn't grow this
+  // list forever.
+  const STORAGE_KEY_CONVERSATIONS = "talkback:conversations";
+  const MAX_STORED_CONVERSATIONS = 20;
+
+  // sessionId of whichever past conversation is currently open in the
+  // detail sub-view — null while the list view is showing. Used by
+  // "Resume" and "Delete" so they act on the entry actually on screen
+  // rather than needing it passed through every call.
+  let activePastConvId = null;
+
+  function loadConversationIndex() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY_CONVERSATIONS);
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (err) {
+      // Malformed JSON or storage unavailable — treat as empty rather than throw.
+      return [];
+    }
+  }
+
+  function saveConversationIndex(list) {
+    try {
+      localStorage.setItem(STORAGE_KEY_CONVERSATIONS, JSON.stringify(list));
+    } catch (err) {
+      // localStorage unavailable (private browsing, disabled storage, quota) —
+      // the list simply won't persist across reloads; nothing to recover from here.
+    }
+  }
+
+  // Called exactly once per brand-new conversation — right after the first
+  // /ask of a session comes back with a server-minted session_id — not on
+  // every subsequent turn of that same conversation. `submitQuestion` is
+  // what decides "new" (sessionId was null going into this call) and passes
+  // the question that started it as the entry's title.
+  function recordNewConversation(sessionId, firstQuestion, persona) {
+    const list = loadConversationIndex().filter((entry) => entry.sessionId !== sessionId);
+    list.unshift({
+      sessionId,
+      startedAt: Date.now(),
+      title: firstQuestion.length > 80 ? `${firstQuestion.slice(0, 77)}…` : firstQuestion,
+      persona,
+    });
+    saveConversationIndex(list.slice(0, MAX_STORED_CONVERSATIONS));
+  }
+
+  function removeStoredConversation(sessionId) {
+    saveConversationIndex(loadConversationIndex().filter((entry) => entry.sessionId !== sessionId));
+  }
+
+  function formatConversationTimestamp(ms) {
+    try {
+      return new Date(ms).toLocaleString(undefined, {
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      });
+    } catch (err) {
+      return "";
+    }
+  }
+
+  function renderPastConvList() {
+    const entries = loadConversationIndex();
+    pastConvList.innerHTML = "";
+
+    if (entries.length === 0) {
+      clearAllConvBtn.disabled = true;
+      const empty = document.createElement("div");
+      empty.className = "empty-state";
+      const icon = document.createElement("span");
+      icon.className = "empty-state-icon";
+      icon.setAttribute("aria-hidden", "true");
+      icon.textContent = "∅";
+      const text = document.createElement("span");
+      text.className = "empty-state-text";
+      text.textContent = "No past conversations on this device yet.";
+      empty.append(icon, text);
+      pastConvList.appendChild(empty);
+      return;
+    }
+
+    clearAllConvBtn.disabled = false;
+    entries.forEach((entry) => {
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className = "past-conv-entry";
+
+      const main = document.createElement("span");
+      main.className = "past-conv-entry-main";
+      const title = document.createElement("span");
+      title.className = "past-conv-entry-title";
+      title.textContent = entry.title || "Untitled conversation";
+      const meta = document.createElement("span");
+      meta.className = "past-conv-entry-meta";
+      const time = document.createElement("span");
+      time.textContent = formatConversationTimestamp(entry.startedAt);
+      const persona = document.createElement("span");
+      persona.textContent = entry.persona === "banter" ? "Banter" : "Baseline";
+      meta.append(time, persona);
+      main.append(title, meta);
+
+      const deleteBtn = document.createElement("button");
+      deleteBtn.type = "button";
+      deleteBtn.className = "past-conv-delete-btn";
+      deleteBtn.setAttribute("aria-label", `Delete conversation: ${entry.title || "Untitled conversation"}`);
+      deleteBtn.textContent = "×";
+      // Deleting is nested inside the row it deletes, so this has to stop
+      // the click from also bubbling up into the row's own "open" handler —
+      // otherwise removing an entry would immediately reopen the one that
+      // used to be underneath it at the same list position.
+      deleteBtn.addEventListener("click", (event) => {
+        event.stopPropagation();
+        removeStoredConversation(entry.sessionId);
+        renderPastConvList();
+      });
+
+      row.append(main, deleteBtn);
+      row.addEventListener("click", () => openPastConversation(entry));
+      pastConvList.appendChild(row);
+    });
+  }
+
+  function showPastConvListView() {
+    activePastConvId = null;
+    pastConvDetailView.hidden = true;
+    pastConvListView.hidden = false;
+    renderPastConvList();
+  }
+
+  async function openPastConversation(entry) {
+    activePastConvId = entry.sessionId;
+    pastConvListView.hidden = true;
+    pastConvDetailView.hidden = false;
+    pastConvSourceTag.textContent = "";
+    pastConvDetailLog.innerHTML = "";
+    const loading = document.createElement("p");
+    loading.className = "empty-state-text";
+    loading.textContent = "Loading…";
+    pastConvDetailLog.appendChild(loading);
+
+    try {
+      const data = await loadConversationHistory(entry.sessionId);
+      pastConvSourceTag.textContent = HISTORY_SOURCE_LABELS[data.source] || data.source;
+      renderHistoryTurns(data.turns, pastConvDetailLog);
+    } catch (err) {
+      pastConvDetailLog.innerHTML = "";
+      const errEl = document.createElement("p");
+      errEl.className = "empty-state-text";
+      errEl.textContent = "Couldn't load this conversation.";
+      pastConvDetailLog.appendChild(errEl);
+      console.error(err);
+    }
+  }
 
   function loadPersistedSettings() {
     try {
@@ -750,13 +1004,18 @@
     questionInput.focus();
   });
 
-  function renderHistoryTurns(turns) {
-    historyLog.innerHTML = "";
+  // `target` defaults to the "Conversation history" panel's own log, but is
+  // passed explicitly by the past-conversations detail view (and by
+  // "Resume", which replays a past transcript into the live `#log`) so all
+  // three surfaces render a transcript identically instead of maintaining
+  // three copies of this markup.
+  function renderHistoryTurns(turns, target = historyLog) {
+    target.innerHTML = "";
     if (turns.length === 0) {
       const empty = document.createElement("p");
       empty.className = "empty-state-text";
       empty.textContent = "Nothing recorded for this conversation yet.";
-      historyLog.appendChild(empty);
+      target.appendChild(empty);
       return;
     }
     turns.forEach((turn) => {
@@ -778,7 +1037,7 @@
         }
         el.appendChild(meta);
       }
-      historyLog.appendChild(el);
+      target.appendChild(el);
     });
   }
 
@@ -800,6 +1059,11 @@
       historyBtn.setAttribute("aria-expanded", "false");
       return;
     }
+
+    // Only one browse surface open at a time — closing this one's counterpart
+    // avoids two panels stacked in the same narrow column.
+    pastConvPanel.hidden = true;
+    pastConvBtn.setAttribute("aria-expanded", "false");
 
     historyPanel.hidden = false;
     historyBtn.setAttribute("aria-expanded", "true");
@@ -827,6 +1091,72 @@
   closeHistoryBtn.addEventListener("click", () => {
     historyPanel.hidden = true;
     historyBtn.setAttribute("aria-expanded", "false");
+  });
+
+  pastConvBtn.addEventListener("click", () => {
+    if (!pastConvPanel.hidden) {
+      pastConvPanel.hidden = true;
+      pastConvBtn.setAttribute("aria-expanded", "false");
+      return;
+    }
+
+    // Only one browse surface open at a time — see the matching close in
+    // the historyBtn handler above.
+    historyPanel.hidden = true;
+    historyBtn.setAttribute("aria-expanded", "false");
+
+    pastConvPanel.hidden = false;
+    pastConvBtn.setAttribute("aria-expanded", "true");
+    showPastConvListView();
+  });
+
+  closePastConvBtn.addEventListener("click", () => {
+    pastConvPanel.hidden = true;
+    pastConvBtn.setAttribute("aria-expanded", "false");
+  });
+
+  clearAllConvBtn.addEventListener("click", () => {
+    saveConversationIndex([]);
+    renderPastConvList();
+  });
+
+  backToConvListBtn.addEventListener("click", showPastConvListView);
+
+  // Loads the selected past conversation's real transcript into the live
+  // `#log` (same rendering `renderHistoryTurns` already does for the
+  // read-only panels) before handing its session_id to `state.sessionId`,
+  // so the next question the user actually asks continues that
+  // conversation's server-side memory instead of quietly starting a new one
+  // under a stale-looking log. If the transcript fails to load, resuming
+  // still proceeds — the backend's own memory doesn't depend on what the
+  // browser could redisplay.
+  resumeConvBtn.addEventListener("click", async () => {
+    if (!activePastConvId) return;
+    try {
+      const data = await loadConversationHistory(activePastConvId);
+      renderHistoryTurns(data.turns, logEl);
+    } catch (err) {
+      console.error(err);
+    }
+    state.sessionId = activePastConvId;
+    updateClearButtonState();
+    updateHistoryButtonState();
+    pastConvPanel.hidden = true;
+    pastConvBtn.setAttribute("aria-expanded", "false");
+    questionInput.focus();
+  });
+
+  deleteConvBtn.addEventListener("click", () => {
+    if (!activePastConvId) return;
+    removeStoredConversation(activePastConvId);
+    // Deleting the conversation that's also the live one ends it client-side
+    // too — matches "Clear conversation" — otherwise the next question would
+    // silently resurrect the same entry this delete just removed.
+    if (state.sessionId === activePastConvId) {
+      state.sessionId = null;
+      updateHistoryButtonState();
+    }
+    showPastConvListView();
   });
 
   SUGGESTED_QUESTIONS.forEach((q) => {
@@ -989,6 +1319,10 @@
     isLoading = true;
     updateSendButtonState();
 
+    // Captured before the request, not after: a mid-conversation retry
+    // (sessionId already set) must never re-record an entry that's already
+    // in the list, so this has to reflect state as it was going in.
+    const isNewConversation = !state.sessionId;
     const typingEl = showTypingIndicator();
 
     try {
@@ -997,6 +1331,9 @@
       addAnswerBubble(data);
       state.sessionId = data.session_id;
       updateHistoryButtonState();
+      if (isNewConversation) {
+        recordNewConversation(data.session_id, question, state.persona);
+      }
     } catch (err) {
       typingEl.remove();
       addErrorBubble(
