@@ -7,18 +7,24 @@
 <style>
   :root {
     --bg: #0b0e14;
-    --panel: #12161f;
-    --panel-2: #171c28;
-    --line: #232a3a;
+    --panel: #171d29;
+    --panel-2: #1d2433;
+    --line: #545f75;
     --ink: #e7ebf3;
     --ink-dim: #9aa4b8;
-    --ink-faint: #5d6579;
+    --ink-faint: #838b9e;
     --accent-baseline: #5fb0c9;
     --accent-baseline-wash: rgba(95, 176, 201, 0.16);
     --accent-banter: #e0a458;
     --accent-banter-wash: rgba(224, 164, 88, 0.16);
     --radius: 10px;
-    --shadow-md: 0 4px 16px rgb(0 0 0 / 0.35);
+    /* Tinted, layered elevation scale (near-black tint, 2-3 stacked layers per level) */
+    --shadow-xs: 0 1px 2px rgb(20 20 19 / 0.30);
+    --shadow-sm: 0 1px 2px rgb(20 20 19 / 0.24), 0 3px 6px rgb(20 20 19 / 0.20);
+    --shadow-md: 0 2px 4px rgb(20 20 19 / 0.20), 0 8px 16px rgb(20 20 19 / 0.24),
+      0 16px 32px rgb(20 20 19 / 0.16);
+    --shadow-lg: 0 4px 8px rgb(20 20 19 / 0.22), 0 12px 24px rgb(20 20 19 / 0.28),
+      0 24px 48px rgb(20 20 19 / 0.20);
   }
   * { box-sizing: border-box; }
   body {
@@ -141,6 +147,7 @@
   }
   .msg-answer {
     align-self: flex-start;
+    background: var(--panel-2);
     border-radius: var(--radius);
     padding: 12px 14px;
     max-width: 90%;
@@ -168,7 +175,7 @@
     display: inline-block;
     padding: 1px 7px;
     border-radius: 999px;
-    background: var(--panel-2);
+    background: var(--panel);
     border: 1px solid var(--line);
   }
 
@@ -214,7 +221,7 @@
   .chips button:hover {
     color: var(--ink);
     transform: translateY(-3px);
-    box-shadow: 0 10px 22px rgb(0 0 0 / 0.4);
+    box-shadow: var(--shadow-lg);
   }
 
   footer {
