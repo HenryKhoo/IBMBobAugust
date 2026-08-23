@@ -228,6 +228,29 @@
   }
   .team-card h3 { margin: 0 0 var(--space-2); font-size: 1.1rem; font-weight: 700; }
   .team-card p { margin: 0; color: var(--ink-dim); font-size: 0.9rem; line-height: 1.6; }
+  .team-social { margin-top: var(--space-4); }
+  .team-social a {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    color: var(--ink);
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+  .team-social a:hover { color: var(--accent-baseline); }
+  .team-social svg { width: 22px; height: 22px; flex-shrink: 0; }
+
+  .ref-list { margin: 0; padding: 0; list-style: none; }
+  .ref-list li {
+    padding: var(--space-4) 0;
+    border-top: 1px solid var(--line);
+    color: var(--ink-dim);
+    font-size: 0.92rem;
+    line-height: 1.6;
+  }
+  .ref-list li:first-child { border-top: none; padding-top: 0; }
+  .ref-list a { color: var(--accent-baseline); word-break: break-word; }
 
   @media (max-width: 900px) {
     .hero { grid-template-columns: 1fr; }
@@ -379,6 +402,15 @@
             MSc in Computer Engineering, Politechnika Wrocławska, Poland<br />
             BSc in Computer Science, Asia Pacific University, Malaysia
           </p>
+          <p class="team-social">
+            <a href="https://www.linkedin.com/in/henry-khoo/" target="_blank" rel="noopener noreferrer">
+              <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <circle cx="12" cy="12" r="12" fill="#0A66C2"/>
+                <path fill="#fff" d="M8.34 9.75H5.62V18h2.72V9.75zM6.98 8.6a1.58 1.58 0 1 0 0-3.16 1.58 1.58 0 0 0 0 3.16zM18.75 18h-2.72v-4.36c0-1.04-.02-2.38-1.45-2.38-1.45 0-1.67 1.13-1.67 2.3V18H10.2V9.75h2.61v1.13h.04c.36-.68 1.25-1.4 2.57-1.4 2.75 0 3.26 1.81 3.26 4.16V18z"/>
+              </svg>
+              LinkedIn
+            </a>
+          </p>
         </article>
         <article class="team-card">
           <h3>Laura Lai</h3>
@@ -386,8 +418,25 @@
             MSc in Computer Engineering, Politechnika Wrocławska, Poland<br />
             BSc in Computer Science, Asia Pacific University, Malaysia
           </p>
+          <p class="team-social">
+            <a href="https://www.linkedin.com/in/laurajiayinglai/" target="_blank" rel="noopener noreferrer">
+              <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <circle cx="12" cy="12" r="12" fill="#0A66C2"/>
+                <path fill="#fff" d="M8.34 9.75H5.62V18h2.72V9.75zM6.98 8.6a1.58 1.58 0 1 0 0-3.16 1.58 1.58 0 0 0 0 3.16zM18.75 18h-2.72v-4.36c0-1.04-.02-2.38-1.45-2.38-1.45 0-1.67 1.13-1.67 2.3V18H10.2V9.75h2.61v1.13h.04c.36-.68 1.25-1.4 2.57-1.4 2.75 0 3.26 1.81 3.26 4.16V18z"/>
+              </svg>
+              LinkedIn
+            </a>
+          </p>
         </article>
       </div>
+
+      <div class="section-eyebrow" style="margin-top: var(--space-10);">References</div>
+      <ol class="ref-list">
+        <li>Tony, L. A., Ganesan, H., Sangeetha, G. R., Amritha, A., Durairaj, R., Chaman, J. J., &amp; Padmakumar, E. S. (2025). Building a standalone AI assistant for deep space exploration. <em>Space Education and Strategic Applications, 5</em>(2), 43–57. <a href="https://doi.org/10.18278/sesa.5.2.7" target="_blank" rel="noopener noreferrer">https://doi.org/10.18278/sesa.5.2.7</a></li>
+        <li>Fraser, "Short jokes dataset," Hugging Face, [Online]. Available: <a href="https://huggingface.co/datasets/Fraser/short-jokes" target="_blank" rel="noopener noreferrer">https://huggingface.co/datasets/Fraser/short-jokes</a>. [Accessed: Aug. 23, 2026].</li>
+        <li>NASA IMPACT, "NASA SMD QA benchmark dataset," Hugging Face, [Online]. Available: <a href="https://huggingface.co/datasets/nasa-impact/nasa-smd-qa-benchmark" target="_blank" rel="noopener noreferrer">https://huggingface.co/datasets/nasa-impact/nasa-smd-qa-benchmark</a>. [Accessed: Aug. 23, 2026].</li>
+        <li>C. Nolan, Director, <em>Interstellar</em>. Paramount Pictures / Warner Bros. Pictures, 2014.</li>
+      </ol>
     </section>
 
     <section class="band">
