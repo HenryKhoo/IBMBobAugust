@@ -148,6 +148,19 @@
   .humor-row output { font-size: var(--text-sm); color: var(--ink-dim); width: 30px; text-align: right; }
   .humor-row[data-disabled="true"] { opacity: 0.35; pointer-events: none; }
 
+  .clear-btn {
+    margin-left: auto;
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--ink-dim);
+    border-radius: var(--radius);
+    padding: var(--space-2) var(--space-3);
+    font-size: var(--text-sm);
+    cursor: pointer;
+  }
+  .clear-btn:hover:not(:disabled) { color: var(--ink); border-color: var(--ink-dim); }
+  .clear-btn:disabled { opacity: 0.35; cursor: default; }
+
   #log {
     display: flex;
     flex-direction: column;
@@ -204,6 +217,24 @@
   }
   .empty-state-text {
     color: var(--ink-dim);
+  }
+  .typing-indicator { padding: var(--space-3) var(--space-4); }
+  .typing-dots { display: inline-flex; gap: var(--space-1); align-items: center; }
+  .typing-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--ink-faint);
+    animation: typing-bounce 1.2s infinite ease-in-out;
+  }
+  .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes typing-bounce {
+    0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
+    30% { transform: translateY(-4px); opacity: 1; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .typing-dot { animation: none; opacity: 0.7; }
   }
   .msg-meta {
     margin-top: var(--space-2);
@@ -327,6 +358,7 @@
           <input type="range" id="humor" min="0" max="100" value="50" />
           <output id="humorVal">50</output>
         </div>
+        <button type="button" class="clear-btn" id="clearBtn" disabled>Clear conversation</button>
       </div>
 
       <div id="log" aria-live="polite"></div>
@@ -365,7 +397,11 @@
     "What causes severe mesoscale thunderstorm systems?",
   ];
 
+  const STORAGE_KEY_PERSONA = "talkback:persona";
+  const STORAGE_KEY_HUMOR = "talkback:humor";
+
   const state = { persona: "baseline", humor: 50 };
+  let isLoading = false;
 
   const logEl = document.getElementById("log");
   const form = document.getElementById("askForm");
@@ -375,6 +411,54 @@
   const humorInput = document.getElementById("humor");
   const humorVal = document.getElementById("humorVal");
   const chipsEl = document.getElementById("chips");
+  const clearBtn = document.getElementById("clearBtn");
+
+  function loadPersistedSettings() {
+    try {
+      const storedPersona = localStorage.getItem(STORAGE_KEY_PERSONA);
+      const storedHumor = localStorage.getItem(STORAGE_KEY_HUMOR);
+      if (storedPersona === "baseline" || storedPersona === "banter") {
+        state.persona = storedPersona;
+      }
+      if (storedHumor !== null && !Number.isNaN(Number(storedHumor))) {
+        state.humor = Number(storedHumor);
+      }
+    } catch (err) {
+      // localStorage unavailable (private browsing, disabled storage) — defaults stand
+    }
+  }
+
+  function persistSettings() {
+    try {
+      localStorage.setItem(STORAGE_KEY_PERSONA, state.persona);
+      localStorage.setItem(STORAGE_KEY_HUMOR, String(state.humor));
+    } catch (err) {
+      // ignore — nothing to persist to
+    }
+  }
+
+  function applyPersistedSettings() {
+    document.querySelectorAll(".persona-toggle button").forEach((b) => {
+      b.setAttribute("aria-pressed", String(b.dataset.persona === state.persona));
+    });
+    humorRow.dataset.disabled = state.persona === "baseline" ? "true" : "false";
+    humorInput.value = String(state.humor);
+    humorVal.textContent = String(state.humor);
+  }
+
+  loadPersistedSettings();
+  applyPersistedSettings();
+
+  function updateSendButtonState() {
+    sendBtn.disabled = isLoading || questionInput.value.trim().length === 0;
+  }
+
+  function updateClearButtonState() {
+    clearBtn.disabled = logEl.children.length === 0;
+  }
+
+  questionInput.addEventListener("input", updateSendButtonState);
+  updateSendButtonState();
 
   document.querySelectorAll(".persona-toggle button").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -383,12 +467,20 @@
         b.setAttribute("aria-pressed", String(b === btn));
       });
       humorRow.dataset.disabled = state.persona === "baseline" ? "true" : "false";
+      persistSettings();
     });
   });
 
   humorInput.addEventListener("input", () => {
     state.humor = Number(humorInput.value);
     humorVal.textContent = String(state.humor);
+    persistSettings();
+  });
+
+  clearBtn.addEventListener("click", () => {
+    logEl.innerHTML = "";
+    updateClearButtonState();
+    questionInput.focus();
   });
 
   SUGGESTED_QUESTIONS.forEach((q) => {
@@ -397,6 +489,7 @@
     chip.textContent = q;
     chip.addEventListener("click", () => {
       questionInput.value = q;
+      questionInput.dispatchEvent(new Event("input"));
       form.requestSubmit();
     });
     chipsEl.appendChild(chip);
@@ -408,6 +501,24 @@
     el.textContent = text;
     logEl.appendChild(el);
     logEl.scrollTop = logEl.scrollHeight;
+    updateClearButtonState();
+  }
+
+  function showTypingIndicator() {
+    const el = document.createElement("div");
+    el.className = "msg-answer typing-indicator";
+    el.setAttribute("aria-hidden", "true");
+    const dots = document.createElement("span");
+    dots.className = "typing-dots";
+    for (let i = 0; i < 3; i++) {
+      const dot = document.createElement("span");
+      dot.className = "typing-dot";
+      dots.appendChild(dot);
+    }
+    el.appendChild(dots);
+    logEl.appendChild(el);
+    logEl.scrollTop = logEl.scrollHeight;
+    return el;
   }
 
   function confidenceLevel(confidence) {
@@ -496,18 +607,24 @@
 
     addQuestionBubble(question);
     questionInput.value = "";
-    sendBtn.disabled = true;
+    isLoading = true;
+    updateSendButtonState();
+
+    const typingEl = showTypingIndicator();
 
     try {
       const data = await askTalkback(question);
+      typingEl.remove();
       addAnswerBubble(data);
     } catch (err) {
+      typingEl.remove();
       addErrorBubble(
         "Couldn't reach the Talkback backend, is the server running on " + API_BASE_URL + "?"
       );
       console.error(err);
     } finally {
-      sendBtn.disabled = false;
+      isLoading = false;
+      updateSendButtonState();
       questionInput.focus();
     }
   });
