@@ -96,6 +96,20 @@ def test_relevance_score_hits_or_empty_reraises_unrelated_value_errors():
         )
 
 
+def test_escape_expr_string_literal_escapes_single_quotes():
+    assert vector_store.escape_expr_string_literal("abc'def") == "abc\\'def"
+
+
+def test_escape_expr_string_literal_escapes_backslashes_before_quotes():
+    # backslash escaped first, so an attacker can't pre-seed a `\'` that
+    # would be read back as an already-escaped (and thus unescaped) quote.
+    assert vector_store.escape_expr_string_literal("a\\'b") == "a\\\\\\'b"
+
+
+def test_escape_expr_string_literal_is_a_no_op_on_a_plain_value():
+    assert vector_store.escape_expr_string_literal("session-abc-123") == "session-abc-123"
+
+
 def test_relevance_score_hits_or_empty_passes_through_real_hits():
     fake_store = _FakeZillizStore(ids=[])  # unused here, just needs the right method
     fake_store.similarity_search_with_relevance_scores = lambda query, **kwargs: [

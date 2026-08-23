@@ -156,6 +156,58 @@ class ConversationTurn(BaseModel):
     source: str | None = None
 
 
+class HistorySource(str, Enum):
+    """How a Talkback answer's conversational context was resolved.
+
+    Orthogonal to `AskResponse.grounded`/`confidence`, which describe the
+    *answer* — this describes the *question's* interpretation instead. The
+    answer itself is always generated strictly from a freshly retrieved
+    `science_reference` passage (see `app.services.talkback`'s module
+    docstring); history is never a source of facts, only of context for
+    resolving a follow-up's pronouns and implicit subject.
+
+    - `NONE`: no prior turns available — either the first question of a
+      session, or an unrecognized `session_id` with nothing recoverable.
+    - `SESSION_MEMORY`: resolved against the live, in-process sliding
+      window (`app.services.memory.ConversationSession`) — the common
+      case for an active, ongoing conversation.
+    - `HISTORY_RETRIEVAL`: the in-process window was empty (an
+      unrecognized or evicted `session_id`, or a fresh process after a
+      restart) but grounded exchanges from earlier in that same session
+      were recovered from Zilliz's long-term store instead. Recall is
+      scoped to the caller's own `session_id` — never a cross-session
+      search — so one visitor's questions never surface as context in
+      another visitor's conversation.
+    """
+
+    NONE = "none"
+    SESSION_MEMORY = "session_memory"
+    HISTORY_RETRIEVAL = "history_retrieval"
+
+
+class ConversationHistoryResponse(BaseModel):
+    """Response body for GET /conversation/history.
+
+    `turns` is ordered oldest-first, same as `ConversationTurn` everywhere
+    else in this API. `source` reports where this transcript came from —
+    see `HistorySource` — so a caller (the frontend's Conversation History
+    panel) can tell "this is the live conversation" apart from "this is a
+    resumed transcript recovered from long-term storage," and render an
+    honest empty state when `source` is `NONE` rather than assuming a typo
+    in the `session_id`.
+
+    Only ever reflects grounded exchanges once a session's in-process
+    memory is gone (see `app.services.memory.persist_grounded_exchange`) —
+    a fallback "no grounded answer" turn is never written to long-term
+    storage, so it will not reappear here after the live session expires,
+    even though it *is* visible while the session is still in memory.
+    """
+
+    session_id: str
+    turns: list[ConversationTurn]
+    source: HistorySource
+
+
 class AskRequest(BaseModel):
     """Request body for POST /ask.
 
@@ -207,6 +259,13 @@ class AskResponse(BaseModel):
     `app.services.talkback.ask_talkback`), not a failure to protect
     against generating an ungrounded guess — the protection already
     happened, that *is* what the fallback response is.
+
+    `history_source` is always populated and reports how (if at all) prior
+    turns shaped the interpretation of this question — see `HistorySource`.
+    It is informational, not a trust signal: it never changes what
+    `confidence` or `grounded` mean, since the answer itself is always
+    generated fresh from a retrieved passage regardless of where the
+    surrounding conversational context came from.
     """
 
     answer: str
@@ -215,3 +274,4 @@ class AskResponse(BaseModel):
     confidence: float | None = None
     source: str | None = None
     session_id: str
+    history_source: HistorySource = HistorySource.NONE

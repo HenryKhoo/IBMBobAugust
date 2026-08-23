@@ -81,6 +81,25 @@ def upsert_chunks(texts: list[str], metadatas: list[dict]) -> int:
     return len(ids)
 
 
+def escape_expr_string_literal(value: str) -> str:
+    """Escape a value for safe interpolation into a Milvus boolean `expr` string.
+
+    Every `expr` filter in this codebase used to be a fixed literal (e.g.
+    `"doc_type == 'science_reference'"`) — no request ever supplied the
+    value going inside the quotes. `app.services.memory`'s session-scoped
+    history recall is the first `expr` built from caller-controlled input
+    (`session_id`, which `app.services.memory.get_or_create_session`
+    deliberately accepts as an arbitrary string and treats an unrecognized
+    one as valid). Without escaping, a `session_id` containing a `'` could
+    break out of the string literal and rewrite the filter — e.g. drop the
+    `doc_id == '...'` clause entirely and turn a session-scoped recall into
+    a search across every session's history, exactly the cross-visitor
+    leakage this filter exists to prevent. Backslash is escaped first so an
+    already-escaped quote can't be re-interpreted.
+    """
+    return value.replace("\\", "\\\\").replace("'", "\\'")
+
+
 def relevance_score_hits_or_empty(store, query: str, *, k: int, expr: str) -> list[tuple]:
     try:
         return store.similarity_search_with_relevance_scores(query, k=k, expr=expr)
