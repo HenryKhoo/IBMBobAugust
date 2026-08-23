@@ -92,6 +92,21 @@
     padding: var(--space-8) 0 var(--space-16);
   }
   .shell { width: 100%; max-width: 720px; padding: 0 var(--space-4); }
+
+  /* Wordmark, matched to index.html's .logo so the two pages read as one
+     product — "NORTH STAR" stays the constant, the span names the page. */
+  .app-nav { padding-top: var(--space-1); }
+  .logo {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--space-2);
+    font-size: 1.1rem;
+    text-decoration: none;
+  }
+  .logo b { font-weight: 800; letter-spacing: -0.02em; color: var(--ink); }
+  .logo span { font-weight: 400; color: var(--ink-dim); letter-spacing: 0.04em; }
+  .logo:focus-visible { outline: 2px solid var(--accent-baseline-text); outline-offset: 2px; border-radius: 4px; }
+
   header {
     position: relative;
     text-align: center;
@@ -434,6 +449,9 @@
 </head>
 <body>
   <div class="shell">
+    <div class="app-nav">
+      <a class="logo" href="index.html"><b>NORTH STAR</b><span>TALKBACK</span></a>
+    </div>
     <header>
       <h1>Talkback</h1>
       <p>Ask a NASA Earth-science question — tropical cyclones, dust storms, drought, wildfires, and more. Grounded in real NASA source material, every time, never a guess.</p>
