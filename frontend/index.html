@@ -157,6 +157,75 @@
     text-align: left;
   }
 
+  /* Content sections — Technology & Modules, Mission, Team */
+  .content-section { padding: var(--space-20) 0; border-top: 1px solid var(--line); }
+  .section-eyebrow {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent-baseline);
+    margin: 0 0 var(--space-3);
+  }
+  .content-section h2 {
+    font-size: clamp(1.8rem, 3.2vw, 2.4rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    margin: 0 0 var(--space-8);
+    max-width: 30ch;
+  }
+
+  .tech-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-6); }
+  .tech-card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: var(--space-6);
+    box-shadow: 0 20px 40px rgba(20, 30, 50, 0.06);
+  }
+  .tech-card h3 { margin: 0 0 var(--space-3); font-size: 1.15rem; font-weight: 700; letter-spacing: -0.01em; }
+  .tech-card p { margin: 0 0 var(--space-3); color: var(--ink-dim); font-size: 0.92rem; line-height: 1.6; }
+  .tech-card p:last-child { margin-bottom: 0; }
+  .tech-card a { color: var(--accent-baseline); }
+  .tech-card .tag {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--accent-banter);
+    margin-bottom: var(--space-2);
+  }
+
+  .mission-detail p {
+    color: var(--ink-dim);
+    font-size: 1.05rem;
+    line-height: 1.65;
+    max-width: 62ch;
+    margin: 0 0 var(--space-4);
+  }
+  .mission-detail p:last-child { margin-bottom: 0; }
+
+  .team-tagline {
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    margin: 0 0 var(--space-6);
+  }
+  .team-card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: var(--space-6);
+    max-width: 460px;
+    box-shadow: 0 20px 40px rgba(20, 30, 50, 0.06);
+  }
+  .team-card h3 { margin: 0 0 var(--space-2); font-size: 1.1rem; font-weight: 700; }
+  .team-card p { margin: 0; color: var(--ink-dim); font-size: 0.9rem; line-height: 1.6; }
+
   @media (max-width: 900px) {
     .hero { grid-template-columns: 1fr; }
     .star-wrap { position: static; width: 100%; height: 320px; margin-top: var(--space-6); }
@@ -164,6 +233,8 @@
     .band { grid-template-columns: 1fr; }
     .band p { justify-self: start; }
     .nav-links { display: none; }
+    .tech-grid { grid-template-columns: 1fr; }
+    .content-section { padding: var(--space-16) 0; }
   }
 </style>
 </head>
@@ -234,6 +305,78 @@
           </g>
         </svg>
       </div>
+    </section>
+
+    <section class="content-section" id="technology">
+      <div class="section-eyebrow">Technology &amp; Modules</div>
+      <h2>What's running under the console</h2>
+      <div class="tech-grid">
+        <article class="tech-card" id="modules">
+          <span class="tag">Module</span>
+          <h3>Talkback</h3>
+          <p>
+            Two expert assistants in Deep Space, each with a different
+            personality: <b>Baseline</b> and <b>Banter</b>.
+          </p>
+          <p>
+            <b>Baseline</b> — no humor, direct. States the fact and cites
+            the source paragraph. <b>Banter</b> — high humor. The same fact,
+            presented as commentary with jokes.
+          </p>
+          <p>
+            Trained on datasets from NASA SMD and IBM Research's
+            <a href="https://huggingface.co/datasets/nasa-impact/nasa-smd-qa-benchmark" target="_blank" rel="noopener">NASA-SMD QA benchmark</a>,
+            and <a href="https://huggingface.co/datasets/Fraser/short-jokes" target="_blank" rel="noopener">short-jokes</a>
+            for Banter's tone.
+          </p>
+          <p>
+            Talkback processes everything on the client side, drawing from
+            a fixed set of 117 NASA datasets.
+          </p>
+        </article>
+        <article class="tech-card">
+          <span class="tag">Dev tool</span>
+          <h3>IBM Bob</h3>
+          <p>
+            The core development tool, used in plan mode for turning ideas
+            into a product requirements document (PRD).
+          </p>
+        </article>
+        <article class="tech-card">
+          <span class="tag">Engine</span>
+          <h3>IBM Granite</h3>
+          <p>
+            The AI LLM model that serves as Talkback's main engine.
+          </p>
+        </article>
+      </div>
+    </section>
+
+    <section class="content-section mission-detail" id="mission">
+      <div class="section-eyebrow">Mission</div>
+      <h2>Grounded answers, not guesses</h2>
+      <p>
+        The North Star turns noisy telemetry, scattered symptoms, and
+        shifting supply numbers into one clear, grounded answer — so a crew
+        in crisis knows what to do next, immediately.
+      </p>
+      <p>
+        Every answer is retrieved from mission documents and grounded with
+        IBM watsonx.ai and Granite embeddings, never a guess, and always
+        traceable back to the source it came from.
+      </p>
+    </section>
+
+    <section class="content-section team" id="team">
+      <div class="section-eyebrow">Team</div>
+      <p class="team-tagline">Representing from Malaysia. Malaysia, Truly Asia. 🇲🇾</p>
+      <article class="team-card">
+        <h3>Henry Shien Chen Khoo</h3>
+        <p>
+          MSc in Computer Engineering, Politechnika Wrocławska, Poland<br />
+          BSc in Computer Science, Asia Pacific University, Malaysia
+        </p>
+      </article>
     </section>
 
     <section class="band">
