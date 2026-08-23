@@ -6,7 +6,7 @@ load_dotenv(override=True)
 
 
 class Settings:
-    APP_NAME: str = "Talkback"
+    APP_NAME: str = "ChortleChat"
 
     WATSONX_API_KEY: str = os.getenv("WATSONX_API_KEY", "")
     WATSONX_PROJECT_ID: str = os.getenv("WATSONX_PROJECT_ID", "")
@@ -17,7 +17,7 @@ class Settings:
 
     ZILLIZ_URI: str = os.getenv("ZILLIZ_URI", "")
     ZILLIZ_TOKEN: str = os.getenv("ZILLIZ_TOKEN", "")
-    ZILLIZ_COLLECTION_NAME: str = os.getenv("ZILLIZ_COLLECTION_NAME", "talkback")
+    ZILLIZ_COLLECTION_NAME: str = os.getenv("ZILLIZ_COLLECTION_NAME", "chortlechat")
 
     PORT: int = int(os.getenv("PORT", "8000"))
 

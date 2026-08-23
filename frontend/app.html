@@ -10,8 +10,8 @@
      fall back to same-origin (correct if the backend is reverse-proxied
      onto the same host as this page). Localhost dev always uses :8000
      regardless of this tag. -->
-<meta name="talkback-api-base-url" content="" />
-<title>Talkback — grounded space Q&amp;A</title>
+<meta name="chortlechat-api-base-url" content="" />
+<title>ChortleChat — grounded space Q&amp;A</title>
 <style>
   :root {
     /* Light system, matched to index.html's landing palette so the console
@@ -66,7 +66,7 @@
     --text-base: 0.875rem;
     --text-md: 0.9375rem;
     --text-display: 3.2rem;
-    /* Spacing scale, 4px base (matches talkback-proposal.md §6) */
+    /* Spacing scale, 4px base (matches chortlechat-proposal.md §6) */
     --space-1: 4px;
     --space-2: 8px;
     --space-3: 12px;
@@ -807,12 +807,12 @@
         <button type="button" class="sidebar-toggle-btn" id="sidebarToggleBtn" aria-expanded="true" aria-controls="sidebar">
           <span aria-hidden="true">&#9776;</span> Sessions
         </button>
-        <a class="logo" href="index.html"><b>NORTH STAR</b><span>TALKBACK</span></a>
+        <a class="logo" href="index.html"><b>NORTH STAR</b><span>CHORTLECHAT</span></a>
       </div>
       <a class="landing-link" href="index.html">&larr; Landing Page</a>
     </div>
     <header>
-      <h1>Talkback</h1>
+      <h1>ChortleChat</h1>
       <p>Ask a NASA Earth-science question — tropical cyclones, dust storms, drought, wildfires, and more. Grounded in real NASA source material, every time, never a guess.</p>
     </header>
 
@@ -898,7 +898,7 @@
 
       <div class="grounding-strip">
         <span class="grounding-strip-icon" aria-hidden="true">&#10003;</span>
-        <span>Grounded in the NASA SMD Q&amp;A benchmark corpus — if nothing in it supports an answer, Talkback says so instead of guessing.</span>
+        <span>Grounded in the NASA SMD Q&amp;A benchmark corpus — if nothing in it supports an answer, ChortleChat says so instead of guessing.</span>
       </div>
 
       <form id="askForm">
@@ -923,7 +923,7 @@
   // Environment-aware backend URL — no hardcoded localhost in production.
   // Resolution order: localhost dev port (including opening this file
   // directly, protocol "file:", which has an empty hostname) ->
-  // <meta name="talkback-api-base-url"> (set at deploy time, see the tag
+  // <meta name="chortlechat-api-base-url"> (set at deploy time, see the tag
   // in <head>) -> same-origin fallback.
   const API_BASE_URL = (() => {
     const { hostname, protocol, host } = window.location;
@@ -931,7 +931,7 @@
       return "http://localhost:8000";
     }
     const configured = document
-      .querySelector('meta[name="talkback-api-base-url"]')
+      .querySelector('meta[name="chortlechat-api-base-url"]')
       ?.content?.trim();
     if (configured) {
       return configured.replace(/\/$/, "");
@@ -945,7 +945,7 @@
   // no backend counterpart: it means "no domain filter", the same
   // whole-corpus behavior the console had before domains existed, and is
   // simply omitted from the request body rather than sent as an empty
-  // string (see askTalkback). Every domain's questions are matched to
+  // string (see askChortleChat). Every domain's questions are matched to
   // what's actually tagged into it in the ingested corpus (see
   // backend/scripts/tag_corpus_domains.py) rather than invented topics
   // that aren't there.
@@ -1008,9 +1008,9 @@
     },
   ];
 
-  const STORAGE_KEY_PERSONA = "talkback:persona";
-  const STORAGE_KEY_HUMOR = "talkback:humor";
-  const STORAGE_KEY_DOMAIN = "talkback:domain";
+  const STORAGE_KEY_PERSONA = "chortlechat:persona";
+  const STORAGE_KEY_HUMOR = "chortlechat:humor";
+  const STORAGE_KEY_DOMAIN = "chortlechat:domain";
 
   // sessionId is deliberately NOT persisted to localStorage — it lives only
   // for the duration of this tab, matching "Clear conversation" as the one
@@ -1077,7 +1077,7 @@
   // which session ids it has already seen. Capped at
   // MAX_STORED_CONVERSATIONS so a long-running tab doesn't grow this
   // list forever.
-  const STORAGE_KEY_CONVERSATIONS = "talkback:conversations";
+  const STORAGE_KEY_CONVERSATIONS = "chortlechat:conversations";
   const MAX_STORED_CONVERSATIONS = 20;
 
   // sessionId of whichever past conversation is currently open in the
@@ -1257,7 +1257,7 @@
   // yet the *initial* default differs by viewport — open on desktop (primary
   // nav), closed on narrow screens (an overlay covering the chat on first
   // load would be a bad first impression).
-  const STORAGE_KEY_SIDEBAR_OPEN = "talkback:sidebarOpen";
+  const STORAGE_KEY_SIDEBAR_OPEN = "chortlechat:sidebarOpen";
   const NARROW_MEDIA_QUERY = "(max-width: 768px)";
 
   function loadSidebarOpenPref() {
@@ -1909,7 +1909,7 @@
     updateClearButtonState();
   }
 
-  async function askTalkback(question) {
+  async function askChortleChat(question) {
     const response = await fetch(`${API_BASE_URL}/ask`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1947,7 +1947,7 @@
     const typingEl = showTypingIndicator();
 
     try {
-      const data = await askTalkback(question);
+      const data = await askChortleChat(question);
       typingEl.remove();
       addAnswerBubble(data);
       state.sessionId = data.session_id;
@@ -1959,7 +1959,7 @@
     } catch (err) {
       typingEl.remove();
       addErrorBubble(
-        "Couldn't reach the Talkback backend, is the server running on " + API_BASE_URL + "?",
+        "Couldn't reach the ChortleChat backend, is the server running on " + API_BASE_URL + "?",
         () => submitQuestion(question)
       );
       console.error(err);

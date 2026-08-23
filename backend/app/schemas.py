@@ -1,9 +1,9 @@
-"""Pydantic schemas for the Talkback API.
+"""Pydantic schemas for the ChortleChat API.
 
-Talkback answers real space-science questions, grounded in the ingested
-NASA SMD Q&A corpus — see `app.services.talkback` for the engine and
-`backend/scripts/fetch_talkback_corpus.py` /
-`backend/scripts/ingest_talkback_corpus.py` for how that corpus gets in.
+ChortleChat answers real space-science questions, grounded in the ingested
+NASA SMD Q&A corpus — see `app.services.chortlechat` for the engine and
+`backend/scripts/fetch_chortlechat_corpus.py` /
+`backend/scripts/ingest_chortlechat_corpus.py` for how that corpus gets in.
 
 This is a deliberately small surface: `GET /health`, `POST /ingest`,
 `POST /query` (raw passage search, for transparency), and `POST /ask`
@@ -11,7 +11,7 @@ This is a deliberately small surface: `GET /health`, `POST /ingest`,
 habitat-crisis-console endpoints (telemetry, crisis, triage, rationing)
 built around a fictional deep-space-habitat scenario; those schemas were
 removed in the revamp to a single-objective product rather than kept
-around unused — see the project's `revamp/talkback` branch history for
+around unused — see the project's `revamp/chortlechat` branch history for
 that decision.
 """
 
@@ -23,7 +23,7 @@ from pydantic import BaseModel, Field
 class HealthResponse(BaseModel):
     """Response body for GET /health.
 
-    `status` is `"ok"` only when every upstream credential Talkback needs
+    `status` is `"ok"` only when every upstream credential ChortleChat needs
     to actually serve a request is configured, and `"degraded"` otherwise
     — derived from the same credential checks a real `/ask` or `/query`
     call would run (`missing_credentials()` in both service modules is the
@@ -42,7 +42,7 @@ class DocumentType(str, Enum):
     """Kinds of documents accepted by POST /ingest.
 
     A single member today (`science_reference`, the NASA SMD Q&A corpus
-    Talkback is grounded in) — kept as an enum rather than inlined as a
+    ChortleChat is grounded in) — kept as an enum rather than inlined as a
     literal string so a second corpus can be added later without changing
     the request/response shape.
     """
@@ -138,7 +138,7 @@ class QueryResponse(BaseModel):
     """Response body for POST /query.
 
     Exposed alongside /ask as a transparency tool — "see the actual source
-    passages Talkback's answers are grounded in" — not as Talkback's main
+    passages ChortleChat's answers are grounded in" — not as ChortleChat's main
     interface. `results` is ordered most-relevant-first. An empty list is a
     valid response (nothing in the corpus matches), not an error: unlike
     /ask, there's no generated claim here that would otherwise go
@@ -149,10 +149,10 @@ class QueryResponse(BaseModel):
 
 
 class AskPersona(str, Enum):
-    """Which voice answers a Talkback question.
+    """Which voice answers a ChortleChat question.
 
     Persona changes only how a true thing is said, never whether it's
-    said, or what it claims — see `app.services.talkback` for how that's
+    said, or what it claims — see `app.services.chortlechat` for how that's
     enforced structurally, not just by prompting convention.
     """
 
@@ -161,7 +161,7 @@ class AskPersona(str, Enum):
 
 
 class ConversationRole(str, Enum):
-    """Who said a given turn in a Talkback conversation.
+    """Who said a given turn in a ChortleChat conversation.
 
     Only ever set by the server — `POST /ask` accepts a `session_id`, never
     a `role`, on the way in. Kept as a schema type rather than an inlined
@@ -175,7 +175,7 @@ class ConversationRole(str, Enum):
 
 
 class ConversationTurn(BaseModel):
-    """One turn of a Talkback conversation, held in short-term session memory.
+    """One turn of a ChortleChat conversation, held in short-term session memory.
 
     `persona` and `source` are only ever set on an `ASSISTANT` turn — `None`
     on every `USER` turn, since a question has no persona or citation of its
@@ -195,12 +195,12 @@ class ConversationTurn(BaseModel):
 
 
 class HistorySource(str, Enum):
-    """How a Talkback answer's conversational context was resolved.
+    """How a ChortleChat answer's conversational context was resolved.
 
     Orthogonal to `AskResponse.grounded`/`confidence`, which describe the
     *answer* — this describes the *question's* interpretation instead. The
     answer itself is always generated strictly from a freshly retrieved
-    `science_reference` passage (see `app.services.talkback`'s module
+    `science_reference` passage (see `app.services.chortlechat`'s module
     docstring); history is never a source of facts, only of context for
     resolving a follow-up's pronouns and implicit subject.
 
@@ -267,7 +267,7 @@ class AskRequest(BaseModel):
     existed.
 
     `domain` restricts retrieval to one `Domain` tag — see
-    `app.services.talkback.ask_talkback` for the fallback that kicks in if
+    `app.services.chortlechat.ask_chortlechat` for the fallback that kicks in if
     that domain has nothing indexed at all. `None` (the default) searches
     the whole corpus, exactly as `/ask` behaved before `domain` existed.
     """
@@ -300,7 +300,7 @@ class AskResponse(BaseModel):
     they can only ever hand back an id this API already issued.
 
     Never a 404: an unmatched question is a valid, honest response (see
-    `app.services.talkback.ask_talkback`), not a failure to protect
+    `app.services.chortlechat.ask_chortlechat`), not a failure to protect
     against generating an ungrounded guess — the protection already
     happened, that *is* what the fallback response is.
 

@@ -9,7 +9,7 @@ Run once, from the repo root, with the venv active and .env configured:
 
     python backend/scripts/reset_zilliz_collection.py
 
-Then re-run backend/scripts/ingest_talkback_corpus.py to recreate the
+Then re-run backend/scripts/ingest_chortlechat_corpus.py to recreate the
 collection and re-embed the corpus under the new metric type.
 """
 
@@ -42,7 +42,7 @@ def main() -> None:
         return
 
     client.drop_collection(name)
-    print(f"Dropped collection {name!r}. Re-run ingest_talkback_corpus.py to recreate it.")
+    print(f"Dropped collection {name!r}. Re-run ingest_chortlechat_corpus.py to recreate it.")
 
 
 if __name__ == "__main__":

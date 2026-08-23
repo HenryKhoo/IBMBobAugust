@@ -1,4 +1,4 @@
-"""FastAPI application entrypoint for Talkback."""
+"""FastAPI application entrypoint for ChortleChat."""
 
 import logging
 
@@ -22,7 +22,7 @@ from app.schemas import (
 from app.services import memory
 from app.services.ingestion import ingest_and_upsert
 from app.services.query import run_query
-from app.services.talkback import ask_talkback
+from app.services.chortlechat import ask_chortlechat
 from app.services.vector_store import get_vector_store
 from app.services.vector_store import missing_credentials as zilliz_missing_credentials
 from app.services.watsonx import missing_credentials as watsonx_missing_credentials
@@ -115,8 +115,8 @@ def health(response: Response) -> HealthResponse:
 def ingest(request: IngestRequest) -> IngestResponse:
     """Chunk, embed with Granite, and upsert documents into Zilliz.
 
-    See `backend/scripts/fetch_talkback_corpus.py` and
-    `backend/scripts/ingest_talkback_corpus.py` for the dev-time path that
+    See `backend/scripts/fetch_chortlechat_corpus.py` and
+    `backend/scripts/ingest_chortlechat_corpus.py` for the dev-time path that
     populates the corpus this endpoint also accepts documents through
     directly.
     """
@@ -129,7 +129,7 @@ def query(request: QueryRequest) -> QueryResponse:
     """Search the embedded corpus directly and return matching passages.
 
     A transparency tool alongside /ask — "see the actual source passages,"
-    not Talkback's main interface. Retrieval only, no generation step: a
+    not ChortleChat's main interface. Retrieval only, no generation step: a
     question that matches nothing in the corpus is a valid, empty result
     set rather than an error.
     """
@@ -141,7 +141,7 @@ def ask(request: AskRequest) -> AskResponse:
     """Answer a space-science question, grounded in the ingested corpus.
 
     Never 404s: an unmatched question is a valid, honest "no grounded
-    answer" response (see `app.services.talkback.ask_talkback`), not an
+    answer" response (see `app.services.chortlechat.ask_chortlechat`), not an
     error to raise — the no-hallucination protection this API's other
     endpoints get from a 404 is already built into that fallback response
     itself here.
@@ -149,7 +149,7 @@ def ask(request: AskRequest) -> AskResponse:
     `request.session_id` opts into conversational memory across calls to
     this endpoint — see `AskRequest.session_id` and `app.services.memory`.
     """
-    return ask_talkback(
+    return ask_chortlechat(
         request.question, request.persona, request.humor, request.session_id, request.domain
     )
 

@@ -6,12 +6,12 @@ Challenge theme: Reimagine Space Exploration with AI
 
 ## Motivation
 
-The North Star is the landing page for **Talkback**, a grounded NASA Earth-science Q&A console. Ask a real question in plain English — tropical cyclones, dust storms, drought, wildfires, and more — and Talkback answers from a real NASA source passage, cites where that answer came from, and says so honestly when nothing in its corpus supports an answer, rather than guessing. Two voices are available: **Baseline**, direct and no-commentary, and **Banter**, the same fact told with personality. Persona only changes how a true thing is said, never whether it's said or what it claims. Built for the IBM Bob AI Builders Challenge (August theme: *Reimagine Space Exploration with AI*).
+The North Star is the landing page for **ChortleChat**, a grounded NASA Earth-science Q&A console. Ask a real question in plain English — tropical cyclones, dust storms, drought, wildfires, and more — and ChortleChat answers from a real NASA source passage, cites where that answer came from, and says so honestly when nothing in its corpus supports an answer, rather than guessing. Two voices are available: **Baseline**, direct and no-commentary, and **Banter**, the same fact told with personality. Persona only changes how a true thing is said, never whether it's said or what it claims. Built for the IBM Bob AI Builders Challenge (August theme: *Reimagine Space Exploration with AI*).
 
 ## How to Use
 
 1. Open the North Star landing page for the pitch, the Technology & Modules breakdown, the Mission, and the Team.
-2. Click **Launch Talkback** to open the console.
+2. Click **Launch ChortleChat** to open the console.
 3. Pick a domain to explore — Tropical Cyclone Dynamics, Saharan Dust, Climate Reconstruction, Environmental Hazards, or Other — or leave it on **All**. This scopes the suggested chips (and, server-side, retrieval itself) to that slice of the corpus.
 4. Pick a persona — Baseline or Banter. Banter unlocks a humor slider; Baseline ignores it.
 5. Ask a question, or pick one of the suggested chips.
@@ -24,11 +24,11 @@ Demo video: [add the demo video link]
 
 ## AI Approach and Architecture
 
-![Talkback architecture: development, ingestion, and runtime pipeline](docs/tech-stack-diagram.png)
+![ChortleChat architecture: development, ingestion, and runtime pipeline](docs/tech-stack-diagram.png)
 
 ### Retrieval-augmented generation — IBM Granite embeddings + Zilliz
 
-NASA SMD Q&A benchmark passages are chunked and embedded with IBM's Granite embedding model on watsonx.ai, then indexed in Zilliz Cloud (managed Milvus) as `science_reference` documents. Every answer Talkback gives is generated from a passage retrieved from that index, never from the model's own memory, which is what keeps every response traceable back to a real source instead of a guess.
+NASA SMD Q&A benchmark passages are chunked and embedded with IBM's Granite embedding model on watsonx.ai, then indexed in Zilliz Cloud (managed Milvus) as `science_reference` documents. Every answer ChortleChat gives is generated from a passage retrieved from that index, never from the model's own memory, which is what keeps every response traceable back to a real source instead of a guess.
 
 ### Grounded generation — IBM watsonx.ai
 

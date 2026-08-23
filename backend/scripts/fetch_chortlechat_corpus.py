@@ -1,15 +1,15 @@
-"""Dev-time fetch: NASA SMD Q&A benchmark -> backend/data/talkback_corpus.json.
+"""Dev-time fetch: NASA SMD Q&A benchmark -> backend/data/chortlechat_corpus.json.
 
 Run once, from the repo root, with backend/requirements.txt installed:
 
-    python backend/scripts/fetch_talkback_corpus.py
+    python backend/scripts/fetch_chortlechat_corpus.py
 
 Pulls nasa-impact/nasa-smd-qa-benchmark via the Hugging Face
 datasets-server `/rows` endpoint (public, no auth token needed) and
 flattens its nested SQuAD-style structure -- one row per split holds
 `data[].paragraphs[].qas[]`, not one row per question -- into a flat list
 of {id, type, text} documents ready for backend/scripts/
-ingest_talkback_corpus.py (or a direct POST /ingest). Each document's
+ingest_chortlechat_corpus.py (or a direct POST /ingest). Each document's
 `text` combines the source paragraph with its question/answer pair, so
 retrieval can match on the paragraph's own wording or a real question's
 phrasing, and generation has real context to work from, not just an
@@ -37,7 +37,7 @@ CONFIG = "default"
 SPLIT = "train"
 BASE_URL = "https://datasets-server.huggingface.co/rows"
 PAGE_SIZE = 100
-OUTPUT_PATH = Path(__file__).resolve().parent.parent / "data" / "talkback_corpus.json"
+OUTPUT_PATH = Path(__file__).resolve().parent.parent / "data" / "chortlechat_corpus.json"
 
 
 def _fetch_all_rows() -> list[dict]:

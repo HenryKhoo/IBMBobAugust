@@ -13,7 +13,7 @@ behind a menu button.
 ## What already exists (don't rebuild this)
 
 `frontend/app.html` already has a device-local conversation index —
-`STORAGE_KEY_CONVERSATIONS` (`talkback:conversations`) in `localStorage`,
+`STORAGE_KEY_CONVERSATIONS` (`chortlechat:conversations`) in `localStorage`,
 capped at `MAX_STORED_CONVERSATIONS = 20`. Each entry is
 `{ sessionId, startedAt, title, persona }`, where `title` is auto-derived
 from the first question asked (truncated to 80 chars). This index already
@@ -65,7 +65,7 @@ validated) is a reasonable Phase 2, not part of this plan.
 - **Collapse control**: a toggle button (persistent, not just for mobile)
   so the sidebar can be manually hidden on wide screens too — collapsed
   state persisted to a new `localStorage` key (e.g.
-  `talkback:sidebarCollapsed`) so it survives reload, same pattern already
+  `chortlechat:sidebarCollapsed`) so it survives reload, same pattern already
   used for `STORAGE_KEY_PERSONA`/`STORAGE_KEY_HUMOR`.
 - **New conversation**: a row/button at the top of the sidebar that clears
   `state.sessionId` and the log, equivalent to the existing `clearBtn`
@@ -98,7 +98,7 @@ validated) is a reasonable Phase 2, not part of this plan.
   Display logic becomes `entry.renamedTitle || entry.title || "Untitled
   conversation"`. No migration needed — existing stored entries just lack
   the field, which reads as falsy.
-- New `localStorage` key `talkback:sidebarCollapsed` (`"1"`/`"0"` or
+- New `localStorage` key `chortlechat:sidebarCollapsed` (`"1"`/`"0"` or
   boolean-ish string, matching the existing simple string-value pattern
   used by `STORAGE_KEY_PERSONA`).
 
@@ -164,7 +164,7 @@ validated) is a reasonable Phase 2, not part of this plan.
 - `node --check` on the extracted `<script>` block (matches this project's
   existing validation habit per the imported project memory).
 - Manual jsdom or browser check: confirm two tabs both reading
-  `talkback:conversations` don't clobber each other's rename in a way
+  `chortlechat:conversations` don't clobber each other's rename in a way
   that's worse than the existing delete/clear-all behavior already
   tolerates (last-write-wins is already implicit in the current code —
   not a new problem introduced here, just worth confirming it isn't made

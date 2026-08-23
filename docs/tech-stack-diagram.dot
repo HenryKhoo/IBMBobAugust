@@ -34,7 +34,7 @@ digraph TechStack {
   }
 
   subgraph cluster_runtime {
-    label="Runtime — Talkback";
+    label="Runtime — ChortleChat";
     style=dashed; color="#888888"; fontsize=13; fontname="Helvetica-Bold";
     USERQ [label="User question" shape=oval fillcolor="#f5f5f5" color="#999999"];
     API [label=<

@@ -1,11 +1,11 @@
-"""Dev-time ingest: backend/data/talkback_corpus.json -> Zilliz.
+"""Dev-time ingest: backend/data/chortlechat_corpus.json -> Zilliz.
 
 Run once, from the repo root, with the venv active and .env configured
 with real WATSONX_*/ZILLIZ_* credentials (this hits both live services):
 
-    python backend/scripts/ingest_talkback_corpus.py
+    python backend/scripts/ingest_chortlechat_corpus.py
 
-Reads the flattened corpus fetch_talkback_corpus.py produced, builds one
+Reads the flattened corpus fetch_chortlechat_corpus.py produced, builds one
 MissionDocument (doc_type=science_reference) per entry, and calls the
 same chunk-embed-upsert pipeline POST /ingest uses -- this script exists
 so ingestion can happen once, at dev time, without needing the FastAPI
@@ -31,14 +31,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from app.schemas import Domain, DocumentType, MissionDocument  # noqa: E402
 from app.services.ingestion import ingest_and_upsert  # noqa: E402
 
-CORPUS_PATH = Path(__file__).resolve().parent.parent / "data" / "talkback_corpus.json"
+CORPUS_PATH = Path(__file__).resolve().parent.parent / "data" / "chortlechat_corpus.json"
 
 
 def main() -> None:
     if not CORPUS_PATH.exists():
         raise SystemExit(
             f"{CORPUS_PATH} not found. Run "
-            "backend/scripts/fetch_talkback_corpus.py first."
+            "backend/scripts/fetch_chortlechat_corpus.py first."
         )
 
     raw_documents = json.loads(CORPUS_PATH.read_text())

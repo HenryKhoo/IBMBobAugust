@@ -2,7 +2,7 @@ from fastapi.testclient import TestClient
 
 from app import main
 from app.main import app
-from app.services import talkback
+from app.services import chortlechat
 
 client = TestClient(app)
 
@@ -58,12 +58,12 @@ def test_unhandled_exception_still_carries_cors_headers(monkeypatch):
     def _boom():
         raise RuntimeError("simulated unexpected failure")
 
-    monkeypatch.setattr(talkback, "get_vector_store", _boom)
+    monkeypatch.setattr(chortlechat, "get_vector_store", _boom)
 
     response = client.post(
         "/ask",
         json={"question": "What is Veggie?"},
-        headers={"Origin": "https://talkback.up.railway.app"},
+        headers={"Origin": "https://chortlechat.up.railway.app"},
     )
 
     assert response.status_code == 500
@@ -72,5 +72,5 @@ def test_unhandled_exception_still_carries_cors_headers(monkeypatch):
     # header is present at all on an error response.
     assert (
         response.headers.get("access-control-allow-origin")
-        == "https://talkback.up.railway.app"
+        == "https://chortlechat.up.railway.app"
     )

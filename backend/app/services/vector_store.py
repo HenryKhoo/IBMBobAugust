@@ -11,7 +11,7 @@ from app.services.watsonx import get_embedding_model
 logger = logging.getLogger(__name__)
 
 # Explicit so every process that builds a Zilliz client -- the FastAPI
-# server (query-side) and backend/scripts/ingest_talkback_corpus.py
+# server (query-side) and backend/scripts/ingest_chortlechat_corpus.py
 # (write-side) alike -- agrees on the metric type without either one having
 # to guess. Without this, whichever process happens to *create* the
 # collection (first `add_texts()` call) silently defaults to L2, and every
@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 # existing index change metric type in place. If ZILLIZ_COLLECTION_NAME
 # already has data ingested under the old L2 default, drop it first with
 # backend/scripts/reset_zilliz_collection.py, then re-run
-# backend/scripts/ingest_talkback_corpus.py so it's recreated with this
+# backend/scripts/ingest_chortlechat_corpus.py so it's recreated with this
 # metric type baked in.
 _INDEX_PARAMS = {"metric_type": "COSINE", "index_type": "AUTOINDEX", "params": {}}
 
