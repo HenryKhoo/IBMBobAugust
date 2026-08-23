@@ -247,6 +247,18 @@
   .empty-state-text {
     color: var(--ink-dim);
   }
+  .retry-btn {
+    display: inline-block;
+    margin-top: var(--space-2);
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--ink-dim);
+    border-radius: var(--radius);
+    padding: var(--space-1) var(--space-3);
+    font-size: var(--text-sm);
+    cursor: pointer;
+  }
+  .retry-btn:hover { color: var(--ink); border-color: var(--ink-dim); }
   .typing-indicator { padding: var(--space-3) var(--space-4); }
   .typing-dots { display: inline-flex; gap: var(--space-1); align-items: center; }
   .typing-dot {
@@ -671,13 +683,30 @@
     logEl.scrollTop = logEl.scrollHeight;
   }
 
-  function addErrorBubble(text) {
+  function addErrorBubble(text, onRetry) {
     const el = document.createElement("div");
     el.className = "msg-answer";
     el.dataset.grounded = "false";
-    el.textContent = text;
+
+    const message = document.createElement("div");
+    message.textContent = text;
+    el.appendChild(message);
+
+    if (onRetry) {
+      const retryBtn = document.createElement("button");
+      retryBtn.type = "button";
+      retryBtn.className = "retry-btn";
+      retryBtn.textContent = "Retry";
+      retryBtn.addEventListener("click", () => {
+        el.remove();
+        onRetry();
+      });
+      el.appendChild(retryBtn);
+    }
+
     logEl.appendChild(el);
     logEl.scrollTop = logEl.scrollHeight;
+    updateClearButtonState();
   }
 
   async function askTalkback(question) {
@@ -692,13 +721,10 @@
     return response.json();
   }
 
-  form.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const question = questionInput.value.trim();
-    if (!question) return;
-
-    addQuestionBubble(question);
-    questionInput.value = "";
+  // Shared by the initial send and by the error bubble's Retry button — retry
+  // re-runs the same question without re-adding a question bubble, since the
+  // original one is already in the log.
+  async function submitQuestion(question) {
     isLoading = true;
     updateSendButtonState();
 
@@ -711,7 +737,8 @@
     } catch (err) {
       typingEl.remove();
       addErrorBubble(
-        "Couldn't reach the Talkback backend, is the server running on " + API_BASE_URL + "?"
+        "Couldn't reach the Talkback backend, is the server running on " + API_BASE_URL + "?",
+        () => submitQuestion(question)
       );
       console.error(err);
     } finally {
@@ -719,6 +746,16 @@
       updateSendButtonState();
       questionInput.focus();
     }
+  }
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const question = questionInput.value.trim();
+    if (!question) return;
+
+    addQuestionBubble(question);
+    questionInput.value = "";
+    await submitQuestion(question);
   });
 </script>
 </body>
