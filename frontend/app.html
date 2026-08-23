@@ -362,6 +362,63 @@
     color: var(--confidence-low-text);
   }
 
+  .history-panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: var(--space-4);
+    margin-bottom: var(--space-4);
+  }
+  .history-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    margin-bottom: var(--space-3);
+  }
+  .history-panel-header h2 {
+    margin: 0;
+    font-size: var(--text-md);
+    font-weight: 700;
+  }
+  .history-source-tag {
+    margin-right: auto;
+    font-size: var(--text-xs);
+    color: var(--ink-faint);
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 1px var(--space-2);
+  }
+  .history-close-btn {
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--ink-dim);
+    border-radius: var(--radius);
+    padding: var(--space-1) var(--space-3);
+    font-size: var(--text-sm);
+    cursor: pointer;
+  }
+  .history-close-btn:hover { color: var(--ink); border-color: var(--ink-dim); }
+  .history-close-btn:focus-visible { outline: 2px solid var(--accent-baseline-text); outline-offset: 1px; }
+  .history-log {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    max-height: 55vh;
+    overflow-y: auto;
+    padding-right: var(--space-1);
+  }
+  .recalled-tag {
+    display: inline-block;
+    padding: 1px var(--space-2);
+    border-radius: 999px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    color: var(--ink-faint);
+    font-weight: 600;
+  }
+
   .grounding-strip {
     display: flex;
     align-items: center;
@@ -464,6 +521,8 @@
     .chips { flex-direction: column; }
     .chips button { width: 100%; }
     .msg-question, .msg-answer { max-width: 95%; }
+    .history-panel-header { flex-wrap: wrap; }
+    .history-source-tag { margin-right: 0; }
   }
 </style>
 </head>
@@ -499,7 +558,22 @@
           <input type="range" id="humor" min="0" max="100" value="50" />
           <output id="humorVal">50</output>
         </div>
+        <button type="button" class="clear-btn" id="historyBtn" disabled aria-expanded="false">Conversation history</button>
         <button type="button" class="clear-btn" id="clearBtn" disabled>Clear conversation</button>
+      </div>
+
+      <!-- Read-only browse panel for this session's past turns — see
+           GET /conversation/history. Hidden until "Conversation history"
+           is toggled, and reuses the same .msg-question/.msg-answer bubble
+           styling the live log already uses, so browsing past turns looks
+           like the same product, not a bolted-on second UI. -->
+      <div class="history-panel" id="historyPanel" hidden>
+        <div class="history-panel-header">
+          <h2>Conversation history</h2>
+          <span class="history-source-tag" id="historySourceTag"></span>
+          <button type="button" class="history-close-btn" id="closeHistoryBtn">Close</button>
+        </div>
+        <div class="history-log" id="historyLog" aria-live="polite"></div>
       </div>
 
       <!-- aria-atomic="false" + aria-relevant="additions" makes explicit what
@@ -563,7 +637,14 @@
   const STORAGE_KEY_PERSONA = "talkback:persona";
   const STORAGE_KEY_HUMOR = "talkback:humor";
 
-  const state = { persona: "baseline", humor: 50 };
+  // sessionId is deliberately NOT persisted to localStorage — it lives only
+  // for the duration of this tab, matching "Clear conversation" as the one
+  // and only way to deliberately end a conversation. Set from the first
+  // /ask response's session_id (server-generated), then sent back on every
+  // subsequent turn so the backend's conversational memory (short-term
+  // in-process, and long-term in Zilliz for grounded exchanges) can attach
+  // this question to that same conversation. See AskRequest.session_id.
+  const state = { persona: "baseline", humor: 50, sessionId: null };
   let isLoading = false;
 
   const logEl = document.getElementById("log");
@@ -575,6 +656,17 @@
   const humorVal = document.getElementById("humorVal");
   const chipsEl = document.getElementById("chips");
   const clearBtn = document.getElementById("clearBtn");
+  const historyBtn = document.getElementById("historyBtn");
+  const historyPanel = document.getElementById("historyPanel");
+  const historyLog = document.getElementById("historyLog");
+  const historySourceTag = document.getElementById("historySourceTag");
+  const closeHistoryBtn = document.getElementById("closeHistoryBtn");
+
+  const HISTORY_SOURCE_LABELS = {
+    session_memory: "Live session",
+    history_retrieval: "Recovered from earlier",
+    none: "No history yet",
+  };
 
   function loadPersistedSettings() {
     try {
@@ -620,6 +712,10 @@
     clearBtn.disabled = logEl.children.length === 0;
   }
 
+  function updateHistoryButtonState() {
+    historyBtn.disabled = !state.sessionId;
+  }
+
   questionInput.addEventListener("input", updateSendButtonState);
   updateSendButtonState();
 
@@ -642,8 +738,95 @@
 
   clearBtn.addEventListener("click", () => {
     logEl.innerHTML = "";
+    // Ending the conversation client-side only clears the DOM; forgetting
+    // sessionId is what actually starts a new one — the next question
+    // omits session_id, so the backend mints a brand-new session rather
+    // than silently continuing the one that was just "cleared" on screen.
+    state.sessionId = null;
     updateClearButtonState();
+    updateHistoryButtonState();
+    historyPanel.hidden = true;
+    historyBtn.setAttribute("aria-expanded", "false");
     questionInput.focus();
+  });
+
+  function renderHistoryTurns(turns) {
+    historyLog.innerHTML = "";
+    if (turns.length === 0) {
+      const empty = document.createElement("p");
+      empty.className = "empty-state-text";
+      empty.textContent = "Nothing recorded for this conversation yet.";
+      historyLog.appendChild(empty);
+      return;
+    }
+    turns.forEach((turn) => {
+      const el = document.createElement("div");
+      el.className = turn.role === "user" ? "msg-question" : "msg-answer";
+      el.textContent = turn.content;
+      if (turn.role === "assistant" && (turn.persona || turn.source)) {
+        const meta = document.createElement("div");
+        meta.className = "msg-meta";
+        if (turn.persona) {
+          const personaTag = document.createElement("span");
+          personaTag.textContent = turn.persona === "banter" ? "Banter" : "Baseline";
+          meta.appendChild(personaTag);
+        }
+        if (turn.source) {
+          const src = document.createElement("span");
+          src.textContent = `source: ${turn.source}`;
+          meta.appendChild(src);
+        }
+        el.appendChild(meta);
+      }
+      historyLog.appendChild(el);
+    });
+  }
+
+  async function loadConversationHistory(sessionId) {
+    const response = await fetch(
+      `${API_BASE_URL}/conversation/history?session_id=${encodeURIComponent(sessionId)}`
+    );
+    if (!response.ok) {
+      throw new Error(`Request failed (${response.status})`);
+    }
+    return response.json();
+  }
+
+  historyBtn.addEventListener("click", async () => {
+    if (!state.sessionId) return;
+
+    if (!historyPanel.hidden) {
+      historyPanel.hidden = true;
+      historyBtn.setAttribute("aria-expanded", "false");
+      return;
+    }
+
+    historyPanel.hidden = false;
+    historyBtn.setAttribute("aria-expanded", "true");
+    historySourceTag.textContent = "";
+    historyLog.innerHTML = "";
+    const loading = document.createElement("p");
+    loading.className = "empty-state-text";
+    loading.textContent = "Loading…";
+    historyLog.appendChild(loading);
+
+    try {
+      const data = await loadConversationHistory(state.sessionId);
+      historySourceTag.textContent = HISTORY_SOURCE_LABELS[data.source] || data.source;
+      renderHistoryTurns(data.turns);
+    } catch (err) {
+      historyLog.innerHTML = "";
+      const errEl = document.createElement("p");
+      errEl.className = "empty-state-text";
+      errEl.textContent = "Couldn't load conversation history.";
+      historyLog.appendChild(errEl);
+      console.error(err);
+    }
+  });
+
+  closeHistoryBtn.addEventListener("click", () => {
+    historyPanel.hidden = true;
+    historyBtn.setAttribute("aria-expanded", "false");
   });
 
   SUGGESTED_QUESTIONS.forEach((q) => {
@@ -690,7 +873,7 @@
     return "low";
   }
 
-  function addAnswerBubble({ answer, persona, grounded, confidence, source }) {
+  function addAnswerBubble({ answer, persona, grounded, confidence, source, history_source }) {
     const el = document.createElement("div");
     el.className = "msg-answer";
     el.dataset.persona = persona;
@@ -737,6 +920,17 @@
       meta.appendChild(src);
     }
 
+    // Only the notable case is surfaced — an ordinary in-window follow-up
+    // (history_source: "session_memory") is the common path and doesn't
+    // need its own badge; recovering context from long-term storage after
+    // the live window was gone is the one worth calling out.
+    if (history_source === "history_retrieval") {
+      const recalled = document.createElement("span");
+      recalled.className = "recalled-tag";
+      recalled.textContent = "recalled from earlier";
+      meta.appendChild(recalled);
+    }
+
     el.appendChild(meta);
     logEl.appendChild(el);
     logEl.scrollTop = logEl.scrollHeight;
@@ -772,7 +966,15 @@
     const response = await fetch(`${API_BASE_URL}/ask`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question, persona: state.persona, humor: state.humor }),
+      body: JSON.stringify({
+        question,
+        persona: state.persona,
+        humor: state.humor,
+        // Omitted (not sent as null) when there's no session yet, so the
+        // backend takes the "start a brand-new session" branch rather than
+        // the "resume this id" branch — see AskRequest.session_id.
+        ...(state.sessionId ? { session_id: state.sessionId } : {}),
+      }),
     });
     if (!response.ok) {
       throw new Error(`Request failed (${response.status})`);
@@ -793,6 +995,8 @@
       const data = await askTalkback(question);
       typingEl.remove();
       addAnswerBubble(data);
+      state.sessionId = data.session_id;
+      updateHistoryButtonState();
     } catch (err) {
       typingEl.remove();
       addErrorBubble(
