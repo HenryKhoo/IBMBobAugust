@@ -95,7 +95,27 @@
 
   /* Wordmark, matched to index.html's .logo so the two pages read as one
      product — "NORTH STAR" stays the constant, the span names the page. */
-  .app-nav { padding-top: var(--space-1); }
+  .app-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: var(--space-1);
+  }
+  .landing-link {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    text-decoration: none;
+    color: var(--ink-dim);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: var(--space-1) var(--space-3);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    transition: color 0.15s ease, border-color 0.15s ease;
+  }
+  .landing-link:hover { color: var(--ink); border-color: var(--ink-dim); }
+  .landing-link:focus-visible { outline: 2px solid var(--accent-baseline-text); outline-offset: 2px; }
   .logo {
     display: inline-flex;
     align-items: baseline;
@@ -451,6 +471,7 @@
   <div class="shell">
     <div class="app-nav">
       <a class="logo" href="index.html"><b>NORTH STAR</b><span>TALKBACK</span></a>
+      <a class="landing-link" href="index.html">&larr; Landing Page</a>
     </div>
     <header>
       <h1>Talkback</h1>
@@ -510,11 +531,13 @@
 
 <script>
   // Environment-aware backend URL — no hardcoded localhost in production.
-  // Resolution order: localhost dev port -> <meta name="talkback-api-base-url">
-  // (set at deploy time, see the tag in <head>) -> same-origin fallback.
+  // Resolution order: localhost dev port (including opening this file
+  // directly, protocol "file:", which has an empty hostname) ->
+  // <meta name="talkback-api-base-url"> (set at deploy time, see the tag
+  // in <head>) -> same-origin fallback.
   const API_BASE_URL = (() => {
     const { hostname, protocol, host } = window.location;
-    if (hostname === "localhost" || hostname === "127.0.0.1") {
+    if (hostname === "localhost" || hostname === "127.0.0.1" || protocol === "file:") {
       return "http://localhost:8000";
     }
     const configured = document
