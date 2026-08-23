@@ -215,11 +215,13 @@
     color: var(--ink-dim);
     margin: 0 0 var(--space-6);
   }
+  .team-grid { display: flex; flex-wrap: wrap; gap: var(--space-6); }
   .team-card {
     background: var(--panel);
     border: 1px solid var(--line);
     border-radius: var(--radius);
     padding: var(--space-6);
+    flex: 1 1 320px;
     max-width: 460px;
     box-shadow: 0 20px 40px rgba(20, 30, 50, 0.06);
   }
@@ -243,8 +245,7 @@
     <nav>
       <div class="logo"><b>NORTH STAR</b><span>TALKBACK</span></div>
       <ul class="nav-links">
-        <li><a href="#modules">Modules</a></li>
-        <li><a href="#technology">Technology</a></li>
+        <li><a href="#technology">Modules &amp; Technology</a></li>
         <li><a href="#mission">Mission</a></li>
         <li><a href="#team">Team</a></li>
       </ul>
@@ -265,12 +266,6 @@
             <div class="mock-label">Grounded — source cited</div>
             <div class="mock-row" style="margin-top: var(--space-4);"><span class="mock-dot warn"></span><span class="mock-bar" style="width:20%"></span></div>
             <div class="mock-label">No source found — flagged, not guessed</div>
-          </div>
-          <div class="tile mock">
-            <div class="mock-row"><span class="mock-dot"></span><span class="mock-bar" style="width:70%"></span></div>
-            <div class="mock-row"><span class="mock-dot warn"></span><span class="mock-bar" style="width:45%"></span></div>
-            <div class="mock-row"><span class="mock-dot"></span><span class="mock-bar" style="width:85%"></span></div>
-            <div class="mock-label">Live telemetry, grounded</div>
           </div>
         </div>
       </div>
@@ -378,13 +373,22 @@
     <section class="content-section team" id="team">
       <div class="section-eyebrow">Team</div>
       <p class="team-tagline">Representing from Malaysia. Malaysia, Truly Asia. 🇲🇾</p>
-      <article class="team-card">
-        <h3>Henry Shien Chen Khoo</h3>
-        <p>
-          MSc in Computer Engineering, Politechnika Wrocławska, Poland<br />
-          BSc in Computer Science, Asia Pacific University, Malaysia
-        </p>
-      </article>
+      <div class="team-grid">
+        <article class="team-card">
+          <h3>Henry Shien Chen Khoo</h3>
+          <p>
+            MSc in Computer Engineering, Politechnika Wrocławska, Poland<br />
+            BSc in Computer Science, Asia Pacific University, Malaysia
+          </p>
+        </article>
+        <article class="team-card">
+          <h3>Laura Lai</h3>
+          <p>
+            MSc in Computer Engineering, Politechnika Wrocławska, Poland<br />
+            BSc in Computer Science, Asia Pacific University, Malaysia
+          </p>
+        </article>
+      </div>
     </section>
 
     <section class="band">
