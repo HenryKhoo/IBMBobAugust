@@ -13,6 +13,10 @@
     --ink: #e7ebf3;
     --ink-dim: #9aa4b8;
     --ink-faint: #838b9e;
+    /* WCAG AA check closed out (talkback-proposal.md §6 open item): both accents
+       clear the 4.5:1 text minimum and the 3:1 UI-component minimum against
+       every surface they sit on — baseline 6.86:1 (--panel) / 6.31:1 (--panel-2),
+       banter 7.73:1 (--panel) / 7.11:1 (--panel-2). No token changes needed. */
     --accent-baseline: #5fb0c9;
     --accent-baseline-wash: rgba(95, 176, 201, 0.16);
     --accent-banter: #e0a458;
@@ -123,7 +127,8 @@
     display: inline-flex;
     border: 1px solid var(--line);
     border-radius: 999px;
-    overflow: hidden;
+    /* No overflow:hidden here — it used to clip the focus-visible ring on the
+       first/last button. Corners are rounded on the buttons themselves instead. */
   }
   .persona-toggle button {
     background: transparent;
@@ -134,6 +139,8 @@
     cursor: pointer;
     font-weight: 600;
   }
+  .persona-toggle button:first-child { border-radius: 999px 0 0 999px; }
+  .persona-toggle button:last-child { border-radius: 0 999px 999px 0; }
   .persona-toggle button[aria-pressed="true"][data-persona="baseline"] {
     background: var(--accent-baseline-wash);
     color: var(--accent-baseline);
@@ -330,6 +337,10 @@
     transform: translateY(-3px);
     box-shadow: var(--shadow-lg);
   }
+  .chips button:focus-visible {
+    outline: 2px solid var(--accent-baseline);
+    outline-offset: 2px;
+  }
 
   footer {
     text-align: center;
@@ -337,6 +348,19 @@
     font-size: var(--text-xs);
     margin-top: var(--space-7);
     line-height: 1.6;
+  }
+
+  /* Mobile pass: stack controls instead of relying on incidental wrapping,
+     shrink the display headline so it can't overflow a narrow viewport. */
+  @media (max-width: 480px) {
+    body { padding: var(--space-6) var(--space-3) var(--space-8); }
+    header h1 { font-size: 2.25rem; }
+    .controls-row { flex-direction: column; align-items: stretch; }
+    .humor-row { min-width: 0; }
+    .clear-btn { margin-left: 0; }
+    .chips { flex-direction: column; }
+    .chips button { width: 100%; }
+    .msg-question, .msg-answer { max-width: 95%; }
   }
 </style>
 </head>
@@ -361,7 +385,10 @@
         <button type="button" class="clear-btn" id="clearBtn" disabled>Clear conversation</button>
       </div>
 
-      <div id="log" aria-live="polite"></div>
+      <!-- aria-atomic="false" + aria-relevant="additions" makes explicit what
+           the append-only DOM updates already do: only the newly appended
+           bubble is announced, never the full history or removals (e.g. Clear). -->
+      <div id="log" aria-live="polite" aria-atomic="false" aria-relevant="additions"></div>
 
       <div class="grounding-strip">
         <span class="grounding-strip-icon" aria-hidden="true">&#10003;</span>
