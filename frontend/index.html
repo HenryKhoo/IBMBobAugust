@@ -71,9 +71,12 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: var(--space-8) var(--space-4) var(--space-16);
+    /* Horizontal padding lives on .shell, not here, so footer (a body-level
+       sibling of .shell) can be a plain width:100% full-bleed band with no
+       viewport-unit math — that math is what caused the mis-centered band. */
+    padding: var(--space-8) 0 var(--space-16);
   }
-  .shell { width: 100%; max-width: 720px; }
+  .shell { width: 100%; max-width: 720px; padding: 0 var(--space-4); }
   header {
     position: relative;
     text-align: center;
@@ -377,15 +380,10 @@
   }
 
   footer {
-    /* Full-bleed band: break out of the centered .shell to span the viewport,
-       regardless of the parent flex container's padding (the 100vw + -50vw
-       recentering trick, self-contained to this element). */
-    width: 100vw;
-    position: relative;
-    left: 50%;
-    right: 50%;
-    margin-left: -50vw;
-    margin-right: -50vw;
+    /* Full-bleed band: body has no horizontal padding (it lives on .shell
+       instead), so a plain 100% width already reaches both viewport edges —
+       no vw-unit/negative-margin trick needed. */
+    width: 100%;
     margin-top: var(--space-8);
     background: var(--footer-band-bg);
     border-top: 1px solid var(--line);
@@ -403,7 +401,9 @@
   /* Mobile pass: stack controls instead of relying on incidental wrapping,
      shrink the display headline so it can't overflow a narrow viewport. */
   @media (max-width: 480px) {
-    body { padding: var(--space-6) var(--space-3) var(--space-8); }
+    body { padding: var(--space-6) 0 var(--space-8); }
+    .shell { padding: 0 var(--space-3); }
+    .footer-inner { padding: var(--space-6) var(--space-3); }
     header h1 { font-size: 2.25rem; }
     .controls-row { flex-direction: column; align-items: stretch; }
     .humor-row { min-width: 0; }
