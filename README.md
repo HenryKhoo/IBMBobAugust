@@ -22,6 +22,8 @@ Demo video: [add the demo video link]
 
 ## AI Approach and Architecture
 
+![Talkback architecture: development, ingestion, and runtime pipeline](docs/tech-stack-diagram.png)
+
 ### Retrieval-augmented generation — IBM Granite embeddings + Zilliz
 
 NASA SMD Q&A benchmark passages are chunked and embedded with IBM's Granite embedding model on watsonx.ai, then indexed in Zilliz Cloud (managed Milvus) as `science_reference` documents. Every answer Talkback gives is generated from a passage retrieved from that index, never from the model's own memory, which is what keeps every response traceable back to a real source instead of a guess.
