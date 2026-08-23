@@ -64,5 +64,4 @@ uvicorn app.main:app --reload --port 8000
 Then serve `frontend/` with any static file server (e.g. `python3 -m http.server 5500`) and open `app.html`. See [SETUP.md](SETUP.md) for full setup, environment variable details, and the git workflow.
 
 ## How IBM Bob was used
-
-This project was built with **IBM Bob** as our AI coding assistant throughout, used for writing new code, debugging errors, scaffolding the backend, and reviewing changes across the FastAPI service and the console frontend. It sat alongside the actual watsonx.ai/Granite stack that powers the product itself, functioning as our day to day development environment.
+**IBM Bob** (Plan Mode) served as our core development engine for development workflow from initial blueprint to final code review. We leverage the Plan mode for structured task execution, our team used IBM Bob to architect the FastAPI backend and console frontend. The product utilizes the watsonx.ai/Granite stack. 
