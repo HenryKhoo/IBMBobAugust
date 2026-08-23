@@ -11,6 +11,9 @@ venv/
 # OS
 .DS_Store
 
+# FUSE silly-rename artifacts (left behind by the synced-folder mount)
+.fuse_hidden*
+
 # Editor
 .vscode/
 .idea/
