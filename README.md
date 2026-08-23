@@ -1,25 +1,20 @@
 # The North Star — IBM Bob August Challenge
 
-_Sailors used the North Star to find their bearing when everything else was uncertain. This console does the same job for a crew in a crisis, turning noisy telemetry, scattered symptoms, and shifting supply numbers into one clear, grounded answer._
+_Sailors used the North Star to find their bearing when everything else was uncertain. This project does the same job for a real question about space science, turning it into one clear, grounded answer instead of a guess._
 
 Challenge theme: Reimagine Space Exploration with AI
 
 ## Motivation
 
-The North Star is an operations console for a deep space habitat. A crew in a
-crisis does not need more raw data, it needs a clear read on what the data
-means and what to do next. The console watches live telemetry, crew
-biometrics, and supply levels, and turns each one into a short, grounded
-answer a crew member can act on immediately. Built for the IBM Bob AI
-Builders Challenge (August theme: *Reimagine Space Exploration with AI*).
+The North Star is the landing page for **Talkback**, a grounded NASA Earth-science Q&A console. Ask a real question in plain English — tropical cyclones, dust storms, drought, wildfires, and more — and Talkback answers from a real NASA source passage, cites where that answer came from, and says so honestly when nothing in its corpus supports an answer, rather than guessing. Two voices are available: **Baseline**, direct and no-commentary, and **Banter**, the same fact told with personality. Persona only changes how a true thing is said, never whether it's said or what it claims. Built for the IBM Bob AI Builders Challenge (August theme: *Reimagine Space Exploration with AI*).
 
 ## How to Use
 
-1. Watch the crisis timeline to see the console read the live event feed, isolate the event that matters, and build the matching emergency procedure step by step.
-2. Read the telemetry translator for a plain language status on each life support sector, complete with a confidence score and a line showing what the reading is grounded in.
-3. Describe a crew member's symptoms in plain English to run a triage; the console cross references their biometrics and file for an immediate, grounded protocol.
-4. Trigger a Veggie grow-chamber failure, diagnose the cause, and tune the LED spectrum and water delivery method to recover the crop — a hands-on simulation grounded in NASA's real Veggie/APH plant-research findings, not the retrieval pipeline.
-5. Search the mission log and procedure library directly to ask a question, and get an answer sourced back to the passage it came from.
+1. Open the North Star landing page for the pitch, the Technology & Modules breakdown, the Mission, and the Team.
+2. Click **Launch Talkback** to open the console.
+3. Pick a persona — Baseline or Banter. Banter unlocks a humor slider; Baseline ignores it.
+4. Ask a question, or pick one of the suggested chips.
+5. Read the answer: a grounded response carries a confidence score and a source citation back to the passage it came from; an unmatched question gets an honest "no grounded answer" instead of a fabricated one.
 
 ## Demo
 
@@ -27,19 +22,35 @@ Demo video: [add the demo video link]
 
 ## AI Approach and Architecture
 
-### Retrieval-augmented generation — IBM Granite embeddings + Pinecone
+### Retrieval-augmented generation — IBM Granite embeddings + Zilliz
 
-Mission documents, including emergency procedures, sector specifications, crew files, and prior incident records, are chunked, embedded with IBM's Granite embedding model on watsonx.ai, and indexed in a Pinecone serverless vector database. Every generated answer, whether it is a telemetry summary, a crisis root cause, or a triage protocol, is answered from passages retrieved from that index rather than the model's own memory. This keeps every AI response traceable back to a real source document instead of a guess. (The Growing Plants in Space module and the "Try It Yourself" modules are hands-on client-side simulations, not backed by this retrieval pipeline.)
+NASA SMD Q&A benchmark passages are chunked and embedded with IBM's Granite embedding model on watsonx.ai, then indexed in Zilliz Cloud (managed Milvus) as `science_reference` documents. Every answer Talkback gives is generated from a passage retrieved from that index, never from the model's own memory, which is what keeps every response traceable back to a real source instead of a guess.
 
-### Grounded decision support — IBM watsonx.ai
+### Grounded generation — IBM watsonx.ai
 
-Each module is backed by a small, focused pipeline:
+1. Retrieve the single best-matching passage for the question.
+2. Convert its cosine similarity to a `[0, 1]` confidence score. Below a 0.68 threshold, both personas return an honest no-match response instead of guessing.
+3. Above threshold, a Granite/Mistral instruct model on watsonx.ai generates the grounded answer exactly once, always in Baseline's voice, strictly from the retrieved passage.
+4. If Banter is selected, it re-tells that already-generated, already-grounded answer in its own tone — it never answers the question itself and is explicitly instructed to introduce no new fact, number, or claim. This is what keeps "honesty is not a dial" a property of the code, not just a prompting convention.
+5. Every grounded answer carries a source reference line back to the document and chunk it came from.
 
-1. Pull the passages relevant to the current sector, event, symptom report, or supply state.
-2. Turn those passages and the live state into a plain language answer, using a Mistral or Granite instruct model on watsonx.ai.
-3. Derive a confidence value from real signals, such as retrieval strength or distance from a nominal band, never a random number.
-4. Carry a source reference line on every answer, back to the document it was grounded in.
+### API surface
+
+`GET /health` — reports whether the required watsonx/Zilliz credentials are actually configured, not just that the process is running. `POST /ingest` — chunk, embed, and upsert documents into Zilliz. `POST /query` — retrieval only, for inspecting the actual source passages a question matches. `POST /ask` — the main Q&A endpoint described above.
+
+## Quickstart
+
+```bash
+git clone https://github.com/HenryKhoo/IBMBobAugust.git
+cd IBMBobAugust/backend
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+cp ../.env.example .env   # fill in WATSONX_* and ZILLIZ_* credentials
+uvicorn app.main:app --reload --port 8000
+```
+
+Then serve `frontend/` with any static file server (e.g. `python3 -m http.server 5500`) and open `app.html`. See [SETUP.md](SETUP.md) for full setup, environment variable details, and the git workflow.
 
 ## How IBM Bob was used
 
-This project was built with **IBM Bob** as our AI coding assistant throughout, used for writing new code, debugging errors, scaffolding the backend, and reviewing changes across the FastAPI service and the console frontend. It sat alongside the actual watsonx.ai/Granite stack that powers the product itself, functioning as our day to day development environment. A `DEVELOPMENT.md` file in this repository sets the ground rules IBM Bob follows here, including keeping the console's existing visual design untouched and grounding every AI response in retrieved documents rather than generated guesses.
+This project was built with **IBM Bob** as our AI coding assistant throughout, used for writing new code, debugging errors, scaffolding the backend, and reviewing changes across the FastAPI service and the console frontend. It sat alongside the actual watsonx.ai/Granite stack that powers the product itself, functioning as our day to day development environment.
