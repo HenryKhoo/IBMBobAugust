@@ -93,6 +93,191 @@
   }
   .shell { width: 100%; max-width: 720px; padding: 0 var(--space-4); }
 
+  /* Sidebar layout wrapper — sits above .shell in the DOM (see body markup)
+     so the sidebar and the chat column are siblings in a row, both centered
+     as a group the same way .shell alone used to be centered by body's
+     align-items:center. .shell keeps its own max-width; inside the flex row
+     it grows/shrinks within a 720px basis instead of forcing width:100% of
+     the row (which would push the sidebar out). */
+  .app-layout {
+    display: flex;
+    width: 100%;
+    justify-content: center;
+    align-items: flex-start;
+    gap: var(--space-4);
+  }
+  .app-layout .shell { width: auto; flex: 1 1 720px; }
+
+  .app-nav-left { display: flex; align-items: center; gap: var(--space-3); }
+  .sidebar-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--ink-dim);
+    border-radius: 999px;
+    padding: var(--space-1) var(--space-3);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .sidebar-toggle-btn:hover { color: var(--ink); border-color: var(--ink-dim); }
+  .sidebar-toggle-btn:focus-visible { outline: 2px solid var(--accent-baseline-text); outline-offset: 2px; }
+
+  /* Hidden on wide screens (overlay is a narrow-viewport-only concept) —
+     see the max-width: 768px block below where it's switched on. */
+  .sidebar-backdrop { display: none; }
+
+  .sidebar {
+    width: 260px;
+    flex-shrink: 0;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: var(--space-3);
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    /* Sticky + capped height so a long session list scrolls internally
+       instead of pushing the footer down or growing past the viewport. */
+    max-height: calc(100vh - var(--space-8) - var(--space-16));
+    position: sticky;
+    top: var(--space-4);
+  }
+  /* Manual "collapse" on wide screens — a separate concept from the
+     narrow-viewport overlay open/close below, but driven by the same
+     data-sidebar-open attribute and the same toggle button. */
+  @media (min-width: 769px) {
+    .app-layout[data-sidebar-open="false"] .sidebar { display: none; }
+  }
+  .sidebar-header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+  .sidebar-header h2 {
+    margin: 0;
+    font-size: var(--text-xs);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-faint);
+  }
+  .sidebar-new-btn {
+    background: var(--accent-baseline-wash);
+    border: 1px solid var(--accent-baseline);
+    color: var(--accent-baseline-text);
+    border-radius: var(--radius);
+    padding: var(--space-2) var(--space-3);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+  }
+  .sidebar-new-btn:hover { border-color: var(--accent-baseline-text); }
+  .sidebar-new-btn:focus-visible { outline: 2px solid var(--accent-baseline-text); outline-offset: 2px; }
+  .sidebar-list { display: flex; flex-direction: column; gap: var(--space-2); overflow-y: auto; flex: 1; min-height: 0; }
+  .sidebar-empty { padding: var(--space-2) var(--space-1); font-size: var(--text-sm); color: var(--ink-faint); }
+
+  .sidebar-entry {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    width: 100%;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: var(--space-2) var(--space-3);
+  }
+  .sidebar-entry[data-active="true"] { border-color: var(--accent-baseline); background: var(--accent-baseline-wash); }
+  .sidebar-entry-main-btn {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    background: transparent;
+    border: none;
+    text-align: left;
+    cursor: pointer;
+    font: inherit;
+    color: inherit;
+    padding: 0;
+  }
+  .sidebar-entry-main-btn:focus-visible { outline: 2px solid var(--accent-baseline-text); outline-offset: 1px; border-radius: 4px; }
+  .sidebar-entry-title {
+    font-weight: 600;
+    font-size: var(--text-sm);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .sidebar-entry-title-input {
+    flex: 1;
+    min-width: 0;
+    font: inherit;
+    font-weight: 600;
+    font-size: var(--text-sm);
+    background: var(--panel);
+    border: 1px solid var(--accent-baseline);
+    border-radius: 4px;
+    padding: 2px var(--space-1);
+    color: inherit;
+  }
+  .sidebar-entry-meta { font-size: var(--text-xs); color: var(--ink-faint); display: flex; gap: var(--space-2); }
+  .sidebar-entry-actions { display: flex; gap: 2px; flex-shrink: 0; }
+  .sidebar-entry-action-btn {
+    flex-shrink: 0;
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--ink-faint);
+    border-radius: 999px;
+    width: 22px;
+    height: 22px;
+    line-height: 1;
+    font-size: var(--text-xs);
+    cursor: pointer;
+  }
+  .sidebar-entry-action-btn:hover { color: var(--ink); border-color: var(--ink-dim); }
+  .sidebar-entry-action-btn:focus-visible { outline: 2px solid var(--accent-baseline-text); outline-offset: 1px; }
+
+  /* Narrow viewports: sidebar becomes an off-canvas overlay instead of a
+     pushed column — there isn't room for both a session list and a usable
+     chat column at once. Toggled by the same #sidebarToggleBtn/aria-expanded
+     pair used for the wide-screen collapse above. */
+  @media (max-width: 768px) {
+    .app-layout { display: block; }
+    .app-layout .shell { width: 100%; }
+    .sidebar-backdrop {
+      display: block;
+      position: fixed;
+      inset: 0;
+      background: rgba(6, 7, 10, 0.4);
+      z-index: 90;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+    .app-layout[data-sidebar-open="true"] .sidebar-backdrop { opacity: 1; pointer-events: auto; }
+    .sidebar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 100vh;
+      max-height: none;
+      width: 280px;
+      max-width: 85vw;
+      border-radius: 0;
+      z-index: 100;
+      box-shadow: var(--shadow-lg);
+      transform: translateX(-100%);
+      transition: transform 0.2s ease;
+    }
+    .app-layout[data-sidebar-open="true"] .sidebar { transform: translateX(0); }
+  }
+  @media (max-width: 768px) and (prefers-reduced-motion: reduce) {
+    .sidebar, .sidebar-backdrop { transition: none; }
+  }
+
   /* Wordmark, matched to index.html's .logo so the two pages read as one
      product — "NORTH STAR" stays the constant, the span names the page. */
   .app-nav {
@@ -598,9 +783,32 @@
 </style>
 </head>
 <body>
-  <div class="shell">
+  <div class="app-layout" id="appLayout" data-sidebar-open="true">
+    <!-- Only rendered visibly on narrow viewports (see the max-width: 768px
+         block) — clicking it closes the overlay sidebar. -->
+    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+    <!-- Persistent sidebar — session switcher for the device-local
+         conversation index already maintained below (STORAGE_KEY_CONVERSATIONS).
+         Built alongside #pastConvPanel rather than replacing it (see
+         docs/chat-session-sidebar-plan.md); both read/write the same storage
+         key and are kept in sync. -->
+    <aside class="sidebar" id="sidebar" aria-label="Chat sessions">
+      <div class="sidebar-header">
+        <h2>Sessions</h2>
+      </div>
+      <button type="button" class="sidebar-new-btn" id="sidebarNewBtn">+ New conversation</button>
+      <div class="sidebar-list" id="sidebarList" aria-live="polite"></div>
+    </aside>
+
+    <div class="shell">
     <div class="app-nav">
-      <a class="logo" href="index.html"><b>NORTH STAR</b><span>TALKBACK</span></a>
+      <div class="app-nav-left">
+        <button type="button" class="sidebar-toggle-btn" id="sidebarToggleBtn" aria-expanded="true" aria-controls="sidebar">
+          <span aria-hidden="true">&#9776;</span> Sessions
+        </button>
+        <a class="logo" href="index.html"><b>NORTH STAR</b><span>TALKBACK</span></a>
+      </div>
       <a class="landing-link" href="index.html">&larr; Landing Page</a>
     </div>
     <header>
@@ -700,6 +908,7 @@
       </form>
 
       <div class="chips" id="chips"></div>
+    </div>
     </div>
   </div>
 
@@ -832,6 +1041,13 @@
   const historySourceTag = document.getElementById("historySourceTag");
   const closeHistoryBtn = document.getElementById("closeHistoryBtn");
 
+  const appLayout = document.getElementById("appLayout");
+  const sidebarToggleBtn = document.getElementById("sidebarToggleBtn");
+  const sidebarBackdrop = document.getElementById("sidebarBackdrop");
+  const sidebarEl = document.getElementById("sidebar");
+  const sidebarNewBtn = document.getElementById("sidebarNewBtn");
+  const sidebarList = document.getElementById("sidebarList");
+
   const pastConvBtn = document.getElementById("pastConvBtn");
   const pastConvPanel = document.getElementById("pastConvPanel");
   const pastConvListView = document.getElementById("pastConvListView");
@@ -908,6 +1124,24 @@
 
   function removeStoredConversation(sessionId) {
     saveConversationIndex(loadConversationIndex().filter((entry) => entry.sessionId !== sessionId));
+  }
+
+  // Rename never touches the auto-derived `title` field `recordNewConversation`
+  // writes — it's stored as a separate `renamedTitle` override so nothing
+  // about the existing recording path has to change. `displayTitle` below is
+  // the one place that decides which of the two wins. An empty/whitespace-only
+  // rename clears the override back to null rather than storing a blank title.
+  function renameStoredConversation(sessionId, newTitle) {
+    const list = loadConversationIndex();
+    const idx = list.findIndex((entry) => entry.sessionId === sessionId);
+    if (idx === -1) return;
+    const trimmed = newTitle.trim();
+    list[idx].renamedTitle = trimmed ? trimmed : null;
+    saveConversationIndex(list);
+  }
+
+  function displayTitle(entry) {
+    return entry.renamedTitle || entry.title || "Untitled conversation";
   }
 
   function formatConversationTimestamp(ms) {
@@ -1016,6 +1250,217 @@
     }
   }
 
+  // --- Sidebar: open/closed state -----------------------------------------
+  // One boolean drives two different visual mechanics (see the CSS): a plain
+  // collapse on wide screens, an off-canvas overlay on narrow ones. Persisted
+  // so a deliberate collapse survives reload, but with no stored preference
+  // yet the *initial* default differs by viewport — open on desktop (primary
+  // nav), closed on narrow screens (an overlay covering the chat on first
+  // load would be a bad first impression).
+  const STORAGE_KEY_SIDEBAR_OPEN = "talkback:sidebarOpen";
+  const NARROW_MEDIA_QUERY = "(max-width: 768px)";
+
+  function loadSidebarOpenPref() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY_SIDEBAR_OPEN);
+      if (raw === "1") return true;
+      if (raw === "0") return false;
+    } catch (err) {
+      // localStorage unavailable — fall through to the viewport-based default
+    }
+    return !window.matchMedia(NARROW_MEDIA_QUERY).matches;
+  }
+
+  function setSidebarOpen(open) {
+    appLayout.dataset.sidebarOpen = String(open);
+    sidebarToggleBtn.setAttribute("aria-expanded", String(open));
+    try {
+      localStorage.setItem(STORAGE_KEY_SIDEBAR_OPEN, open ? "1" : "0");
+    } catch (err) {
+      // ignore — this session just won't remember the choice on reload
+    }
+  }
+
+  function closeSidebarOnNarrowViewport() {
+    if (window.matchMedia(NARROW_MEDIA_QUERY).matches) {
+      setSidebarOpen(false);
+    }
+  }
+
+  // --- Sidebar: session list ------------------------------------------------
+  // sessionId of whichever sidebar row is currently mid-rename — mirrors
+  // activePastConvId's role for the old panel's detail view. Only one row
+  // can be renaming at a time.
+  let renamingSessionId = null;
+
+  function renderSidebarList() {
+    const entries = loadConversationIndex();
+    sidebarList.innerHTML = "";
+
+    if (entries.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "sidebar-empty";
+      empty.textContent = "No conversations yet — ask a question to start one.";
+      sidebarList.appendChild(empty);
+      return;
+    }
+
+    entries.forEach((entry) => {
+      const title = displayTitle(entry);
+      const row = document.createElement("div");
+      row.className = "sidebar-entry";
+      row.dataset.active = String(entry.sessionId === state.sessionId);
+
+      if (renamingSessionId === entry.sessionId) {
+        const input = document.createElement("input");
+        input.type = "text";
+        input.className = "sidebar-entry-title-input";
+        input.value = title;
+        input.maxLength = 80;
+        input.setAttribute("aria-label", "Rename conversation");
+
+        let cancelled = false;
+        const commit = () => {
+          if (cancelled) return;
+          renameStoredConversation(entry.sessionId, input.value);
+          renamingSessionId = null;
+          renderSidebarList();
+        };
+        const cancel = () => {
+          cancelled = true;
+          renamingSessionId = null;
+          renderSidebarList();
+        };
+        input.addEventListener("blur", commit);
+        input.addEventListener("keydown", (event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            input.blur(); // triggers commit via the blur handler above
+          } else if (event.key === "Escape") {
+            event.preventDefault();
+            cancel();
+          }
+        });
+
+        const actions = document.createElement("div");
+        actions.className = "sidebar-entry-actions";
+        const cancelBtn = document.createElement("button");
+        cancelBtn.type = "button";
+        cancelBtn.className = "sidebar-entry-action-btn";
+        cancelBtn.setAttribute("aria-label", "Cancel rename");
+        cancelBtn.textContent = "×";
+        // mousedown, not click: click fires after blur, by which point
+        // commit() would already have run and this button would be gone.
+        cancelBtn.addEventListener("mousedown", (event) => {
+          event.preventDefault();
+          cancel();
+        });
+        actions.appendChild(cancelBtn);
+
+        row.append(input, actions);
+        sidebarList.appendChild(row);
+        input.focus();
+        input.select();
+        return;
+      }
+
+      const mainBtn = document.createElement("button");
+      mainBtn.type = "button";
+      mainBtn.className = "sidebar-entry-main-btn";
+      mainBtn.setAttribute("aria-label", `Open conversation: ${title}`);
+
+      const titleEl = document.createElement("span");
+      titleEl.className = "sidebar-entry-title";
+      titleEl.textContent = title;
+
+      const meta = document.createElement("span");
+      meta.className = "sidebar-entry-meta";
+      const time = document.createElement("span");
+      time.textContent = formatConversationTimestamp(entry.startedAt);
+      const persona = document.createElement("span");
+      persona.textContent = entry.persona === "banter" ? "Banter" : "Baseline";
+      meta.append(time, persona);
+
+      mainBtn.append(titleEl, meta);
+      mainBtn.addEventListener("click", () => selectSidebarConversation(entry));
+
+      const actions = document.createElement("div");
+      actions.className = "sidebar-entry-actions";
+
+      const renameBtn = document.createElement("button");
+      renameBtn.type = "button";
+      renameBtn.className = "sidebar-entry-action-btn";
+      renameBtn.setAttribute("aria-label", `Rename conversation: ${title}`);
+      renameBtn.textContent = "✎";
+      renameBtn.addEventListener("click", (event) => {
+        event.stopPropagation();
+        renamingSessionId = entry.sessionId;
+        renderSidebarList();
+      });
+
+      const deleteBtn = document.createElement("button");
+      deleteBtn.type = "button";
+      deleteBtn.className = "sidebar-entry-action-btn";
+      deleteBtn.setAttribute("aria-label", `Delete conversation: ${title}`);
+      deleteBtn.textContent = "×";
+      deleteBtn.addEventListener("click", (event) => {
+        event.stopPropagation();
+        removeStoredConversation(entry.sessionId);
+        // Deleting the live conversation ends it client-side too — same
+        // reasoning as the old panel's deleteConvBtn handler.
+        if (state.sessionId === entry.sessionId) {
+          state.sessionId = null;
+          updateClearButtonState();
+          updateHistoryButtonState();
+        }
+        renderSidebarList();
+      });
+
+      actions.append(renameBtn, deleteBtn);
+      row.append(mainBtn, actions);
+      sidebarList.appendChild(row);
+    });
+  }
+
+  // Loads the selected conversation's transcript into the live `#log` and
+  // makes it the active session — the sidebar's equivalent of the old
+  // panel's "Resume this conversation" button, just reachable in one click
+  // instead of open-panel -> open-entry -> resume.
+  async function selectSidebarConversation(entry) {
+    if (entry.sessionId === state.sessionId) {
+      closeSidebarOnNarrowViewport();
+      return;
+    }
+    try {
+      const data = await loadConversationHistory(entry.sessionId);
+      renderHistoryTurns(data.turns, logEl);
+    } catch (err) {
+      console.error(err);
+    }
+    state.sessionId = entry.sessionId;
+    updateClearButtonState();
+    updateHistoryButtonState();
+    historyPanel.hidden = true;
+    historyBtn.setAttribute("aria-expanded", "false");
+    renderSidebarList();
+    closeSidebarOnNarrowViewport();
+    questionInput.focus();
+  }
+
+  // Shared by the sidebar's "+ New conversation" button and the existing
+  // "Clear conversation" button (see clearBtn's listener below) so there's
+  // one definition of what ending the current conversation means, reused
+  // rather than duplicated.
+  function startNewConversation() {
+    logEl.innerHTML = "";
+    state.sessionId = null;
+    updateClearButtonState();
+    updateHistoryButtonState();
+    historyPanel.hidden = true;
+    historyBtn.setAttribute("aria-expanded", "false");
+    renderSidebarList();
+  }
+
   function loadPersistedSettings() {
     try {
       const storedPersona = localStorage.getItem(STORAGE_KEY_PERSONA);
@@ -1098,6 +1543,7 @@
       updateHistoryButtonState();
       historyPanel.hidden = true;
       historyBtn.setAttribute("aria-expanded", "false");
+      renderSidebarList();
     }
   }
 
@@ -1114,6 +1560,8 @@
 
   loadPersistedSettings();
   applyPersistedSettings();
+  setSidebarOpen(loadSidebarOpenPref());
+  renderSidebarList();
 
   function updateSendButtonState() {
     sendBtn.disabled = isLoading || questionInput.value.trim().length === 0;
@@ -1148,17 +1596,38 @@
   });
 
   clearBtn.addEventListener("click", () => {
-    logEl.innerHTML = "";
     // Ending the conversation client-side only clears the DOM; forgetting
     // sessionId is what actually starts a new one — the next question
     // omits session_id, so the backend mints a brand-new session rather
     // than silently continuing the one that was just "cleared" on screen.
-    state.sessionId = null;
-    updateClearButtonState();
-    updateHistoryButtonState();
-    historyPanel.hidden = true;
-    historyBtn.setAttribute("aria-expanded", "false");
+    startNewConversation();
     questionInput.focus();
+  });
+
+  sidebarToggleBtn.addEventListener("click", () => {
+    setSidebarOpen(appLayout.dataset.sidebarOpen !== "true");
+  });
+
+  sidebarBackdrop.addEventListener("click", () => setSidebarOpen(false));
+
+  sidebarNewBtn.addEventListener("click", () => {
+    startNewConversation();
+    closeSidebarOnNarrowViewport();
+    questionInput.focus();
+  });
+
+  // Overlay-only affordance (see the max-width: 768px CSS) — closing on
+  // Escape only matters when the sidebar is actually covering content,
+  // which is exactly the narrow-viewport case.
+  document.addEventListener("keydown", (event) => {
+    if (
+      event.key === "Escape" &&
+      appLayout.dataset.sidebarOpen === "true" &&
+      window.matchMedia(NARROW_MEDIA_QUERY).matches
+    ) {
+      setSidebarOpen(false);
+      sidebarToggleBtn.focus();
+    }
   });
 
   // `target` defaults to the "Conversation history" panel's own log, but is
@@ -1275,6 +1744,7 @@
   clearAllConvBtn.addEventListener("click", () => {
     saveConversationIndex([]);
     renderPastConvList();
+    renderSidebarList();
   });
 
   backToConvListBtn.addEventListener("click", showPastConvListView);
@@ -1300,6 +1770,7 @@
     updateHistoryButtonState();
     pastConvPanel.hidden = true;
     pastConvBtn.setAttribute("aria-expanded", "false");
+    renderSidebarList();
     questionInput.focus();
   });
 
@@ -1314,6 +1785,7 @@
       updateHistoryButtonState();
     }
     showPastConvListView();
+    renderSidebarList();
   });
 
   function addQuestionBubble(text) {
@@ -1483,6 +1955,7 @@
       if (isNewConversation) {
         recordNewConversation(data.session_id, question, state.persona);
       }
+      renderSidebarList();
     } catch (err) {
       typingEl.remove();
       addErrorBubble(
