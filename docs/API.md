@@ -55,10 +55,12 @@ already populates this).
 ```json
 {
   "documents": [
-    { "id": "string", "type": "science_reference", "text": "string" }
+    { "id": "string", "type": "science_reference", "text": "string", "domain": "other" }
   ]
 }
 ```
+
+`domain` is optional per document, defaulting to `"other"` — see "Mission-based domains" below. Existing callers that predate `domain` keep working unchanged.
 
 **Response**
 ```json
@@ -81,11 +83,14 @@ ungrounded.
 ```json
 {
   "question": "string",
-  "top_k": 5
+  "top_k": 5,
+  "domain": "tropical_cyclone_dynamics | saharan_dust | climate_reconstruction | environmental_hazards | other | null"
 }
 ```
 
-`top_k` is optional (default `5`, max `20`).
+`top_k` is optional (default `5`, max `20`). `domain` is optional — see
+"Mission-based domains" below; `null`/omitted searches the whole corpus,
+exactly as this endpoint behaved before `domain` existed.
 
 **Response**
 ```json
@@ -113,7 +118,8 @@ failure.
   "question": "string",
   "persona": "baseline | banter",
   "humor": 50,
-  "session_id": "string | null"
+  "session_id": "string | null",
+  "domain": "tropical_cyclone_dynamics | saharan_dust | climate_reconstruction | environmental_hazards | other | null"
 }
 ```
 
@@ -121,6 +127,9 @@ failure.
 `session_id` is optional — omit it on the first question of a
 conversation, then send back whatever the previous response's
 `session_id` was on every follow-up. See "Conversational memory" below.
+`domain` is optional — see "Mission-based domains" below; `null`/omitted
+searches the whole corpus, exactly as this endpoint behaved before
+`domain` existed.
 
 **Response**
 ```json
@@ -197,6 +206,34 @@ shapes what a question is *interpreted to mean*; it is never a source of
 facts and never substitutes for the current question's own retrieval — see
 the grounding discipline under "Conventions" below, which is otherwise
 completely unaffected by any of this.
+
+## Mission-based domains
+
+A lightweight topical tag on the single existing `science_reference`
+corpus — not a second corpus, and not a return of the pre-revamp habitat
+mission-console module set (telemetry/crisis/triage/rationing) that was
+deliberately removed from this API; see `app/schemas.py`'s module
+docstring. The five `Domain` values are `tropical_cyclone_dynamics`,
+`saharan_dust`, `climate_reconstruction`, `environmental_hazards`, and
+`other`. `other` is a real, permanent bucket for topics that don't fit
+the four specific ones, not a placeholder for "unclassified" — every
+ingested document gets tagged into one of the five (see
+`backend/scripts/tag_corpus_domains.py`).
+
+A user picks a domain in the console before asking a question so the
+suggested chips — and, if a domain is set, retrieval itself — are scoped
+to what they're actually interested in. `domain` on `/ask`/`/query`
+restricts the main-answer or passage search to documents tagged with that
+value; conversational-history recall on `/ask` is unaffected, since it's
+scoped by `session_id`, not subject matter.
+
+If a domain-scoped search on `/ask` comes back with literally nothing —
+an empty or misconfigured domain, not just a weak match — it retries once
+against the whole corpus rather than surfacing a false "no grounded
+answer" that would really just mean "nothing tagged for this domain." A
+domain search that does find something, even below the confidence
+threshold, is a real "no grounded answer in this domain" and is not
+retried.
 
 ## Conventions
 

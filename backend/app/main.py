@@ -133,7 +133,7 @@ def query(request: QueryRequest) -> QueryResponse:
     question that matches nothing in the corpus is a valid, empty result
     set rather than an error.
     """
-    return run_query(request.question, request.top_k)
+    return run_query(request.question, request.top_k, request.domain)
 
 
 @app.post("/ask", response_model=AskResponse)
@@ -149,7 +149,9 @@ def ask(request: AskRequest) -> AskResponse:
     `request.session_id` opts into conversational memory across calls to
     this endpoint — see `AskRequest.session_id` and `app.services.memory`.
     """
-    return ask_talkback(request.question, request.persona, request.humor, request.session_id)
+    return ask_talkback(
+        request.question, request.persona, request.humor, request.session_id, request.domain
+    )
 
 
 @app.get("/conversation/history", response_model=ConversationHistoryResponse)

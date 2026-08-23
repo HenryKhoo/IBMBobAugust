@@ -1,6 +1,6 @@
 import pytest
 
-from app.schemas import DocumentType, MissionDocument
+from app.schemas import Domain, DocumentType, MissionDocument
 from app.services.ingestion import chunk_document, chunk_documents, chunk_text
 
 
@@ -87,11 +87,15 @@ def test_chunk_document_tags_each_chunk_with_its_source():
     assert chunk.doc_type == "science_reference"
     assert chunk.chunk_index == 0
     assert chunk.doc_text == document.text
+    # domain defaults to "other" here since the document above never set one —
+    # see test_chunk_document_carries_the_document_s_domain_onto_every_chunk
+    # for a document that does.
     assert chunk.metadata() == {
         "doc_id": "nasa-smd-001",
         "doc_type": "science_reference",
         "chunk_index": 0,
         "doc_text": document.text,
+        "domain": "other",
     }
 
 
@@ -112,6 +116,20 @@ def test_chunk_document_carries_full_doc_text_on_every_chunk():
         # doc_text is the full document; a chunk's own text is at most a
         # (usually strict) substring/piece of it.
         assert chunk.text != chunk.doc_text or len(chunks) == 1
+
+
+def test_chunk_document_carries_the_document_s_domain_onto_every_chunk():
+    document = MissionDocument(
+        id="nasa-smd-dust-001",
+        type=DocumentType.SCIENCE_REFERENCE,
+        text=" ".join(f"word{i}" for i in range(300)),
+        domain=Domain.SAHARAN_DUST,
+    )
+    chunks = chunk_document(document, chunk_size=100, overlap=20)
+
+    assert len(chunks) > 2
+    assert all(chunk.domain == "saharan_dust" for chunk in chunks)
+    assert all(chunk.metadata()["domain"] == "saharan_dust" for chunk in chunks)
 
 
 def test_chunk_documents_processes_a_batch_in_order():

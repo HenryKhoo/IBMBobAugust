@@ -48,10 +48,15 @@ from app.schemas import (
     AskResponse,
     ConversationRole,
     ConversationTurn,
+    Domain,
     HistorySource,
 )
 from app.services.memory import get_or_create_session, persist_grounded_exchange, recall_relevant_history
-from app.services.vector_store import get_vector_store, relevance_score_hits_or_empty
+from app.services.vector_store import (
+    escape_expr_string_literal,
+    get_vector_store,
+    relevance_score_hits_or_empty,
+)
 from app.services.watsonx import get_instruct_model
 
 # Below this, a retrieval hit exists but is too weak to trust — same
@@ -116,6 +121,22 @@ def _humor_label(humor: int) -> str:
 
 def _source_line(metadata: dict) -> str:
     return f"{metadata['doc_type']}:{metadata['doc_id']}#chunk{metadata['chunk_index']}"
+
+
+def _retrieval_expr(domain: Domain | None) -> str:
+    """Build the Milvus `expr` for the main-answer retrieval.
+
+    `domain` is a closed `Domain` enum value, not free text a caller could
+    inject through — Pydantic already rejects anything else at the
+    `AskRequest`/`QueryRequest` boundary — so escaping here is
+    defense-in-depth rather than a real injection risk, matching how
+    every other filter value in this codebase gets escaped before joining
+    an `expr`, regardless of how trusted its source looks today.
+    """
+    expr = "doc_type == 'science_reference'"
+    if domain is not None:
+        expr += f" and domain == '{escape_expr_string_literal(domain.value)}'"
+    return expr
 
 
 def _history_block(turns: list[ConversationTurn]) -> str:
@@ -187,7 +208,11 @@ def _fallback_response(
 
 
 def ask_talkback(
-    question: str, persona: AskPersona, humor: int, session_id: str | None = None
+    question: str,
+    persona: AskPersona,
+    humor: int,
+    session_id: str | None = None,
+    domain: Domain | None = None,
 ) -> AskResponse:
     """Answer a space-science question, grounded in the ingested corpus.
 
@@ -213,6 +238,16 @@ def ask_talkback(
     what a caller sends back on the next turn to keep continuity, and
     `AskResponse.history_source` reports which stage (if either) actually
     contributed context for this question.
+
+    `domain` restricts the main-answer retrieval to that `Domain` tag —
+    conversational-history recall (above) is unaffected, since it's scoped
+    by `session_id`, not subject matter. If the domain-scoped search comes
+    back with literally nothing (an empty or misconfigured domain, not
+    just a weak match), retrieval retries once against the whole corpus
+    rather than surfacing a false "no grounded answer" that would really
+    just mean "nothing tagged for this domain" — see `_retrieval_expr`.
+    `None` searches the whole corpus directly, exactly as this function
+    behaved before `domain` existed.
     """
     store = get_vector_store()
     session = get_or_create_session(session_id)
@@ -239,9 +274,9 @@ def ask_talkback(
 
     session.add_turn(ConversationRole.USER, question)
 
-    hits = relevance_score_hits_or_empty(
-        store, question, k=1, expr="doc_type == 'science_reference'"
-    )
+    hits = relevance_score_hits_or_empty(store, question, k=1, expr=_retrieval_expr(domain))
+    if not hits and domain is not None:
+        hits = relevance_score_hits_or_empty(store, question, k=1, expr=_retrieval_expr(None))
     if not hits:
         response = _fallback_response(
             persona, confidence=None, session_id=session.session_id, history_source=history_source

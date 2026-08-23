@@ -4,6 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.schemas import Domain
 from app.services import query
 from tests.conftest import _FakeDocument
 
@@ -69,6 +70,46 @@ def test_run_query_returns_passages_ordered_by_relevance(monkeypatch, fake_hits)
     assert "expr" not in fake_store.calls[0]
     assert fake_store.calls[0]["query"] == "What caused the Sector 4 breach?"
     assert fake_store.calls[0]["k"] == 5
+
+
+def test_run_query_passes_no_expr_at_all_by_default(monkeypatch, fake_hits):
+    # Belt-and-suspenders alongside the assertion already in
+    # test_run_query_returns_passages_ordered_by_relevance: omitting `domain`
+    # must reach the store exactly as it did before `domain` existed, not as
+    # an explicit `expr=None`.
+    fake_store = _FakeVectorStore(fake_hits)
+    monkeypatch.setattr(query, "get_vector_store", lambda: fake_store)
+
+    query.run_query("What caused the Sector 4 breach?", top_k=5)
+
+    assert "expr" not in fake_store.calls[0]
+
+
+def test_run_query_scopes_to_one_domain_when_given(monkeypatch, fake_hits):
+    fake_store = _FakeVectorStore(fake_hits)
+    monkeypatch.setattr(query, "get_vector_store", lambda: fake_store)
+
+    query.run_query("dust storms", top_k=5, domain=Domain.SAHARAN_DUST)
+
+    assert fake_store.calls[0]["expr"] == "domain == 'saharan_dust'"
+
+
+def test_endpoint_accepts_a_domain_and_scopes_the_search(monkeypatch, fake_hits):
+    fake_store = _FakeVectorStore(fake_hits)
+    monkeypatch.setattr(query, "get_vector_store", lambda: fake_store)
+
+    response = client.post(
+        "/query",
+        json={"question": "dust storms", "domain": "saharan_dust"},
+    )
+
+    assert response.status_code == 200
+    assert fake_store.calls[0]["expr"] == "domain == 'saharan_dust'"
+
+
+def test_endpoint_rejects_an_unknown_domain():
+    response = client.post("/query", json={"question": "valid", "domain": "not_a_real_domain"})
+    assert response.status_code == 422
 
 
 def test_run_query_clamps_relevance_into_unit_range(monkeypatch):

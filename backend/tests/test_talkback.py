@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 
 from app import main
 from app.main import app
+from app.schemas import Domain
 from app.services import talkback
 from tests.conftest import _FakeDocument, _FakeInstructModel, _FakeMessage
 
@@ -65,6 +66,28 @@ RELEVANCE_SCORE = 0.82
 @pytest.fixture
 def fake_hit() -> tuple[_FakeDocument, float]:
     return (_FakeDocument(REFERENCE_TEXT, dict(REFERENCE_METADATA)), RELEVANCE_SCORE)
+
+
+class _DomainAwareFakeVectorStore(_FakeVectorStore):
+    """Like `_FakeVectorStore`, but distinguishes a domain-scoped call from
+    the domain-less retry `ask_talkback` makes when a domain search comes
+    back empty — needed only by the domain-fallback tests below; every
+    other test's `_FakeVectorStore` has no reason to care which expr it
+    got, so this stays local rather than replacing the shared fake.
+    """
+
+    def __init__(self, hits, domain_hits, history_hits=None):
+        super().__init__(hits, history_hits)
+        self.domain_hits = domain_hits
+
+    def similarity_search_with_relevance_scores(self, query, **kwargs):
+        self.calls.append({"query": query, **kwargs})
+        expr = kwargs.get("expr", "")
+        if "conversation_turn" in expr:
+            return self.history_hits
+        if "domain ==" in expr:
+            return self.domain_hits
+        return self.hits
 
 
 def test_ask_baseline_returns_grounded_answer_and_source(monkeypatch, fake_hit):
@@ -143,6 +166,113 @@ def test_ask_falls_back_below_confidence_threshold_with_persona_specific_wording
     assert banter_response.grounded is False
     assert banter_response.answer != baseline_response.answer
     assert fake_model.invoked_with == []
+
+
+# --- Domain scoping -----------------------------------------------------
+
+
+def test_ask_scopes_retrieval_to_the_requested_domain(monkeypatch, fake_hit):
+    fake_store = _FakeVectorStore([fake_hit])
+    fake_model = _FakeInstructModel(STUBBED_ANSWER)
+    monkeypatch.setattr(talkback, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(talkback, "get_instruct_model", lambda: fake_model)
+
+    talkback.ask_talkback(
+        "What is Veggie?",
+        talkback.AskPersona.BASELINE,
+        humor=50,
+        domain=Domain.TROPICAL_CYCLONE_DYNAMICS,
+    )
+
+    assert fake_store.calls[0]["expr"] == (
+        "doc_type == 'science_reference' and domain == 'tropical_cyclone_dynamics'"
+    )
+    # exactly one retrieval call — a real hit came back, so there's nothing
+    # for the empty-domain fallback to do.
+    assert len(fake_store.calls) == 1
+
+
+def test_ask_falls_back_to_the_whole_corpus_when_a_domain_has_nothing_indexed(monkeypatch):
+    # The requested domain's own search comes back with literally nothing,
+    # but the whole corpus (no domain clause) does have a real match —
+    # simulating an empty/misconfigured domain rather than a genuinely
+    # unanswerable question.
+    strong_hit = (_FakeDocument(REFERENCE_TEXT, dict(REFERENCE_METADATA)), RELEVANCE_SCORE)
+    fake_store = _DomainAwareFakeVectorStore(hits=[strong_hit], domain_hits=[])
+    fake_model = _FakeInstructModel(STUBBED_ANSWER)
+    monkeypatch.setattr(talkback, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(talkback, "get_instruct_model", lambda: fake_model)
+
+    response = talkback.ask_talkback(
+        "What is Veggie?",
+        talkback.AskPersona.BASELINE,
+        humor=50,
+        domain=Domain.SAHARAN_DUST,
+    )
+
+    assert response.grounded is True
+    assert response.answer == STUBBED_ANSWER
+    # two retrieval calls: the domain-scoped one that came back empty, then
+    # the domain-less retry that actually found something.
+    assert len(fake_store.calls) == 2
+    assert "domain ==" in fake_store.calls[0]["expr"]
+    assert "domain ==" not in fake_store.calls[1]["expr"]
+
+
+def test_ask_does_not_fall_back_when_a_domain_search_finds_only_a_weak_match(monkeypatch):
+    # A domain-scoped search that finds *something*, just below the
+    # confidence threshold, must be treated as a real "no grounded answer
+    # in this domain" — not retried against the whole corpus, even though a
+    # stronger match exists elsewhere. The empty-domain fallback exists for
+    # "nothing indexed here at all," not for "weak match in this domain."
+    weak_hit = (_FakeDocument(REFERENCE_TEXT, dict(REFERENCE_METADATA)), 0.1)
+    strong_hit_elsewhere = (_FakeDocument(REFERENCE_TEXT, dict(REFERENCE_METADATA)), 0.95)
+    fake_store = _DomainAwareFakeVectorStore(hits=[strong_hit_elsewhere], domain_hits=[weak_hit])
+    fake_model = _FakeInstructModel(STUBBED_ANSWER)
+    monkeypatch.setattr(talkback, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(talkback, "get_instruct_model", lambda: fake_model)
+
+    response = talkback.ask_talkback(
+        "anything",
+        talkback.AskPersona.BASELINE,
+        humor=50,
+        domain=Domain.CLIMATE_RECONSTRUCTION,
+    )
+
+    assert response.grounded is False
+    assert response.confidence == 0.1
+    assert len(fake_store.calls) == 1
+    assert fake_model.invoked_with == []
+
+
+def test_ask_without_a_domain_makes_exactly_one_retrieval_call(monkeypatch, fake_hit):
+    fake_store = _FakeVectorStore([fake_hit])
+    fake_model = _FakeInstructModel(STUBBED_ANSWER)
+    monkeypatch.setattr(talkback, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(talkback, "get_instruct_model", lambda: fake_model)
+
+    talkback.ask_talkback("What is Veggie?", talkback.AskPersona.BASELINE, humor=50)
+
+    assert fake_store.calls[0]["expr"] == "doc_type == 'science_reference'"
+    assert len(fake_store.calls) == 1
+
+
+def test_endpoint_accepts_a_domain_and_rejects_an_unknown_one(monkeypatch, fake_hit):
+    fake_store = _FakeVectorStore([fake_hit])
+    fake_model = _FakeInstructModel(STUBBED_ANSWER)
+    monkeypatch.setattr(talkback, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(talkback, "get_instruct_model", lambda: fake_model)
+
+    ok = client.post(
+        "/ask", json={"question": "What is Veggie?", "domain": "environmental_hazards"}
+    )
+    assert ok.status_code == 200
+    assert fake_store.calls[0]["expr"] == (
+        "doc_type == 'science_reference' and domain == 'environmental_hazards'"
+    )
+
+    bad = client.post("/ask", json={"question": "valid", "domain": "not_a_real_domain"})
+    assert bad.status_code == 422
 
 
 def test_endpoint_happy_path_matches_api_contract_shape(monkeypatch, fake_hit):

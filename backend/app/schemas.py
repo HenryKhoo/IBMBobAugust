@@ -50,12 +50,45 @@ class DocumentType(str, Enum):
     SCIENCE_REFERENCE = "science_reference"
 
 
+class Domain(str, Enum):
+    """Which subject-matter slice of the science_reference corpus a document
+    or a question belongs to.
+
+    This is a lightweight topical tag on top of the single existing corpus
+    — not a second corpus, and not a return of the pre-revamp habitat
+    mission-console module set (telemetry/crisis/triage/rationing) that
+    was deliberately removed; see this module's own docstring. A user
+    picks one of these before asking a question so the suggested chips and
+    (optionally) retrieval itself are scoped to what they're actually
+    interested in, instead of one undifferentiated question box.
+
+    `OTHER` is a real, permanent bucket, not a placeholder for
+    "unclassified" — every corpus document gets tagged into one of these
+    five at ingestion time (see `backend/scripts/tag_corpus_domains.py`),
+    and a document whose topic doesn't fit the four specific buckets
+    belongs in `OTHER` on purpose, the same way a "no filter" question
+    still needs a real, matchable domain if one is ever assigned to it.
+    """
+
+    TROPICAL_CYCLONE_DYNAMICS = "tropical_cyclone_dynamics"
+    SAHARAN_DUST = "saharan_dust"
+    CLIMATE_RECONSTRUCTION = "climate_reconstruction"
+    ENVIRONMENTAL_HAZARDS = "environmental_hazards"
+    OTHER = "other"
+
+
 class MissionDocument(BaseModel):
-    """A single raw document submitted for ingestion."""
+    """A single raw document submitted for ingestion.
+
+    `domain` defaults to `Domain.OTHER` so an existing /ingest caller that
+    predates this field keeps working unchanged rather than being rejected
+    for a now-required value it never knew to send.
+    """
 
     id: str
     type: DocumentType
     text: str = Field(min_length=1)
+    domain: Domain = Domain.OTHER
 
 
 class IngestRequest(BaseModel):
@@ -77,10 +110,15 @@ class QueryRequest(BaseModel):
     Bounded (`ge=1, le=20`) since this endpoint has no downstream
     generation step to keep a runaway value in check the way `/ask`'s
     single-chunk retrieval implicitly does.
+
+    `domain` restricts retrieval to one `Domain` tag. `None` (the default)
+    searches the whole corpus, exactly as this endpoint behaved before
+    `domain` existed — see `app.services.query.run_query`.
     """
 
     question: str = Field(min_length=1)
     top_k: int = Field(default=5, ge=1, le=20)
+    domain: Domain | None = None
 
 
 class QueryResult(BaseModel):
@@ -227,12 +265,18 @@ class AskRequest(BaseModel):
     supplies a fact — every answer is still generated strictly from
     whatever the current question retrieves, exactly as before this field
     existed.
+
+    `domain` restricts retrieval to one `Domain` tag — see
+    `app.services.talkback.ask_talkback` for the fallback that kicks in if
+    that domain has nothing indexed at all. `None` (the default) searches
+    the whole corpus, exactly as `/ask` behaved before `domain` existed.
     """
 
     question: str = Field(min_length=1)
     persona: AskPersona = AskPersona.BASELINE
     humor: int = Field(default=50, ge=0, le=100)
     session_id: str | None = None
+    domain: Domain | None = None
 
 
 class AskResponse(BaseModel):

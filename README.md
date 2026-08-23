@@ -12,9 +12,11 @@ The North Star is the landing page for **Talkback**, a grounded NASA Earth-scien
 
 1. Open the North Star landing page for the pitch, the Technology & Modules breakdown, the Mission, and the Team.
 2. Click **Launch Talkback** to open the console.
-3. Pick a persona — Baseline or Banter. Banter unlocks a humor slider; Baseline ignores it.
-4. Ask a question, or pick one of the suggested chips.
-5. Read the answer: a grounded response carries a confidence score and a source citation back to the passage it came from; an unmatched question gets an honest "no grounded answer" instead of a fabricated one.
+3. Pick a domain to explore — Tropical Cyclone Dynamics, Saharan Dust, Climate Reconstruction, Environmental Hazards, or Other — or leave it on **All**. This scopes the suggested chips (and, server-side, retrieval itself) to that slice of the corpus.
+4. Pick a persona — Baseline or Banter. Banter unlocks a humor slider; Baseline ignores it.
+5. Ask a question, or pick one of the suggested chips.
+6. Read the answer: a grounded response carries a confidence score and a source citation back to the passage it came from; an unmatched question gets an honest "no grounded answer" instead of a fabricated one.
+7. Open **Past conversations** to browse and resume earlier conversations from this device, or **Conversation history** for the current one.
 
 ## Demo
 
@@ -39,6 +41,10 @@ NASA SMD Q&A benchmark passages are chunked and embedded with IBM's Granite embe
 ### API surface
 
 `GET /health` — reports whether the required watsonx/Zilliz credentials are actually configured, not just that the process is running. `POST /ingest` — chunk, embed, and upsert documents into Zilliz. `POST /query` — retrieval only, for inspecting the actual source passages a question matches. `POST /ask` — the main Q&A endpoint described above. `GET /conversation/history` — the transcript for one conversation, for the console's Conversation History panel.
+
+### Mission-based domains
+
+`/ask` and `/query` both accept an optional `domain` — one of Tropical Cyclone Dynamics, Saharan Dust, Climate Reconstruction, Environmental Hazards, or Other — that scopes retrieval to documents tagged with that value (see `backend/scripts/tag_corpus_domains.py`). Omitting it searches the whole corpus, exactly as before this existed. If a chosen domain has nothing indexed at all, `/ask` retries once against the whole corpus rather than surfacing a false no-match. See `docs/API.md` for the full contract.
 
 ### Conversational memory
 

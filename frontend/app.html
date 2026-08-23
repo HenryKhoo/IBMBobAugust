@@ -178,6 +178,32 @@
     padding: var(--space-4);
     box-shadow: var(--shadow-md);
   }
+  /* Mission-based domain picker — a step before the persona/question
+     controls, not folded into .controls-row: this scopes *what the
+     corpus is about* for the conversation about to start, a different
+     axis than persona (how it's said) or humor (how much personality).
+     "All" is the leading pill and the default, so a user who never
+     touches this gets exactly the whole-corpus behavior the console had
+     before domains existed. */
+  .domain-picker { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-4); }
+  .domain-picker button {
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    color: var(--ink-dim);
+    border-radius: 999px;
+    padding: var(--space-2) var(--space-4);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .domain-picker button:hover { color: var(--ink); border-color: var(--ink-dim); }
+  .domain-picker button[aria-pressed="true"] {
+    background: var(--accent-baseline-wash);
+    color: var(--accent-baseline-text);
+    border-color: var(--accent-baseline);
+  }
+  .domain-picker button:focus-visible { outline: 2px solid var(--accent-baseline-text); outline-offset: 2px; }
+
   .controls-row {
     display: flex;
     gap: var(--space-3);
@@ -583,6 +609,11 @@
     </header>
 
     <div class="panel">
+      <!-- Populated by JS from DOMAINS. Scopes the suggested-question chips
+           (and, server-side, retrieval itself — see AskRequest.domain) to
+           one subject-matter slice of the corpus. "All" is the default. -->
+      <div class="domain-picker" role="group" aria-label="Choose a domain to explore" id="domainPicker"></div>
+
       <div class="controls-row">
         <div class="persona-toggle" role="group" aria-label="Choose a persona">
           <button type="button" data-persona="baseline" aria-pressed="true">
@@ -699,19 +730,78 @@
     return `${protocol}//${host}`;
   })();
 
-  // Matched to what's actually in the ingested corpus (NASA SMD Earth
-  // Science Q&A — tropical cyclones, dust storms, drought, wildfires,
-  // pollution) rather than spacecraft/astronaut topics that aren't there.
-  const SUGGESTED_QUESTIONS = [
-    "What ocean heat conditions favor tropical cyclone intensification?",
-    "How does airborne Saharan dust affect tropical cyclone development?",
-    "How are historical droughts reconstructed from climate data?",
-    "What environmental factors drive wildland fire risk?",
-    "What causes severe mesoscale thunderstorm systems?",
+  // Mirrors backend/app/schemas.py's Domain enum — `id` values must match
+  // its member values exactly, since `id` is sent verbatim as
+  // AskRequest.domain/QueryRequest.domain. `id: ""` is the one value with
+  // no backend counterpart: it means "no domain filter", the same
+  // whole-corpus behavior the console had before domains existed, and is
+  // simply omitted from the request body rather than sent as an empty
+  // string (see askTalkback). Every domain's questions are matched to
+  // what's actually tagged into it in the ingested corpus (see
+  // backend/scripts/tag_corpus_domains.py) rather than invented topics
+  // that aren't there.
+  const DOMAINS = [
+    {
+      id: "",
+      label: "All",
+      questions: [
+        "What ocean heat conditions favor tropical cyclone intensification?",
+        "How does airborne Saharan dust affect tropical cyclone development?",
+        "How are historical droughts reconstructed from climate data?",
+        "What environmental factors drive wildland fire risk?",
+        "What causes severe mesoscale thunderstorm systems?",
+      ],
+    },
+    {
+      id: "tropical_cyclone_dynamics",
+      label: "Tropical Cyclone Dynamics",
+      questions: [
+        "What ocean heat conditions favor tropical cyclone intensification?",
+        "How does eyewall mesovortex dynamics affect a hurricane's intensity?",
+        "What atmospheric conditions influence tropical cyclone formation?",
+      ],
+    },
+    {
+      id: "saharan_dust",
+      label: "Saharan Dust",
+      questions: [
+        "How does airborne Saharan dust affect tropical cyclone development?",
+        "What is the impact of Saharan dust on the atmosphere?",
+        "How are dust storms characterized by particle size?",
+      ],
+    },
+    {
+      id: "climate_reconstruction",
+      label: "Climate Reconstruction",
+      questions: [
+        "How are historical droughts reconstructed from climate data?",
+        "How is satellite-based precipitation data validated on the ground?",
+        "What evidence do scientists use to study climate change over time?",
+      ],
+    },
+    {
+      id: "environmental_hazards",
+      label: "Environmental Hazards",
+      questions: [
+        "What environmental factors drive wildland fire risk?",
+        "What causes environmental degradation?",
+        "How does pollution affect water quality?",
+      ],
+    },
+    {
+      id: "other",
+      label: "Other",
+      questions: [
+        "What causes severe mesoscale thunderstorm systems?",
+        "What is a dryline and how does it trigger severe weather?",
+        "What is cold-air damming?",
+      ],
+    },
   ];
 
   const STORAGE_KEY_PERSONA = "talkback:persona";
   const STORAGE_KEY_HUMOR = "talkback:humor";
+  const STORAGE_KEY_DOMAIN = "talkback:domain";
 
   // sessionId is deliberately NOT persisted to localStorage — it lives only
   // for the duration of this tab, matching "Clear conversation" as the one
@@ -720,9 +810,13 @@
   // subsequent turn so the backend's conversational memory (short-term
   // in-process, and long-term in Zilliz for grounded exchanges) can attach
   // this question to that same conversation. See AskRequest.session_id.
-  const state = { persona: "baseline", humor: 50, sessionId: null };
+  // domain defaults to "" ("All") — the same whole-corpus behavior the
+  // console had before domains existed, so a user who never touches the
+  // domain picker sees no change at all.
+  const state = { persona: "baseline", humor: 50, sessionId: null, domain: "" };
   let isLoading = false;
 
+  const domainPickerEl = document.getElementById("domainPicker");
   const logEl = document.getElementById("log");
   const form = document.getElementById("askForm");
   const questionInput = document.getElementById("question");
@@ -926,11 +1020,15 @@
     try {
       const storedPersona = localStorage.getItem(STORAGE_KEY_PERSONA);
       const storedHumor = localStorage.getItem(STORAGE_KEY_HUMOR);
+      const storedDomain = localStorage.getItem(STORAGE_KEY_DOMAIN);
       if (storedPersona === "baseline" || storedPersona === "banter") {
         state.persona = storedPersona;
       }
       if (storedHumor !== null && !Number.isNaN(Number(storedHumor))) {
         state.humor = Number(storedHumor);
+      }
+      if (storedDomain !== null && DOMAINS.some((d) => d.id === storedDomain)) {
+        state.domain = storedDomain;
       }
     } catch (err) {
       // localStorage unavailable (private browsing, disabled storage) — defaults stand
@@ -941,8 +1039,65 @@
     try {
       localStorage.setItem(STORAGE_KEY_PERSONA, state.persona);
       localStorage.setItem(STORAGE_KEY_HUMOR, String(state.humor));
+      localStorage.setItem(STORAGE_KEY_DOMAIN, state.domain);
     } catch (err) {
       // ignore — nothing to persist to
+    }
+  }
+
+  function currentDomainConfig() {
+    return DOMAINS.find((d) => d.id === state.domain) || DOMAINS[0];
+  }
+
+  function renderDomainPicker() {
+    domainPickerEl.innerHTML = "";
+    DOMAINS.forEach((d) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.dataset.domain = d.id;
+      btn.textContent = d.label;
+      btn.setAttribute("aria-pressed", String(d.id === state.domain));
+      btn.addEventListener("click", () => selectDomain(d.id));
+      domainPickerEl.appendChild(btn);
+    });
+  }
+
+  function renderChipsForCurrentDomain() {
+    chipsEl.innerHTML = "";
+    currentDomainConfig().questions.forEach((q) => {
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.textContent = q;
+      chip.addEventListener("click", () => {
+        questionInput.value = q;
+        questionInput.dispatchEvent(new Event("input"));
+        form.requestSubmit();
+      });
+      chipsEl.appendChild(chip);
+    });
+  }
+
+  // Switching domain mid-conversation would silently change what the *next*
+  // answer is grounded in without the prior turns in the log having been
+  // asked under that scope — the same reasoning that makes "Clear
+  // conversation" the one deliberate way to end a conversation. Cheapest
+  // safe behavior: changing domains starts fresh, exactly like Clear.
+  function selectDomain(domainId) {
+    if (domainId === state.domain) return;
+    state.domain = domainId;
+    persistSettings();
+    document.querySelectorAll("#domainPicker button").forEach((b) => {
+      b.setAttribute("aria-pressed", String(b.dataset.domain === domainId));
+    });
+    renderChipsForCurrentDomain();
+
+    if (state.sessionId || logEl.children.length > 0) {
+      logEl.innerHTML = "";
+      state.sessionId = null;
+      updateClearButtonState();
+      updateHistoryButtonState();
+      historyPanel.hidden = true;
+      historyBtn.setAttribute("aria-expanded", "false");
     }
   }
 
@@ -953,6 +1108,8 @@
     humorRow.dataset.disabled = state.persona === "baseline" ? "true" : "false";
     humorInput.value = String(state.humor);
     humorVal.textContent = String(state.humor);
+    renderDomainPicker();
+    renderChipsForCurrentDomain();
   }
 
   loadPersistedSettings();
@@ -1159,18 +1316,6 @@
     showPastConvListView();
   });
 
-  SUGGESTED_QUESTIONS.forEach((q) => {
-    const chip = document.createElement("button");
-    chip.type = "button";
-    chip.textContent = q;
-    chip.addEventListener("click", () => {
-      questionInput.value = q;
-      questionInput.dispatchEvent(new Event("input"));
-      form.requestSubmit();
-    });
-    chipsEl.appendChild(chip);
-  });
-
   function addQuestionBubble(text) {
     const el = document.createElement("div");
     el.className = "msg-question";
@@ -1304,6 +1449,10 @@
         // backend takes the "start a brand-new session" branch rather than
         // the "resume this id" branch — see AskRequest.session_id.
         ...(state.sessionId ? { session_id: state.sessionId } : {}),
+        // Omitted entirely for domain "" ("All") rather than sent as an
+        // empty string — AskRequest.domain is `Domain | None`, and an
+        // empty string isn't a valid Domain value.
+        ...(state.domain ? { domain: state.domain } : {}),
       }),
     });
     if (!response.ok) {

@@ -41,6 +41,12 @@ class Chunk:
     enough — no second lookup keyed by `doc_id` is needed. Cheap at this
     project's scale (mission documents are single-digit KB, a handful of
     chunks each).
+
+    `domain` is the source document's `Domain` value (already a plain
+    `str` by the time it gets here — see `chunk_document`), carried
+    through the same way `doc_type` is: every chunk of a document gets the
+    same tag, so a retrieval hit on any chunk can be scoped or filtered by
+    it without a second lookup.
     """
 
     doc_id: str
@@ -48,6 +54,7 @@ class Chunk:
     chunk_index: int
     text: str
     doc_text: str
+    domain: str
 
     def metadata(self) -> dict:
         """Metadata dict attached to this chunk's vector store record."""
@@ -56,6 +63,7 @@ class Chunk:
             "doc_type": self.doc_type,
             "chunk_index": self.chunk_index,
             "doc_text": self.doc_text,
+            "domain": self.domain,
         }
 
 
@@ -140,6 +148,7 @@ def chunk_document(
             chunk_index=index,
             text=piece,
             doc_text=document.text,
+            domain=document.domain.value,
         )
         for index, piece in enumerate(pieces)
     ]
