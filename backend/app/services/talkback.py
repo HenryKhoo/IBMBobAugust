@@ -18,11 +18,19 @@ Baseline wouldn't have said first.
 If nothing in the corpus scores as a confident match, both personas say so
 plainly instead of guessing — same no-hallucination discipline the rest of
 this API's retrieval-backed endpoints already follow.
+
+Short-term conversational memory (`app.services.memory`) sits on top of
+this: prior turns in the same session are rendered into the Baseline
+prompt as a "Conversation so far" block so a follow-up question can be
+understood in context. This changes what a question is interpreted to
+*mean* only — the grounding rules above are otherwise untouched. See
+`_history_block` and `app.services.memory`'s module docstring.
 """
 
 from __future__ import annotations
 
-from app.schemas import AskPersona, AskResponse
+from app.schemas import AskPersona, AskResponse, ConversationRole, ConversationTurn
+from app.services.memory import get_or_create_session
 from app.services.vector_store import get_vector_store, relevance_score_hits_or_empty
 from app.services.watsonx import get_instruct_model
 
@@ -46,7 +54,7 @@ reference passage below. Do not add information the passage does not \
 support, and do not speculate beyond it. If the passage only partly \
 answers the question, say what it does support and stop there. Two to \
 four sentences, plain and direct, no commentary or humor.
-
+{history}
 Reference passage:
 {passage}
 
@@ -90,6 +98,29 @@ def _source_line(metadata: dict) -> str:
     return f"{metadata['doc_type']}:{metadata['doc_id']}#chunk{metadata['chunk_index']}"
 
 
+def _history_block(turns: list[ConversationTurn]) -> str:
+    """Render prior turns as a "Conversation so far" block for the Baseline prompt.
+
+    Empty string — not e.g. "Conversation so far:\\n(none)" — when there's
+    no history yet, so the first question in a session sees byte-for-byte
+    the same prompt Talkback always used before this feature existed. No
+    regression for the common single-question case.
+
+    This is included so the model can resolve a follow-up's pronouns and
+    implicit subject ("what does it eat?") against what was already asked
+    and answered. It is never a source of facts for the *current* answer —
+    that's still generated strictly from `passage` in `_BASELINE_PROMPT`,
+    exactly as before this existed.
+    """
+    if not turns:
+        return ""
+    lines = [
+        f"{'Question' if turn.role == ConversationRole.USER else 'Answer'}: {turn.content}"
+        for turn in turns
+    ]
+    return "\nConversation so far:\n" + "\n".join(lines) + "\n"
+
+
 def _retrieval_strength(relevance_score: float) -> float:
     """Normalize a retrieval relevance score to a [0, 1] confidence signal.
 
@@ -101,17 +132,22 @@ def _retrieval_strength(relevance_score: float) -> float:
     return round(max(0.0, min(1.0, relevance_score)), 2)
 
 
-def _fallback_response(persona: AskPersona, confidence: float | None) -> AskResponse:
+def _fallback_response(
+    persona: AskPersona, confidence: float | None, session_id: str
+) -> AskResponse:
     return AskResponse(
         answer=_FALLBACK_BASELINE if persona == AskPersona.BASELINE else _FALLBACK_BANTER,
         persona=persona,
         grounded=False,
         confidence=confidence,
         source=None,
+        session_id=session_id,
     )
 
 
-def ask_talkback(question: str, persona: AskPersona, humor: int) -> AskResponse:
+def ask_talkback(
+    question: str, persona: AskPersona, humor: int, session_id: str | None = None
+) -> AskResponse:
     """Answer a space-science question, grounded in the ingested corpus.
 
     Retrieves the single best-matching `science_reference` chunk. With
@@ -121,19 +157,38 @@ def ask_talkback(question: str, persona: AskPersona, humor: int) -> AskResponse:
     is generated exactly once, always in Baseline's voice; Banter re-styles
     that finished, already-true answer rather than generating its own, so
     the humor dial can never change what is actually claimed.
+
+    `session_id` opts into short-term conversational memory
+    (`app.services.memory`): the prior turns of that session (if any) are
+    rendered into the Baseline prompt as context before this question's
+    turn is recorded, and this question's turn plus whatever answer gets
+    returned are recorded afterward, regardless of whether that answer was
+    grounded or a fallback. `None` starts a brand-new session. Either way
+    the returned `AskResponse.session_id` is what a caller sends back on
+    the next turn to keep continuity.
     """
+    session = get_or_create_session(session_id)
+    history = _history_block(session.recent_turns())
+    session.add_turn(ConversationRole.USER, question)
+
     hits = relevance_score_hits_or_empty(
         get_vector_store(), question, k=1, expr="doc_type == 'science_reference'"
     )
     if not hits:
-        return _fallback_response(persona, confidence=None)
+        response = _fallback_response(persona, confidence=None, session_id=session.session_id)
+        session.add_turn(ConversationRole.ASSISTANT, response.answer, persona=persona)
+        return response
 
     chunk, relevance_score = hits[0]
     confidence = _retrieval_strength(relevance_score)
     if confidence < _CONFIDENCE_THRESHOLD:
-        return _fallback_response(persona, confidence=confidence)
+        response = _fallback_response(persona, confidence=confidence, session_id=session.session_id)
+        session.add_turn(ConversationRole.ASSISTANT, response.answer, persona=persona)
+        return response
 
-    baseline_prompt = _BASELINE_PROMPT.format(passage=chunk.page_content, question=question)
+    baseline_prompt = _BASELINE_PROMPT.format(
+        history=history, passage=chunk.page_content, question=question
+    )
     baseline_message = get_instruct_model().invoke(baseline_prompt)
     baseline_answer = str(baseline_message.content).strip()
 
@@ -146,10 +201,14 @@ def ask_talkback(question: str, persona: AskPersona, humor: int) -> AskResponse:
         banter_message = get_instruct_model().invoke(banter_prompt)
         final_answer = str(banter_message.content).strip()
 
+    source = _source_line(chunk.metadata)
+    session.add_turn(ConversationRole.ASSISTANT, final_answer, persona=persona, source=source)
+
     return AskResponse(
         answer=final_answer,
         persona=persona,
         grounded=True,
         confidence=confidence,
-        source=_source_line(chunk.metadata),
+        source=source,
+        session_id=session.session_id,
     )

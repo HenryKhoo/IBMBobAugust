@@ -132,9 +132,17 @@ def test_endpoint_happy_path_matches_api_contract_shape(monkeypatch, fake_hit):
 
     assert response.status_code == 200
     body = response.json()
-    assert set(body.keys()) == {"answer", "persona", "grounded", "confidence", "source"}
+    assert set(body.keys()) == {
+        "answer",
+        "persona",
+        "grounded",
+        "confidence",
+        "source",
+        "session_id",
+    }
     assert body["answer"] == STUBBED_ANSWER
     assert body["grounded"] is True
+    assert body["session_id"]
 
 
 def test_endpoint_never_404s_on_no_match(monkeypatch):
@@ -174,3 +182,55 @@ def test_endpoint_defaults_persona_to_baseline_and_humor_to_fifty(monkeypatch, f
 def test_endpoint_rejects_invalid_requests(payload):
     response = client.post("/ask", json=payload)
     assert response.status_code == 422
+
+
+def test_ask_without_session_id_starts_a_fresh_session_each_time(monkeypatch, fake_hit):
+    fake_store = _FakeVectorStore([fake_hit])
+    fake_model = _FakeInstructModel(STUBBED_ANSWER)
+    monkeypatch.setattr(talkback, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(talkback, "get_instruct_model", lambda: fake_model)
+
+    first = talkback.ask_talkback("What is Veggie?", talkback.AskPersona.BASELINE, humor=50)
+    second = talkback.ask_talkback("What is Veggie?", talkback.AskPersona.BASELINE, humor=50)
+
+    assert first.session_id != second.session_id
+    # no history block on either call — each is the first question of its
+    # own session, so the prompt is byte-for-byte the no-history shape.
+    assert "Conversation so far" not in fake_model.invoked_with[0]
+    assert "Conversation so far" not in fake_model.invoked_with[1]
+
+
+def test_ask_with_session_id_replays_prior_turns_into_the_next_prompt(monkeypatch, fake_hit):
+    fake_store = _FakeVectorStore([fake_hit])
+    fake_model = _FakeInstructModel(STUBBED_ANSWER)
+    monkeypatch.setattr(talkback, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(talkback, "get_instruct_model", lambda: fake_model)
+
+    first = talkback.ask_talkback("What is Veggie?", talkback.AskPersona.BASELINE, humor=50)
+    second = talkback.ask_talkback(
+        "What does it grow?",
+        talkback.AskPersona.BASELINE,
+        humor=50,
+        session_id=first.session_id,
+    )
+
+    assert second.session_id == first.session_id
+    second_prompt = fake_model.invoked_with[-1]
+    assert "Conversation so far" in second_prompt
+    assert "What is Veggie?" in second_prompt
+    assert STUBBED_ANSWER in second_prompt
+
+
+def test_ask_records_fallback_turns_in_session_history_too(monkeypatch):
+    fake_store = _FakeVectorStore([])
+    fake_model = _FakeInstructModel(STUBBED_ANSWER)
+    monkeypatch.setattr(talkback, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(talkback, "get_instruct_model", lambda: fake_model)
+
+    first = talkback.ask_talkback("anything", talkback.AskPersona.BASELINE, humor=50)
+    from app.services import memory
+
+    session = memory.get_or_create_session(first.session_id)
+    roles = [turn.role for turn in session.recent_turns()]
+    assert roles == [memory.ConversationRole.USER, memory.ConversationRole.ASSISTANT]
+    assert session.recent_turns()[-1].content == "No grounded answer for that."

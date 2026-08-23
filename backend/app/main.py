@@ -142,5 +142,9 @@ def ask(request: AskRequest) -> AskResponse:
     error to raise — the no-hallucination protection this API's other
     endpoints get from a 404 is already built into that fallback response
     itself here.
+
+    `request.session_id` opts into short-term conversational memory across
+    calls to this endpoint — see `AskRequest.session_id` and
+    `app.services.memory`.
     """
-    return ask_talkback(request.question, request.persona, request.humor)
+    return ask_talkback(request.question, request.persona, request.humor, request.session_id)
