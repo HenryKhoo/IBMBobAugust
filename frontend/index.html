@@ -33,9 +33,50 @@
     padding: 32px 16px 64px;
   }
   .shell { width: 100%; max-width: 720px; }
-  header { text-align: center; margin-bottom: 24px; }
-  header h1 { font-size: 1.7rem; margin: 0 0 6px; letter-spacing: 0.02em; }
-  header p { color: var(--ink-dim); margin: 0; font-size: 0.95rem; line-height: 1.5; }
+  header {
+    position: relative;
+    text-align: center;
+    margin-bottom: 24px;
+    padding-top: 12px;
+  }
+  header::before {
+    content: "";
+    position: absolute;
+    top: -60px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 480px;
+    height: 260px;
+    max-width: 140vw;
+    background: radial-gradient(
+      circle,
+      var(--accent-baseline-wash) 0%,
+      var(--accent-banter-wash) 45%,
+      transparent 72%
+    );
+    filter: blur(36px);
+    opacity: 0.8;
+    pointer-events: none;
+    z-index: 0;
+  }
+  header h1 {
+    position: relative;
+    z-index: 1;
+    font-size: 3.2rem;
+    font-weight: 800;
+    margin: 0 0 10px;
+    letter-spacing: -0.03em;
+    text-transform: uppercase;
+    line-height: 1;
+  }
+  header p {
+    position: relative;
+    z-index: 1;
+    color: var(--ink-dim);
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.5;
+  }
   .panel {
     background: var(--panel);
     border: 1px solid var(--line);
@@ -96,6 +137,7 @@
     padding: 10px 14px;
     max-width: 85%;
     font-size: 0.92rem;
+    box-shadow: var(--shadow-md);
   }
   .msg-answer {
     align-self: flex-start;
@@ -105,6 +147,7 @@
     font-size: 0.94rem;
     line-height: 1.5;
     border: 1px solid var(--line);
+    box-shadow: var(--shadow-md);
   }
   .msg-answer[data-persona="baseline"] { border-left: 3px solid var(--accent-baseline); }
   .msg-answer[data-persona="banter"] { border-left: 3px solid var(--accent-banter); }
@@ -154,17 +197,25 @@
   }
   button.send:disabled { opacity: 0.5; cursor: default; }
 
-  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 0; }
+  .chips { display: flex; flex-wrap: wrap; gap: 10px; margin: 16px 0 0; }
   .chips button {
     background: var(--panel-2);
     border: 1px solid var(--line);
+    border-top: 3px solid var(--accent-baseline);
     color: var(--ink-dim);
-    border-radius: 999px;
-    padding: 6px 12px;
+    border-radius: var(--radius);
+    padding: 10px 14px;
     font-size: 0.78rem;
+    text-align: left;
     cursor: pointer;
+    box-shadow: var(--shadow-md);
+    transition: transform 0.15s ease, box-shadow 0.15s ease, color 0.15s ease;
   }
-  .chips button:hover { color: var(--ink); border-color: var(--accent-baseline); }
+  .chips button:hover {
+    color: var(--ink);
+    transform: translateY(-3px);
+    box-shadow: 0 10px 22px rgb(0 0 0 / 0.4);
+  }
 
   footer {
     text-align: center;
