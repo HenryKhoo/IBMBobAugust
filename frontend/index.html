@@ -3,6 +3,14 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<!-- Deploy config: this repo runs frontend and backend as separate services
+     (see RAILWAY.md), so the backend's public URL isn't knowable at build
+     time from a single static file. Set this to that URL before deploying —
+     e.g. content="https://your-backend.up.railway.app". Leave it empty to
+     fall back to same-origin (correct if the backend is reverse-proxied
+     onto the same host as this page). Localhost dev always uses :8000
+     regardless of this tag. -->
+<meta name="talkback-api-base-url" content="" />
 <title>Talkback — grounded space Q&amp;A</title>
 <style>
   :root {
@@ -411,7 +419,22 @@
   </div>
 
 <script>
-  const API_BASE_URL = "http://localhost:8000"; // update this when deployed
+  // Environment-aware backend URL — no hardcoded localhost in production.
+  // Resolution order: localhost dev port -> <meta name="talkback-api-base-url">
+  // (set at deploy time, see the tag in <head>) -> same-origin fallback.
+  const API_BASE_URL = (() => {
+    const { hostname, protocol, host } = window.location;
+    if (hostname === "localhost" || hostname === "127.0.0.1") {
+      return "http://localhost:8000";
+    }
+    const configured = document
+      .querySelector('meta[name="talkback-api-base-url"]')
+      ?.content?.trim();
+    if (configured) {
+      return configured.replace(/\/$/, "");
+    }
+    return `${protocol}//${host}`;
+  })();
 
   // Matched to what's actually in the ingested corpus (NASA SMD Earth
   // Science Q&A — tropical cyclones, dust storms, drought, wildfires,
