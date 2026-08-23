@@ -25,25 +25,40 @@
       0 16px 32px rgb(20 20 19 / 0.16);
     --shadow-lg: 0 4px 8px rgb(20 20 19 / 0.22), 0 12px 24px rgb(20 20 19 / 0.28),
       0 24px 48px rgb(20 20 19 / 0.20);
+    /* Type scale — replaces eight ad hoc font-size values with five steps */
+    --text-xs: 0.75rem;
+    --text-sm: 0.8125rem;
+    --text-base: 0.875rem;
+    --text-md: 0.9375rem;
+    --text-display: 3.2rem;
+    /* Spacing scale, 4px base (matches talkback-proposal.md §6) */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-6: 24px;
+    --space-7: 28px;
+    --space-8: 32px;
+    --space-16: 64px;
   }
   * { box-sizing: border-box; }
   body {
     margin: 0;
-    font-family: -apple-system, "Segoe UI", Inter, sans-serif;
+    font-family: -apple-system, "Segoe UI", sans-serif;
     background: var(--bg);
     color: var(--ink);
     min-height: 100vh;
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 32px 16px 64px;
+    padding: var(--space-8) var(--space-4) var(--space-16);
   }
   .shell { width: 100%; max-width: 720px; }
   header {
     position: relative;
     text-align: center;
-    margin-bottom: 24px;
-    padding-top: 12px;
+    margin-bottom: var(--space-6);
+    padding-top: var(--space-3);
   }
   header::before {
     content: "";
@@ -68,9 +83,9 @@
   header h1 {
     position: relative;
     z-index: 1;
-    font-size: 3.2rem;
+    font-size: var(--text-display);
     font-weight: 800;
-    margin: 0 0 10px;
+    margin: 0 0 var(--space-3);
     letter-spacing: -0.03em;
     text-transform: uppercase;
     line-height: 1;
@@ -80,22 +95,22 @@
     z-index: 1;
     color: var(--ink-dim);
     margin: 0;
-    font-size: 0.95rem;
+    font-size: var(--text-md);
     line-height: 1.5;
   }
   .panel {
     background: var(--panel);
     border: 1px solid var(--line);
     border-radius: var(--radius);
-    padding: 18px;
+    padding: var(--space-4);
     box-shadow: var(--shadow-md);
   }
   .controls-row {
     display: flex;
-    gap: 12px;
+    gap: var(--space-3);
     align-items: center;
     flex-wrap: wrap;
-    margin-bottom: 16px;
+    margin-bottom: var(--space-4);
   }
   .persona-toggle {
     display: inline-flex;
@@ -107,8 +122,8 @@
     background: transparent;
     border: none;
     color: var(--ink-dim);
-    padding: 8px 16px;
-    font-size: 0.85rem;
+    padding: var(--space-2) var(--space-4);
+    font-size: var(--text-base);
     cursor: pointer;
     font-weight: 600;
   }
@@ -120,38 +135,38 @@
     background: var(--accent-banter-wash);
     color: var(--accent-banter);
   }
-  .humor-row { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 200px; }
-  .humor-row label { font-size: 0.8rem; color: var(--ink-dim); white-space: nowrap; }
+  .humor-row { display: flex; align-items: center; gap: var(--space-2); flex: 1; min-width: 200px; }
+  .humor-row label { font-size: var(--text-sm); color: var(--ink-dim); white-space: nowrap; }
   .humor-row input[type="range"] { flex: 1; accent-color: var(--accent-banter); }
-  .humor-row output { font-size: 0.8rem; color: var(--ink-dim); width: 30px; text-align: right; }
+  .humor-row output { font-size: var(--text-sm); color: var(--ink-dim); width: 30px; text-align: right; }
   .humor-row[data-disabled="true"] { opacity: 0.35; pointer-events: none; }
 
   #log {
     display: flex;
     flex-direction: column;
-    gap: 14px;
-    margin-bottom: 18px;
+    gap: var(--space-4);
+    margin-bottom: var(--space-4);
     max-height: 55vh;
     overflow-y: auto;
-    padding-right: 4px;
+    padding-right: var(--space-1);
   }
   .msg-question {
     align-self: flex-end;
     background: var(--panel-2);
     border: 1px solid var(--line);
     border-radius: var(--radius);
-    padding: 10px 14px;
+    padding: var(--space-3) var(--space-4);
     max-width: 85%;
-    font-size: 0.92rem;
+    font-size: var(--text-md);
     box-shadow: var(--shadow-md);
   }
   .msg-answer {
     align-self: flex-start;
     background: var(--panel-2);
     border-radius: var(--radius);
-    padding: 12px 14px;
+    padding: var(--space-3) var(--space-4);
     max-width: 90%;
-    font-size: 0.94rem;
+    font-size: var(--text-md);
     line-height: 1.5;
     border: 1px solid var(--line);
     box-shadow: var(--shadow-md);
@@ -164,30 +179,30 @@
     font-style: italic;
   }
   .msg-meta {
-    margin-top: 8px;
-    font-size: 0.72rem;
+    margin-top: var(--space-2);
+    font-size: var(--text-xs);
     color: var(--ink-faint);
     display: flex;
-    gap: 10px;
+    gap: var(--space-3);
     flex-wrap: wrap;
   }
   .confidence-badge {
     display: inline-block;
-    padding: 1px 7px;
+    padding: 1px var(--space-2); /* 1px vertical is a hairline, not part of the spacing rhythm */
     border-radius: 999px;
     background: var(--panel);
     border: 1px solid var(--line);
   }
 
-  form { display: flex; gap: 8px; }
+  form { display: flex; gap: var(--space-2); }
   input[type="text"] {
     flex: 1;
     background: var(--panel-2);
     border: 1px solid var(--line);
     border-radius: 8px;
-    padding: 10px 12px;
+    padding: var(--space-3);
     color: var(--ink);
-    font-size: 0.95rem;
+    font-size: var(--text-md);
   }
   input[type="text"]:focus-visible, button:focus-visible {
     outline: 2px solid var(--accent-baseline);
@@ -199,20 +214,20 @@
     color: #08131a;
     font-weight: 700;
     border-radius: 8px;
-    padding: 0 18px;
+    padding: 0 var(--space-4);
     cursor: pointer;
   }
   button.send:disabled { opacity: 0.5; cursor: default; }
 
-  .chips { display: flex; flex-wrap: wrap; gap: 10px; margin: 16px 0 0; }
+  .chips { display: flex; flex-wrap: wrap; gap: var(--space-3); margin: var(--space-4) 0 0; }
   .chips button {
     background: var(--panel-2);
     border: 1px solid var(--line);
     border-top: 3px solid var(--accent-baseline);
     color: var(--ink-dim);
     border-radius: var(--radius);
-    padding: 10px 14px;
-    font-size: 0.78rem;
+    padding: var(--space-3) var(--space-4);
+    font-size: var(--text-sm);
     text-align: left;
     cursor: pointer;
     box-shadow: var(--shadow-md);
@@ -227,8 +242,8 @@
   footer {
     text-align: center;
     color: var(--ink-faint);
-    font-size: 0.72rem;
-    margin-top: 28px;
+    font-size: var(--text-xs);
+    margin-top: var(--space-7);
     line-height: 1.6;
   }
 </style>
