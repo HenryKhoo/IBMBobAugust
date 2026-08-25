@@ -34,7 +34,7 @@ NASA SMD Q&A benchmark passages are chunked and embedded — with IBM's Granite 
 
 1. Retrieve the single best-matching passage for the question.
 2. Convert its cosine similarity to a `[0, 1]` confidence score. Below a 0.68 threshold, both personas return an honest no-match response instead of guessing.
-3. Above threshold, an instruct model generates the grounded answer exactly once, always in Baseline's voice, strictly from the retrieved passage. When a Gemini API key is configured, Gemini is the primary generation model, since watsonx's own trial-tier rate limit was being hit too often to trust as the first attempt; watsonx's Granite/Mistral models become an automatic two-tier failover instead, on the same retrieved passage and the same no-hallucination rules regardless of which model actually answers — see `app/services/watsonx.py`.
+3. Above threshold, a Granite/Mistral instruct model on watsonx.ai generates the grounded answer exactly once, always in Baseline's voice, strictly from the retrieved passage, with an automatic watsonx-only failover model if the primary errors — see `app/services/watsonx.py`.
 4. If Banter is selected, it re-tells that already-generated, already-grounded answer in its own tone — it never answers the question itself and is explicitly instructed to introduce no new fact, number, or claim. This is what keeps "honesty is not a dial" a property of the code, not just a prompting convention.
 5. Every grounded answer carries a source reference line back to the document and chunk it came from.
 
