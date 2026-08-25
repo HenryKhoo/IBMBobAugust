@@ -1856,8 +1856,26 @@
     populateCompanionVoices();
     speechSynthesis.onvoiceschanged = populateCompanionVoices;
   }
+  // The Web Speech API exposes no reliable `gender` field on a voice (it's
+  // deprecated/unimplemented across engines), so "male" has to be inferred
+  // from name — these are the common male voice names shipped by Chrome/
+  // Google, Edge/Microsoft, and Safari/macOS's speech engines. Falls back to
+  // whatever's available if none of them are installed, so this never
+  // silences the companion on a system with a smaller voice list.
+  const MALE_VOICE_HINTS = [
+    "male", "david", "guy", "mark", "daniel", "alex", "fred", "aaron",
+    "arthur", "gordon", "eric", "ryan", "james", "george", "brian",
+  ];
+  function isLikelyMaleVoice(v) {
+    const name = v.name.toLowerCase();
+    if (name.includes("female")) return false;
+    return MALE_VOICE_HINTS.some((hint) => name.includes(hint));
+  }
   function pickCompanionVoice() {
     return (
+      companionVoices.find((v) => v.lang === "en-US" && isLikelyMaleVoice(v) && v.name.includes("Google")) ||
+      companionVoices.find((v) => v.lang === "en-US" && isLikelyMaleVoice(v)) ||
+      companionVoices.find((v) => v.lang.startsWith("en") && isLikelyMaleVoice(v)) ||
       companionVoices.find((v) => v.lang === "en-US" && v.name.includes("Google")) ||
       companionVoices.find((v) => v.lang === "en-US") ||
       companionVoices[0]
