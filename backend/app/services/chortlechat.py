@@ -29,9 +29,13 @@ model. Baseline and Banter each have their own pre-drafted, corpus-verified
 text in the cache (`baseline_answer` / `banter_answer`); Banter's cached
 copy still only ever restates what Baseline's cached copy says, drafted by
 hand under the exact same "no new fact" rule `_BANTER_PROMPT` enforces at
-generation time — it's just not generated live for these questions. The
-one genuinely unanswerable chip question is cached too, routed straight to
-the same honest fallback every other unanswerable question gets — see
+generation time — it's just not generated live for these questions. Every
+cached `banter_answer` opens with an actual short joke on the question's
+topic (style inspired by the Kaggle "Short Jokes" dataset; see
+`backend/data/preset_qa.json`'s `_readme`) — jokes are commentary, not a
+claim, so they don't touch the "no new fact" rule either way. The one
+genuinely unanswerable chip question is cached too, routed straight to the
+same honest fallback every other unanswerable question gets — see
 `_PRESET_CACHE` and `_preset_response`.
 
 Conversational memory (`app.services.memory`) sits on top of this in two
