@@ -641,10 +641,16 @@ def test_conversation_history_endpoint_requires_session_id():
 
 
 # --- Preset chip-question cache (backend/data/preset_qa.json) ----------------
+#
+# All 15 chip questions are cached for both personas now — Baseline and
+# Banter each read their own pre-drafted field, so neither persona ever
+# makes a live generation call for one of these questions. Expected text is
+# pulled straight from _PRESET_CACHE rather than duplicated here, so these
+# tests can't silently drift from the actual preset content.
 
 CACHED_QUESTION = "What ocean heat conditions favor tropical cyclone intensification?"
-CACHED_ANSWER_SNIPPET = "barrier layer thickness"
-UNCACHED_NO_MATCH_QUESTION = "What atmospheric conditions influence tropical cyclone formation?"
+NO_MATCH_CACHED_QUESTION = "What atmospheric conditions influence tropical cyclone formation?"
+_CACHED_ENTRY = chortlechat._PRESET_CACHE[CACHED_QUESTION.strip().lower()]
 
 
 def test_ask_serves_a_cached_baseline_answer_without_touching_retrieval(monkeypatch, fake_hit):
@@ -656,15 +662,35 @@ def test_ask_serves_a_cached_baseline_answer_without_touching_retrieval(monkeypa
     response = chortlechat.ask_chortlechat(CACHED_QUESTION, chortlechat.AskPersona.BASELINE, humor=50)
 
     assert response.grounded is True
-    assert CACHED_ANSWER_SNIPPET in response.answer
+    assert response.answer == _CACHED_ENTRY["baseline_answer"]
     assert response.answer != STUBBED_ANSWER
     assert response.source == "science_reference:nasa-smd-50#chunk0"
     # confidence is None: nothing was retrieved, on purpose — this is a
     # demo cache hit, not a scored live match.
     assert response.confidence is None
-    # no Baseline generation call, and no retrieval call either — a cache
-    # hit answers straight from the curated cache, live vector store and
+    # no generation call, and no retrieval call either — a cache hit
+    # answers straight from the curated cache, live vector store and
     # instruct-model quota issues notwithstanding.
+    assert fake_model.invoked_with == []
+    assert fake_store.calls == []
+
+
+def test_ask_serves_a_cached_banter_answer_without_any_generation_call(monkeypatch, fake_hit):
+    fake_store = _FakeVectorStore([fake_hit])
+    fake_model = _FakeInstructModel(STUBBED_ANSWER)
+    monkeypatch.setattr(chortlechat, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(chortlechat, "get_instruct_model", lambda: fake_model)
+
+    response = chortlechat.ask_chortlechat(CACHED_QUESTION, chortlechat.AskPersona.BANTER, humor=80)
+
+    assert response.grounded is True
+    assert response.answer == _CACHED_ENTRY["banter_answer"]
+    # Banter's cached copy is its own pre-drafted text, not a restyle of
+    # Baseline's generated live — it should read differently even though
+    # both ultimately say the same thing.
+    assert response.answer != _CACHED_ENTRY["baseline_answer"]
+    assert response.confidence is None
+    # no generation call for either persona, and no retrieval call.
     assert fake_model.invoked_with == []
     assert fake_store.calls == []
 
@@ -688,39 +714,32 @@ def test_ask_serves_a_cached_answer_even_when_the_vector_store_would_fail(monkey
     response = chortlechat.ask_chortlechat(CACHED_QUESTION, chortlechat.AskPersona.BASELINE, humor=50)
 
     assert response.grounded is True
-    assert CACHED_ANSWER_SNIPPET in response.answer
+    assert response.answer == _CACHED_ENTRY["baseline_answer"]
 
 
-def test_ask_banter_still_makes_a_live_call_to_restyle_a_cached_baseline_answer(
-    monkeypatch, fake_hit
-):
+def test_ask_serves_the_honest_fallback_for_the_cached_no_match_question(monkeypatch, fake_hit):
+    """tc-formation-conditions is cached too, but with grounded: false — a
+    hit routes straight to the same honest fallback any other unanswerable
+    question gets, still without touching retrieval or the model, for
+    either persona.
+    """
     fake_store = _FakeVectorStore([fake_hit])
     fake_model = _FakeInstructModel(STUBBED_ANSWER)
     monkeypatch.setattr(chortlechat, "get_vector_store", lambda: fake_store)
     monkeypatch.setattr(chortlechat, "get_instruct_model", lambda: fake_model)
 
-    chortlechat.ask_chortlechat(CACHED_QUESTION, chortlechat.AskPersona.BANTER, humor=80)
-
-    # exactly one generation call — the banter restyle — no baseline call
-    # and no retrieval call.
-    assert len(fake_model.invoked_with) == 1
-    banter_prompt = fake_model.invoked_with[0]
-    assert CACHED_ANSWER_SNIPPET in banter_prompt
-    assert "80/100" in banter_prompt
-    assert fake_store.calls == []
-
-
-def test_ask_ignores_the_cache_for_the_documented_no_match_question(monkeypatch, fake_hit):
-    fake_store = _FakeVectorStore([fake_hit])
-    fake_model = _FakeInstructModel(STUBBED_ANSWER)
-    monkeypatch.setattr(chortlechat, "get_vector_store", lambda: fake_store)
-    monkeypatch.setattr(chortlechat, "get_instruct_model", lambda: fake_model)
-
-    response = chortlechat.ask_chortlechat(
-        UNCACHED_NO_MATCH_QUESTION, chortlechat.AskPersona.BASELINE, humor=50
+    baseline_response = chortlechat.ask_chortlechat(
+        NO_MATCH_CACHED_QUESTION, chortlechat.AskPersona.BASELINE, humor=50
+    )
+    banter_response = chortlechat.ask_chortlechat(
+        NO_MATCH_CACHED_QUESTION, chortlechat.AskPersona.BANTER, humor=50
     )
 
-    # this entry's use_cache is false, per preset_qa.json — falls through to
-    # normal live generation exactly as an uncached question would.
-    assert response.answer == STUBBED_ANSWER
-    assert len(fake_model.invoked_with) == 1
+    assert baseline_response.grounded is False
+    assert baseline_response.confidence is None
+    assert baseline_response.answer == "No grounded answer for that."
+    assert banter_response.grounded is False
+    assert banter_response.answer != baseline_response.answer
+    # never touched the model or the store for either persona.
+    assert fake_model.invoked_with == []
+    assert fake_store.calls == []

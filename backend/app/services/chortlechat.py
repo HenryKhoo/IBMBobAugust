@@ -22,11 +22,17 @@ this API's retrieval-backed endpoints already follow.
 For the fixed set of "chip" questions the frontend suggests
 (`backend/data/preset_qa.json`, drafted in `docs/preset-qa-draft.md`), a
 matching question is answered straight from that curated cache — no
-retrieval, no confidence gate, no Baseline generation call — so these
-known-good demo questions always answer instantly and consistently. See
-`_PRESET_CACHE` and `_preset_response`. Banter still always makes its own
-live call to restyle whichever Baseline answer is in play, cached or
-generated.
+retrieval, no confidence gate, and no generation call for *either* persona
+— so these known-good demo questions always answer instantly and
+consistently, with zero dependency on a live vector store or instruct
+model. Baseline and Banter each have their own pre-drafted, corpus-verified
+text in the cache (`baseline_answer` / `banter_answer`); Banter's cached
+copy still only ever restates what Baseline's cached copy says, drafted by
+hand under the exact same "no new fact" rule `_BANTER_PROMPT` enforces at
+generation time — it's just not generated live for these questions. The
+one genuinely unanswerable chip question is cached too, routed straight to
+the same honest fallback every other unanswerable question gets — see
+`_PRESET_CACHE` and `_preset_response`.
 
 Conversational memory (`app.services.memory`) sits on top of this in two
 stages, tried in order:
@@ -126,20 +132,20 @@ _FALLBACK_BANTER = (
 # backend/data/preset_qa.json's own _readme and docs/preset-qa-draft.md for
 # how each entry was drafted and verified against the corpus. This is a
 # curated demo path, not a shortcut layered on top of live retrieval: a
-# cache hit answers directly from the pre-verified baseline_answer and
-# skips retrieval, the confidence-threshold gate, and the Baseline
-# generation call entirely, so these 14 known-good questions always answer
-# instantly and consistently in a live demo regardless of vector-store or
-# embedding-provider hiccups. `grounded` is still `True` and `confidence`
-# is `None` — same meaning `AskResponse.confidence` already carries for
-# "nothing was retrieved," which is literally true here since retrieval
-# never ran. Banter is unaffected either way: it still always makes its
-# own live call to restyle whichever baseline_answer is in play, cached or
-# generated, so it can never introduce a fact Baseline didn't already
-# state. Keyed by the exact chip question text (stripped/lowercased for a
-# forgiving match); only entries flagged `use_cache: true` are included —
-# the one no_match entry in the file is documentation, not real cache
-# config, and always falls through to normal live retrieval.
+# cache hit answers directly from a pre-verified answer and skips
+# retrieval, the confidence-threshold gate, and the generation call
+# entirely — for *both* personas — so all 15 known chip questions always
+# answer instantly and consistently in a live demo, with zero dependency on
+# a live vector store or instruct model. Baseline and Banter each read
+# their own pre-drafted field (`baseline_answer` / `banter_answer`); the
+# one entry with `grounded: false` (no passage in the corpus actually
+# answers it) is cached too, and routes to the exact same honest fallback
+# `_fallback_response` gives any other unanswerable question — see
+# `_preset_response`. `confidence` is always `None` on a cache hit — same
+# meaning `AskResponse.confidence` already carries for "nothing was
+# retrieved," which is literally true here since retrieval never ran.
+# Keyed by the exact chip question text (stripped/lowercased for a
+# forgiving match); every entry in the file is flagged `use_cache: true`.
 _PRESET_QA_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "preset_qa.json"
 
 
@@ -258,30 +264,34 @@ def _preset_response(
     store,
     preset: dict,
     persona: AskPersona,
-    humor: int,
     session,
     question: str,
     history_source: HistorySource,
 ) -> AskResponse:
     """Answer a known chip question straight from the curated demo cache.
 
-    No retrieval, no confidence gate, no Baseline generation call — see
-    `_PRESET_CACHE` for why. Banter still makes its own live call here,
-    restyling the curated `baseline_answer` exactly as it would restyle a
-    freshly generated one, so it never gets a path to state a fact
-    Baseline didn't.
+    No retrieval, no confidence gate, no generation call — for either
+    persona — see `_PRESET_CACHE` for why. `preset["grounded"]` is `False`
+    for the one chip question the corpus genuinely doesn't answer; that
+    case is routed to the same honest, hardcoded fallback text
+    `_fallback_response` gives any other unanswerable question, still
+    without touching retrieval. Otherwise, Baseline and Banter each read
+    their own pre-drafted, corpus-verified field — `baseline_answer` /
+    `banter_answer` — rather than one being generated from the other live;
+    both were hand-drafted under the same "Banter never adds a new fact"
+    rule `_BANTER_PROMPT` enforces at generation time.
     """
-    baseline_answer = preset["baseline_answer"]
-    source = ", ".join(preset.get("source") or []) or None
-
-    if persona == AskPersona.BASELINE:
-        final_answer = baseline_answer
-    else:
-        banter_prompt = _BANTER_PROMPT.format(
-            humor=humor, humor_label=_humor_label(humor), baseline_answer=baseline_answer
+    if not preset.get("grounded", True):
+        response = _fallback_response(
+            persona, confidence=None, session_id=session.session_id, history_source=history_source
         )
-        banter_message = get_instruct_model().invoke(banter_prompt)
-        final_answer = str(banter_message.content).strip()
+        session.add_turn(ConversationRole.ASSISTANT, response.answer, persona=persona)
+        return response
+
+    final_answer = (
+        preset["baseline_answer"] if persona == AskPersona.BASELINE else preset["banter_answer"]
+    )
+    source = ", ".join(preset.get("source") or []) or None
 
     session.add_turn(ConversationRole.ASSISTANT, final_answer, persona=persona, source=source)
     persist_grounded_exchange(
@@ -368,9 +378,7 @@ def ask_chortlechat(
 
     preset = _PRESET_CACHE.get(question.strip().lower())
     if preset is not None:
-        return _preset_response(
-            store, preset, persona, humor, session, question, history_source
-        )
+        return _preset_response(store, preset, persona, session, question, history_source)
 
     hits = relevance_score_hits_or_empty(store, question, k=1, expr=_retrieval_expr(domain))
     if not hits and domain is not None:
