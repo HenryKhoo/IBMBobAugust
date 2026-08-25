@@ -415,6 +415,21 @@
     background: var(--panel-2);
     color: var(--ink);
   }
+  /* Pause/resume the companion's speech mid-answer — see
+     speakCompanionAnswer's onboundary handling. Disabled whenever nothing
+     is actually speaking, so there's never a pause with nothing to pause. */
+  .companion-pause-btn {
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--ink-dim);
+    border-radius: 999px;
+    padding: var(--space-1) var(--space-3);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .companion-pause-btn:hover:not(:disabled) { color: var(--ink); border-color: var(--ink-dim); }
+  .companion-pause-btn:disabled { opacity: 0.35; cursor: default; }
   .panel {
     background: var(--panel);
     border: 1px solid var(--line);
@@ -881,6 +896,15 @@
           alt="ChortleChat's mission companion avatar"
         />
         <span class="companion-caption" id="companionCaption">Standing by</span>
+        <button
+          type="button"
+          class="companion-pause-btn"
+          id="companionPauseBtn"
+          disabled
+          aria-label="Pause the companion's voice"
+        >
+          Pause
+        </button>
         <div class="companion-gender-toggle" role="group" aria-label="Choose the companion's voice and avatar">
           <button type="button" data-gender="male" aria-pressed="true">Male</button>
           <button type="button" data-gender="female" aria-pressed="false">Female</button>
@@ -1144,6 +1168,7 @@
   const companionEl = document.getElementById("companion");
   const companionAvatar = document.getElementById("companionAvatar");
   const companionCaption = document.getElementById("companionCaption");
+  const companionPauseBtn = document.getElementById("companionPauseBtn");
 
   const appLayout = document.getElementById("appLayout");
   const sidebarToggleBtn = document.getElementById("sidebarToggleBtn");
@@ -2002,12 +2027,29 @@
     );
   }
 
+  // Lip-sync interval plus the alternating-frame flag both live at this
+  // outer scope (not inside speakCompanionAnswer) so the pause/resume
+  // button below can stop and restart the same puppet without needing its
+  // own copy of this state — pausing mid-answer doesn't end the utterance,
+  // it just needs the mouth to stop moving until resumed.
   let companionLipSyncInterval = null;
+  let companionMouthOpen = true;
+  function startCompanionLipSync() {
+    clearInterval(companionLipSyncInterval);
+    companionMouthOpen = true;
+    companionLipSyncInterval = setInterval(() => {
+      const frames = COMPANION_FRAMES[state.companionGender];
+      companionAvatar.src = companionMouthOpen ? frames.open : frames.closed;
+      companionMouthOpen = !companionMouthOpen;
+    }, 150);
+  }
+
   function speakCompanionAnswer(text) {
     if (!window.speechSynthesis || !text) return;
 
     speechSynthesis.cancel();
     clearInterval(companionLipSyncInterval);
+    companionPauseBtn.textContent = "Pause";
 
     const utterance = new SpeechSynthesisUtterance(text);
     const voice = pickCompanionVoice();
@@ -2015,23 +2057,44 @@
 
     utterance.onstart = () => {
       companionCaption.textContent = "Speaking";
-      let mouthOpen = true;
-      companionLipSyncInterval = setInterval(() => {
-        const frames = COMPANION_FRAMES[state.companionGender];
-        companionAvatar.src = mouthOpen ? frames.open : frames.closed;
-        mouthOpen = !mouthOpen;
-      }, 150);
+      companionPauseBtn.disabled = false;
+      startCompanionLipSync();
     };
     const restCompanion = () => {
       clearInterval(companionLipSyncInterval);
       syncCompanionAvatarFrame();
       companionCaption.textContent = "Standing by";
+      companionPauseBtn.disabled = true;
+      companionPauseBtn.textContent = "Pause";
     };
     utterance.onend = restCompanion;
     utterance.onerror = restCompanion;
 
     speechSynthesis.speak(utterance);
   }
+
+  // Pause/resume the Web Speech API utterance in place — speechSynthesis
+  // treats pause/resume as a state on the current utterance rather than
+  // something that ends it, so `onend`/`onerror` never fire from this and
+  // the lip-sync puppet is the only other thing that needs to react:
+  // frozen (mouth closed) while paused, restarted from a fresh open/closed
+  // cycle on resume rather than trying to reconstruct exactly where it left
+  // off, which the Web Speech API has no API surface to report anyway.
+  companionPauseBtn.addEventListener("click", () => {
+    if (!window.speechSynthesis || !speechSynthesis.speaking) return;
+    if (speechSynthesis.paused) {
+      speechSynthesis.resume();
+      companionCaption.textContent = "Speaking";
+      companionPauseBtn.textContent = "Pause";
+      startCompanionLipSync();
+    } else {
+      speechSynthesis.pause();
+      clearInterval(companionLipSyncInterval);
+      syncCompanionAvatarFrame();
+      companionCaption.textContent = "Paused";
+      companionPauseBtn.textContent = "Resume";
+    }
+  });
 
   function syncCompanionPersona() {
     companionEl.dataset.persona = state.persona;
