@@ -2114,8 +2114,18 @@
   function speakCompanionAnswer(text) {
     if (!window.speechSynthesis || !text) return;
 
-    companionSuppressEnd = true; // ignore onend/onerror from whatever word was already in flight
-    speechSynthesis.cancel();
+    // Only arm the suppress flag if cancel() is actually interrupting
+    // something — if nothing was speaking (the common case: a fresh
+    // question with nothing left over from before), cancel() fires no
+    // onend/onerror at all, and an armed-but-never-consumed flag would
+    // instead eat the *first word's own* completion, stalling the queue
+    // one word in.
+    if (speechSynthesis.speaking || speechSynthesis.pending) {
+      companionSuppressEnd = true;
+      speechSynthesis.cancel();
+    } else {
+      companionSuppressEnd = false;
+    }
     clearInterval(companionLipSyncInterval);
     companionPauseBtn.textContent = "Pause";
 
