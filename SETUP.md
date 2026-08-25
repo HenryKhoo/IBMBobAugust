@@ -30,6 +30,7 @@ cp .env.example .env           # from repo root
 Fill in `.env` with:
 - `WATSONX_API_KEY`, `WATSONX_PROJECT_ID` — IBM watsonx.ai credentials
 - `ZILLIZ_URI`, `ZILLIZ_TOKEN` — Zilliz Cloud (Milvus) credentials
+- `GEMINI_API_KEY` — optional. Only used as a third fallback tier for `/ask` generation, tried after both watsonx models have failed (e.g. a watsonx rate limit). Leave blank to skip it entirely; get a key at https://aistudio.google.com/apikey.
 
 Ask Henry for these values — they're not in the repo.
 
