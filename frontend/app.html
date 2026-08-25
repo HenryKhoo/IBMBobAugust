@@ -357,6 +357,37 @@
     font-size: var(--text-md);
     line-height: 1.5;
   }
+  /* Companion avatar — a two-frame lip-sync puppet (mouth-open/mouth-closed
+     crossfade timed to the Web Speech API) that voices whichever answer the
+     backend already grounded and generated. It never generates text itself;
+     see docs/companion-lipsync-proposal.md Path A. Border color tracks the
+     active persona using the same accent tokens the persona toggle uses,
+     rather than introducing a new color. */
+  .companion {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-2);
+    margin-top: var(--space-4);
+  }
+  .companion-avatar {
+    width: 88px;
+    height: 88px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: var(--panel);
+    border: 2px solid var(--accent-baseline);
+    box-shadow: var(--shadow-sm);
+  }
+  .companion[data-persona="banter"] .companion-avatar {
+    border-color: var(--accent-banter);
+  }
+  .companion-caption {
+    font-size: var(--text-xs);
+    color: var(--ink-faint);
+  }
   .panel {
     background: var(--panel);
     border: 1px solid var(--line);
@@ -815,6 +846,15 @@
     <header>
       <h1>ChortleChat</h1>
       <p>Ask a NASA Earth-science question — tropical cyclones, dust storms, drought, wildfires, and more. Grounded in real NASA source material, every time, never a guess.</p>
+      <div class="companion" id="companion" data-persona="baseline">
+        <img
+          class="companion-avatar"
+          id="companionAvatar"
+          src="/public/companion-mouth-closed.jpg"
+          alt="ChortleChat's mission companion avatar"
+        />
+        <span class="companion-caption" id="companionCaption">Standing by</span>
+      </div>
     </header>
 
     <div class="panel">
@@ -1041,6 +1081,9 @@
   const historyLog = document.getElementById("historyLog");
   const historySourceTag = document.getElementById("historySourceTag");
   const closeHistoryBtn = document.getElementById("closeHistoryBtn");
+  const companionEl = document.getElementById("companion");
+  const companionAvatar = document.getElementById("companionAvatar");
+  const companionCaption = document.getElementById("companionCaption");
 
   const appLayout = document.getElementById("appLayout");
   const sidebarToggleBtn = document.getElementById("sidebarToggleBtn");
@@ -1555,6 +1598,7 @@
     humorRow.dataset.disabled = state.persona === "baseline" ? "true" : "false";
     humorInput.value = String(state.humor);
     humorVal.textContent = String(state.humor);
+    syncCompanionPersona();
     renderDomainPicker();
     renderChipsForCurrentDomain();
   }
@@ -1586,6 +1630,7 @@
         b.setAttribute("aria-pressed", String(b === btn));
       });
       humorRow.dataset.disabled = state.persona === "baseline" ? "true" : "false";
+      syncCompanionPersona();
       persistSettings();
     });
   });
@@ -1789,6 +1834,70 @@
     renderSidebarList();
   });
 
+  // Companion lip sync — a two-frame puppet ported from the companion-python
+  // codelab's app.js: swap a mouth-open/mouth-closed image on a timer keyed
+  // to the Web Speech API's utterance lifecycle. This never generates or
+  // alters a word of the answer; it only performs and voices whatever
+  // /ask already grounded and returned. See docs/companion-lipsync-proposal.md.
+  const COMPANION_MOUTH_OPEN = "/public/companion-mouth-open.jpg";
+  const COMPANION_MOUTH_CLOSED = "/public/companion-mouth-closed.jpg";
+  (function preloadCompanionFrames() {
+    [COMPANION_MOUTH_OPEN, COMPANION_MOUTH_CLOSED].forEach((src) => {
+      const img = new Image();
+      img.src = src;
+    });
+  })();
+
+  let companionVoices = [];
+  function populateCompanionVoices() {
+    companionVoices = window.speechSynthesis ? speechSynthesis.getVoices() : [];
+  }
+  if (window.speechSynthesis) {
+    populateCompanionVoices();
+    speechSynthesis.onvoiceschanged = populateCompanionVoices;
+  }
+  function pickCompanionVoice() {
+    return (
+      companionVoices.find((v) => v.lang === "en-US" && v.name.includes("Google")) ||
+      companionVoices.find((v) => v.lang === "en-US") ||
+      companionVoices[0]
+    );
+  }
+
+  let companionLipSyncInterval = null;
+  function speakCompanionAnswer(text) {
+    if (!window.speechSynthesis || !text) return;
+
+    speechSynthesis.cancel();
+    clearInterval(companionLipSyncInterval);
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    const voice = pickCompanionVoice();
+    if (voice) utterance.voice = voice;
+
+    utterance.onstart = () => {
+      companionCaption.textContent = "Speaking";
+      let mouthOpen = true;
+      companionLipSyncInterval = setInterval(() => {
+        companionAvatar.src = mouthOpen ? COMPANION_MOUTH_OPEN : COMPANION_MOUTH_CLOSED;
+        mouthOpen = !mouthOpen;
+      }, 150);
+    };
+    const restCompanion = () => {
+      clearInterval(companionLipSyncInterval);
+      companionAvatar.src = COMPANION_MOUTH_CLOSED;
+      companionCaption.textContent = "Standing by";
+    };
+    utterance.onend = restCompanion;
+    utterance.onerror = restCompanion;
+
+    speechSynthesis.speak(utterance);
+  }
+
+  function syncCompanionPersona() {
+    companionEl.dataset.persona = state.persona;
+  }
+
   function addQuestionBubble(text) {
     const el = document.createElement("div");
     el.className = "msg-question";
@@ -1826,6 +1935,12 @@
     el.className = "msg-answer";
     el.dataset.persona = persona;
     el.dataset.grounded = String(grounded);
+
+    // The avatar performs whatever /ask already grounded and generated —
+    // including the honest no-match fallback text, spoken the same as any
+    // other answer, never silently. See speakCompanionAnswer above.
+    companionEl.dataset.persona = persona;
+    speakCompanionAnswer(answer);
 
     if (grounded) {
       el.textContent = answer;
