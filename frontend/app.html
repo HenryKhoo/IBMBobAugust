@@ -415,13 +415,9 @@
     background: var(--panel-2);
     color: var(--ink);
   }
-  /* Locked while the companion is speaking or paused mid-answer (see
-     setCompanionGenderLocked) — switching voice/avatar partway through a
-     line the user already heard in the old voice would be jarring. */
-  .companion-gender-toggle button:disabled { opacity: 0.35; cursor: default; }
   /* Pause/resume the companion's speech mid-answer — see
-     speakCompanionWord's per-word queue. Disabled whenever nothing is
-     actually speaking, so there's never a pause with nothing to pause. */
+     speakCompanionAnswer's onboundary handling. Disabled whenever nothing
+     is actually speaking, so there's never a pause with nothing to pause. */
   .companion-pause-btn {
     background: transparent;
     border: 1px solid var(--line);
@@ -1739,9 +1735,11 @@
       document.querySelectorAll(".companion-gender-toggle button").forEach((b) => {
         b.setAttribute("aria-pressed", String(b === btn));
       });
-      // These buttons are disabled for the whole speaking/paused stretch of
-      // an answer (see setCompanionGenderLocked), so a click here only ever
-      // happens while the companion is idle — just update the rest frame.
+      // Only the rest frame changes here — if the companion is mid-answer,
+      // speakCompanionAnswer's lip-sync interval reads state.companionGender
+      // on every tick, so it picks up the new face/voice pairing on the
+      // very next syllable rather than waiting for the current answer to
+      // finish.
       syncCompanionAvatarFrame();
       persistSettings();
     });
@@ -2051,62 +2049,49 @@
   // silently no-ops once an utterance has been paused for more than a few
   // seconds: `speaking` and `paused` both stay true forever and no audio
   // ever comes back (https://bugs.chromium.org/p/chromium/issues/detail?id=679437).
-  // A single long utterance plus `onboundary` tracking has a similar problem
-  // in practice: several engines only report boundaries at the sentence
-  // level, so "resuming" from the last boundary replayed the whole current
-  // sentence instead of continuing partway through it. Speaking the answer
-  // as a queue of small per-word utterances sidesteps both issues — pausing
-  // just stops the queue from advancing, and resuming restarts at most the
-  // one word that got interrupted.
-  let companionSpeechWords = [];
-  let companionWordIndex = 0;
+  // So instead of pausing the utterance in place, we cancel it and remember
+  // how far it got via `onboundary` (which fires per word with a charIndex
+  // into the text), then "resume" by speaking a fresh utterance built from
+  // the remaining text. Same voice, just a new utterance object every time
+  // we stop and start.
+  let companionSpeechText = "";
   let companionSpeechVoice = null;
-  let companionSuppressEnd = false; // true while we cancel() on purpose, so onend/onerror don't advance the queue or reset the UI
+  let companionBoundaryOffset = 0; // where the *current* utterance's text starts within companionSpeechText
+  let companionResumeIndex = 0; // where a future resume should start from
+  let companionSuppressEnd = false; // true while we cancel() on purpose, so onend/onerror don't reset the UI
 
-  // Locks the gender/voice toggle for the whole speaking-or-paused stretch
-  // of an answer. Letting it change mid-answer would pair words already
-  // spoken in one voice with words still to come in another.
-  function setCompanionGenderLocked(locked) {
-    document.querySelectorAll(".companion-gender-toggle button").forEach((btn) => {
-      btn.disabled = locked;
-    });
-  }
-
-  function speakCompanionWord(index) {
-    if (index >= companionSpeechWords.length) {
-      clearInterval(companionLipSyncInterval);
-      syncCompanionAvatarFrame();
-      companionCaption.textContent = "Standing by";
-      companionPauseBtn.disabled = true;
-      companionPauseBtn.textContent = "Pause";
-      setCompanionGenderLocked(false);
-      return;
-    }
-
-    companionWordIndex = index;
-    const utterance = new SpeechSynthesisUtterance(companionSpeechWords[index]);
+  function speakCompanionFrom(charIndex) {
+    const utterance = new SpeechSynthesisUtterance(companionSpeechText.slice(charIndex));
     if (companionSpeechVoice) utterance.voice = companionSpeechVoice;
+    companionBoundaryOffset = charIndex;
+    companionResumeIndex = charIndex;
 
+    utterance.onboundary = (event) => {
+      if (typeof event.charIndex === "number") {
+        companionResumeIndex = companionBoundaryOffset + event.charIndex;
+      }
+    };
     utterance.onstart = () => {
       companionCaption.textContent = "Speaking";
       companionPauseBtn.disabled = false;
       companionPauseBtn.textContent = "Pause";
-      setCompanionGenderLocked(true);
       startCompanionLipSync();
     };
-    const advance = () => {
+    const restCompanion = () => {
+      clearInterval(companionLipSyncInterval);
       if (companionSuppressEnd) {
-        // We cancelled this word ourselves (pause, or a new answer cutting
-        // this one off) — the queue shouldn't advance past a word that
-        // never actually finished playing, and the UI belongs to whoever
-        // triggered the cancel, not to this handler.
+        // We cancelled this utterance ourselves to pause it — the "resting"
+        // UI state (caption/button) belongs to the pause handler, not here.
         companionSuppressEnd = false;
         return;
       }
-      speakCompanionWord(index + 1);
+      syncCompanionAvatarFrame();
+      companionCaption.textContent = "Standing by";
+      companionPauseBtn.disabled = true;
+      companionPauseBtn.textContent = "Pause";
     };
-    utterance.onend = advance;
-    utterance.onerror = advance;
+    utterance.onend = restCompanion;
+    utterance.onerror = restCompanion;
 
     speechSynthesis.speak(utterance);
   }
@@ -2114,34 +2099,24 @@
   function speakCompanionAnswer(text) {
     if (!window.speechSynthesis || !text) return;
 
-    // Only arm the suppress flag if cancel() is actually interrupting
-    // something — if nothing was speaking (the common case: a fresh
-    // question with nothing left over from before), cancel() fires no
-    // onend/onerror at all, and an armed-but-never-consumed flag would
-    // instead eat the *first word's own* completion, stalling the queue
-    // one word in.
-    if (speechSynthesis.speaking || speechSynthesis.pending) {
-      companionSuppressEnd = true;
-      speechSynthesis.cancel();
-    } else {
-      companionSuppressEnd = false;
-    }
+    companionSuppressEnd = false;
+    speechSynthesis.cancel();
     clearInterval(companionLipSyncInterval);
     companionPauseBtn.textContent = "Pause";
 
-    companionSpeechWords = text.match(/\S+\s*/g) || [];
+    companionSpeechText = text;
     companionSpeechVoice = pickCompanionVoice();
-    speakCompanionWord(0);
+    speakCompanionFrom(0);
   }
 
-  // Pause/resume the companion's speech. See the note above speakCompanionWord
-  // for why this cancels and re-speaks from the interrupted word instead of
-  // calling the native speechSynthesis.pause()/resume().
+  // Pause/resume the companion's speech. See the note above speakCompanionFrom
+  // for why this cancels and re-speaks from a remembered word boundary
+  // instead of calling the native speechSynthesis.pause()/resume().
   companionPauseBtn.addEventListener("click", () => {
     if (!window.speechSynthesis) return;
     if (companionPauseBtn.textContent === "Resume") {
       clearInterval(companionLipSyncInterval);
-      speakCompanionWord(companionWordIndex);
+      speakCompanionFrom(companionResumeIndex);
     } else {
       if (!speechSynthesis.speaking) return;
       companionSuppressEnd = true;
@@ -2150,8 +2125,6 @@
       syncCompanionAvatarFrame();
       companionCaption.textContent = "Paused";
       companionPauseBtn.textContent = "Resume";
-      // Gender toggle stays locked (set by speakCompanionWord's onstart)
-      // until the answer actually finishes — pausing isn't finishing.
     }
   });
 
