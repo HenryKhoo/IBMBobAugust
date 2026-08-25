@@ -1105,6 +1105,25 @@
     domain: "",
     companionGender: "male",
   };
+
+  // Companion avatar frame set, keyed by state.companionGender — declared
+  // here (rather than down by the rest of the companion lip-sync code)
+  // because applyPersistedSettings() below calls syncCompanionAvatarFrame()
+  // during page init, before that later code would otherwise run; a `const`
+  // is not hoisted the way a `function` declaration is, so referencing it
+  // there before this point would throw "Cannot access before
+  // initialization". See the "Companion lip sync" section further down for
+  // how this is used (preloading, lip-sync ticks, voice pairing).
+  const COMPANION_FRAMES = {
+    male: {
+      open: "/public/companion-mouth-open.jpg",
+      closed: "/public/companion-mouth-closed.jpg",
+    },
+    female: {
+      open: "/public/female_astronaut_mouth_open.png",
+      closed: "/public/female_astronaut.png",
+    },
+  };
   let isLoading = false;
 
   const domainPickerEl = document.getElementById("domainPicker");
@@ -1909,17 +1928,8 @@
   // Frame set and voice are both keyed by state.companionGender (see the
   // .companion-gender-toggle wiring above) so the face on screen and the
   // voice speaking always agree — never a female voice over the male
-  // avatar or vice versa.
-  const COMPANION_FRAMES = {
-    male: {
-      open: "/public/companion-mouth-open.jpg",
-      closed: "/public/companion-mouth-closed.jpg",
-    },
-    female: {
-      open: "/public/female_astronaut_mouth_open.png",
-      closed: "/public/female_astronaut.png",
-    },
-  };
+  // avatar or vice versa. COMPANION_FRAMES itself is declared up near
+  // `state`, not here — see the comment there for why.
   (function preloadCompanionFrames() {
     Object.values(COMPANION_FRAMES).forEach(({ open, closed }) => {
       [open, closed].forEach((src) => {
