@@ -2044,24 +2044,47 @@
     }, 150);
   }
 
-  function speakCompanionAnswer(text) {
-    if (!window.speechSynthesis || !text) return;
+  // speechSynthesis.pause()/resume() looks like the obvious way to implement
+  // the button below, but Chrome has a long-standing bug where resume()
+  // silently no-ops once an utterance has been paused for more than a few
+  // seconds: `speaking` and `paused` both stay true forever and no audio
+  // ever comes back (https://bugs.chromium.org/p/chromium/issues/detail?id=679437).
+  // So instead of pausing the utterance in place, we cancel it and remember
+  // how far it got via `onboundary` (which fires per word with a charIndex
+  // into the text), then "resume" by speaking a fresh utterance built from
+  // the remaining text. Same voice, just a new utterance object every time
+  // we stop and start.
+  let companionSpeechText = "";
+  let companionSpeechVoice = null;
+  let companionBoundaryOffset = 0; // where the *current* utterance's text starts within companionSpeechText
+  let companionResumeIndex = 0; // where a future resume should start from
+  let companionSuppressEnd = false; // true while we cancel() on purpose, so onend/onerror don't reset the UI
 
-    speechSynthesis.cancel();
-    clearInterval(companionLipSyncInterval);
-    companionPauseBtn.textContent = "Pause";
+  function speakCompanionFrom(charIndex) {
+    const utterance = new SpeechSynthesisUtterance(companionSpeechText.slice(charIndex));
+    if (companionSpeechVoice) utterance.voice = companionSpeechVoice;
+    companionBoundaryOffset = charIndex;
+    companionResumeIndex = charIndex;
 
-    const utterance = new SpeechSynthesisUtterance(text);
-    const voice = pickCompanionVoice();
-    if (voice) utterance.voice = voice;
-
+    utterance.onboundary = (event) => {
+      if (typeof event.charIndex === "number") {
+        companionResumeIndex = companionBoundaryOffset + event.charIndex;
+      }
+    };
     utterance.onstart = () => {
       companionCaption.textContent = "Speaking";
       companionPauseBtn.disabled = false;
+      companionPauseBtn.textContent = "Pause";
       startCompanionLipSync();
     };
     const restCompanion = () => {
       clearInterval(companionLipSyncInterval);
+      if (companionSuppressEnd) {
+        // We cancelled this utterance ourselves to pause it — the "resting"
+        // UI state (caption/button) belongs to the pause handler, not here.
+        companionSuppressEnd = false;
+        return;
+      }
       syncCompanionAvatarFrame();
       companionCaption.textContent = "Standing by";
       companionPauseBtn.disabled = true;
@@ -2073,22 +2096,31 @@
     speechSynthesis.speak(utterance);
   }
 
-  // Pause/resume the Web Speech API utterance in place — speechSynthesis
-  // treats pause/resume as a state on the current utterance rather than
-  // something that ends it, so `onend`/`onerror` never fire from this and
-  // the lip-sync puppet is the only other thing that needs to react:
-  // frozen (mouth closed) while paused, restarted from a fresh open/closed
-  // cycle on resume rather than trying to reconstruct exactly where it left
-  // off, which the Web Speech API has no API surface to report anyway.
+  function speakCompanionAnswer(text) {
+    if (!window.speechSynthesis || !text) return;
+
+    companionSuppressEnd = false;
+    speechSynthesis.cancel();
+    clearInterval(companionLipSyncInterval);
+    companionPauseBtn.textContent = "Pause";
+
+    companionSpeechText = text;
+    companionSpeechVoice = pickCompanionVoice();
+    speakCompanionFrom(0);
+  }
+
+  // Pause/resume the companion's speech. See the note above speakCompanionFrom
+  // for why this cancels and re-speaks from a remembered word boundary
+  // instead of calling the native speechSynthesis.pause()/resume().
   companionPauseBtn.addEventListener("click", () => {
-    if (!window.speechSynthesis || !speechSynthesis.speaking) return;
-    if (speechSynthesis.paused) {
-      speechSynthesis.resume();
-      companionCaption.textContent = "Speaking";
-      companionPauseBtn.textContent = "Pause";
-      startCompanionLipSync();
+    if (!window.speechSynthesis) return;
+    if (companionPauseBtn.textContent === "Resume") {
+      clearInterval(companionLipSyncInterval);
+      speakCompanionFrom(companionResumeIndex);
     } else {
-      speechSynthesis.pause();
+      if (!speechSynthesis.speaking) return;
+      companionSuppressEnd = true;
+      speechSynthesis.cancel();
       clearInterval(companionLipSyncInterval);
       syncCompanionAvatarFrame();
       companionCaption.textContent = "Paused";
