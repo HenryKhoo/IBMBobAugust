@@ -21,11 +21,12 @@ this API's retrieval-backed endpoints already follow.
 
 For the fixed set of "chip" questions the frontend suggests
 (`backend/data/preset_qa.json`, drafted in `docs/preset-qa-draft.md`), a
-matching Baseline answer is served from that curated cache instead of a
-fresh generation call, once retrieval has confirmed a real, above-threshold
-match for the question exactly as it would for any other question — see
-`_PRESET_CACHE`. Banter still always makes its own live call to restyle
-whichever Baseline answer is in play, cached or generated.
+matching question is answered straight from that curated cache — no
+retrieval, no confidence gate, no Baseline generation call — so these
+known-good demo questions always answer instantly and consistently. See
+`_PRESET_CACHE` and `_preset_response`. Banter still always makes its own
+live call to restyle whichever Baseline answer is in play, cached or
+generated.
 
 Conversational memory (`app.services.memory`) sits on top of this in two
 stages, tried in order:
@@ -124,18 +125,21 @@ _FALLBACK_BANTER = (
 # Cache-first lookup for the frontend's suggested "chip" questions — see
 # backend/data/preset_qa.json's own _readme and docs/preset-qa-draft.md for
 # how each entry was drafted and verified against the corpus. This is a
-# latency/consistency shortcut for a known, fixed set of questions, not a
-# second source of truth: retrieval and the confidence-threshold gate below
-# still run exactly as before, so a cached question that the live corpus
-# can no longer support (a re-ingest, a threshold change) honestly falls
-# back instead of blindly trusting a stale cache entry. Only the Baseline
-# generation call is skipped on a hit — Banter still makes its usual live
-# call to restyle whichever baseline_answer is in play (cached or
-# generated), so "Banter never invents a fact" holds exactly as it always
-# has. Keyed by the exact chip question text (stripped/lowercased for a
+# curated demo path, not a shortcut layered on top of live retrieval: a
+# cache hit answers directly from the pre-verified baseline_answer and
+# skips retrieval, the confidence-threshold gate, and the Baseline
+# generation call entirely, so these 14 known-good questions always answer
+# instantly and consistently in a live demo regardless of vector-store or
+# embedding-provider hiccups. `grounded` is still `True` and `confidence`
+# is `None` — same meaning `AskResponse.confidence` already carries for
+# "nothing was retrieved," which is literally true here since retrieval
+# never ran. Banter is unaffected either way: it still always makes its
+# own live call to restyle whichever baseline_answer is in play, cached or
+# generated, so it can never introduce a fact Baseline didn't already
+# state. Keyed by the exact chip question text (stripped/lowercased for a
 # forgiving match); only entries flagged `use_cache: true` are included —
 # the one no_match entry in the file is documentation, not real cache
-# config.
+# config, and always falls through to normal live retrieval.
 _PRESET_QA_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "preset_qa.json"
 
 
@@ -250,6 +254,51 @@ def _fallback_response(
     )
 
 
+def _preset_response(
+    store,
+    preset: dict,
+    persona: AskPersona,
+    humor: int,
+    session,
+    question: str,
+    history_source: HistorySource,
+) -> AskResponse:
+    """Answer a known chip question straight from the curated demo cache.
+
+    No retrieval, no confidence gate, no Baseline generation call — see
+    `_PRESET_CACHE` for why. Banter still makes its own live call here,
+    restyling the curated `baseline_answer` exactly as it would restyle a
+    freshly generated one, so it never gets a path to state a fact
+    Baseline didn't.
+    """
+    baseline_answer = preset["baseline_answer"]
+    source = ", ".join(preset.get("source") or []) or None
+
+    if persona == AskPersona.BASELINE:
+        final_answer = baseline_answer
+    else:
+        banter_prompt = _BANTER_PROMPT.format(
+            humor=humor, humor_label=_humor_label(humor), baseline_answer=baseline_answer
+        )
+        banter_message = get_instruct_model().invoke(banter_prompt)
+        final_answer = str(banter_message.content).strip()
+
+    session.add_turn(ConversationRole.ASSISTANT, final_answer, persona=persona, source=source)
+    persist_grounded_exchange(
+        store, session.session_id, session.turn_count, question, final_answer, persona, source
+    )
+
+    return AskResponse(
+        answer=final_answer,
+        persona=persona,
+        grounded=True,
+        confidence=None,
+        source=source,
+        session_id=session.session_id,
+        history_source=history_source,
+    )
+
+
 def ask_chortlechat(
     question: str,
     persona: AskPersona,
@@ -317,6 +366,12 @@ def ask_chortlechat(
 
     session.add_turn(ConversationRole.USER, question)
 
+    preset = _PRESET_CACHE.get(question.strip().lower())
+    if preset is not None:
+        return _preset_response(
+            store, preset, persona, humor, session, question, history_source
+        )
+
     hits = relevance_score_hits_or_empty(store, question, k=1, expr=_retrieval_expr(domain))
     if not hits and domain is not None:
         hits = relevance_score_hits_or_empty(store, question, k=1, expr=_retrieval_expr(None))
@@ -336,20 +391,11 @@ def ask_chortlechat(
         session.add_turn(ConversationRole.ASSISTANT, response.answer, persona=persona)
         return response
 
-    preset = _PRESET_CACHE.get(question.strip().lower())
-    if preset is not None:
-        # Cache hit on a known chip question: reuse the curated,
-        # corpus-verified answer instead of a fresh generation call.
-        # Confidence/source above still came from a real retrieval this
-        # call — the cache only replaces the generation step, not the
-        # grounding check.
-        baseline_answer = preset["baseline_answer"]
-    else:
-        baseline_prompt = _BASELINE_PROMPT.format(
-            history=history, passage=chunk.page_content, question=question
-        )
-        baseline_message = get_instruct_model().invoke(baseline_prompt)
-        baseline_answer = str(baseline_message.content).strip()
+    baseline_prompt = _BASELINE_PROMPT.format(
+        history=history, passage=chunk.page_content, question=question
+    )
+    baseline_message = get_instruct_model().invoke(baseline_prompt)
+    baseline_answer = str(baseline_message.content).strip()
 
     if persona == AskPersona.BASELINE:
         final_answer = baseline_answer

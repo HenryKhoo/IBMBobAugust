@@ -647,7 +647,7 @@ CACHED_ANSWER_SNIPPET = "barrier layer thickness"
 UNCACHED_NO_MATCH_QUESTION = "What atmospheric conditions influence tropical cyclone formation?"
 
 
-def test_ask_serves_a_cached_baseline_answer_for_a_known_chip_question(monkeypatch, fake_hit):
+def test_ask_serves_a_cached_baseline_answer_without_touching_retrieval(monkeypatch, fake_hit):
     fake_store = _FakeVectorStore([fake_hit])
     fake_model = _FakeInstructModel(STUBBED_ANSWER)
     monkeypatch.setattr(chortlechat, "get_vector_store", lambda: fake_store)
@@ -658,12 +658,37 @@ def test_ask_serves_a_cached_baseline_answer_for_a_known_chip_question(monkeypat
     assert response.grounded is True
     assert CACHED_ANSWER_SNIPPET in response.answer
     assert response.answer != STUBBED_ANSWER
-    # confidence/source still come from a real retrieval call, not the cache
-    # — the cache only ever replaces the generation step.
-    assert response.confidence == RELEVANCE_SCORE
-    assert response.source == "science_reference:nasa-smd-veggie-001#chunk0"
-    # no Baseline generation call needed on a cache hit.
+    assert response.source == "science_reference:nasa-smd-50#chunk0"
+    # confidence is None: nothing was retrieved, on purpose — this is a
+    # demo cache hit, not a scored live match.
+    assert response.confidence is None
+    # no Baseline generation call, and no retrieval call either — a cache
+    # hit answers straight from the curated cache, live vector store and
+    # instruct-model quota issues notwithstanding.
     assert fake_model.invoked_with == []
+    assert fake_store.calls == []
+
+
+def test_ask_serves_a_cached_answer_even_when_the_vector_store_would_fail(monkeypatch):
+    """The whole point of bypassing retrieval for a cache hit: a live
+    vector-store/embedding outage must not be able to take down these known
+    demo questions."""
+
+    class _RejectingVectorStore:
+        def similarity_search_with_relevance_scores(self, query, **kwargs):
+            raise RuntimeError("vector store is unreachable")
+
+        def add_texts(self, texts, metadatas):
+            raise RuntimeError("vector store is unreachable")
+
+    fake_model = _FakeInstructModel(STUBBED_ANSWER)
+    monkeypatch.setattr(chortlechat, "get_vector_store", lambda: _RejectingVectorStore())
+    monkeypatch.setattr(chortlechat, "get_instruct_model", lambda: fake_model)
+
+    response = chortlechat.ask_chortlechat(CACHED_QUESTION, chortlechat.AskPersona.BASELINE, humor=50)
+
+    assert response.grounded is True
+    assert CACHED_ANSWER_SNIPPET in response.answer
 
 
 def test_ask_banter_still_makes_a_live_call_to_restyle_a_cached_baseline_answer(
@@ -676,27 +701,13 @@ def test_ask_banter_still_makes_a_live_call_to_restyle_a_cached_baseline_answer(
 
     chortlechat.ask_chortlechat(CACHED_QUESTION, chortlechat.AskPersona.BANTER, humor=80)
 
-    # exactly one generation call — the banter restyle — no baseline call.
+    # exactly one generation call — the banter restyle — no baseline call
+    # and no retrieval call.
     assert len(fake_model.invoked_with) == 1
     banter_prompt = fake_model.invoked_with[0]
     assert CACHED_ANSWER_SNIPPET in banter_prompt
     assert "80/100" in banter_prompt
-
-
-def test_ask_does_not_trust_a_cached_question_below_the_confidence_threshold(monkeypatch):
-    weak_hit = (_FakeDocument(REFERENCE_TEXT, dict(REFERENCE_METADATA)), 0.1)
-    fake_store = _FakeVectorStore([weak_hit])
-    fake_model = _FakeInstructModel(STUBBED_ANSWER)
-    monkeypatch.setattr(chortlechat, "get_vector_store", lambda: fake_store)
-    monkeypatch.setattr(chortlechat, "get_instruct_model", lambda: fake_model)
-
-    response = chortlechat.ask_chortlechat(CACHED_QUESTION, chortlechat.AskPersona.BASELINE, humor=50)
-
-    # a weak live retrieval score still wins honestly, even for a question
-    # that has a curated cache entry — the cache never overrides the gate.
-    assert response.grounded is False
-    assert response.confidence == 0.1
-    assert fake_model.invoked_with == []
+    assert fake_store.calls == []
 
 
 def test_ask_ignores_the_cache_for_the_documented_no_match_question(monkeypatch, fake_hit):
