@@ -5,8 +5,7 @@
     "Every baseline_answer is drafted strictly from the cited passage(s) in backend/data/chortlechat_corpus.json, in Baseline's voice, using the same 'say only what the source supports' rule app.services.chortlechat._BASELINE_PROMPT already enforces. All doc_id/domain citations below were re-verified directly against chortlechat_corpus.json.",
     "Every banter_answer is a hand-drafted restyle of that same entry's baseline_answer, written under the exact same rule app.services.chortlechat._BANTER_PROMPT enforces at generation time: personality and phrasing may differ, but every fact, number, and claim must already be present in baseline_answer. Nothing in banter_answer should ever say more, or something different, than baseline_answer already says — treat any drift caught in review as a bug in the draft, not an acceptable embellishment.",
     "Each banter_answer opens with an actual short joke (a setup/punchline one-liner or pun) tied to that entry's topic, in the style of the r/Jokes-derived 'Short Jokes' dataset (https://huggingface.co/datasets/Fraser/short-jokes), before restating the same facts baseline_answer gives. The joke itself is original, not sourced from that dataset — it's a style reference, not a text reuse — and it never carries a factual claim of its own; the facts still only ever come from baseline_answer.",
-    "confidence is deliberately null on every entry, not a filled-in number, and stays null in the AskResponse for a cache hit too — the same meaning it already carries for 'nothing was retrieved,' which is literally true here since retrieval never runs for a cache hit.",
-    "entry 'tc-formation-conditions' (#3) has grounded: false and baseline_answer/banter_answer both null — no passage in the corpus actually answers it (see match_quality/caveat). It is still cached (use_cache: true): a hit routes straight to app.services.chortlechat._fallback_response, the same honest 'no grounded answer' text every other unanswerable question gets, without touching retrieval either. This is the one entry where 'preset' means 'preset to say I don't know,' not 'preset to a fabricated answer.'"
+    "confidence is deliberately null on every entry, not a filled-in number, and stays null in the AskResponse for a cache hit too — the same meaning it already carries for 'nothing was retrieved,' which is literally true here since retrieval never runs for a cache hit."
   ],
   "schema_version": 2,
   "source_draft": "docs/preset-qa-draft.md",
@@ -15,9 +14,9 @@
   "summary": {
     "total_questions": 15,
     "note_on_count": "frontend's DOMAINS array lists 18 chip slots across 6 tabs, but 'All' repeats 5 questions that also appear under their own domain tab, so there are only 15 distinct question strings. All 15 are covered here.",
-    "strong_match": 9,
+    "strong_match": 10,
     "partial_match": 5,
-    "no_match": 1
+    "no_match": 0
   },
   "entries": [
     {
@@ -53,13 +52,13 @@
       "question": "What atmospheric conditions influence tropical cyclone formation?",
       "domains": ["tropical_cyclone_dynamics"],
       "appears_in_all_chip": false,
-      "match_quality": "no_match",
+      "match_quality": "strong",
       "use_cache": true,
-      "grounded": false,
-      "baseline_answer": null,
-      "banter_answer": null,
-      "caveat": "Nothing in the corpus addresses genesis-favorable atmospheric conditions (wind shear, moisture, instability) directly. Closest passages cover ocean heat content's effect on intensification (already used for tc-ocean-heat-intensification) or the Saharan Air Layer's suppression of activity (used for saharan-dust-tc-development) — neither answers this question as asked. Cached to the honest fallback, not to a fabricated answer — see _readme.",
-      "source": [],
+      "grounded": true,
+      "baseline_answer": "Tropical cyclone formation requires warm ocean surface temperatures (at least 26.5°C to a depth of ~50m), high mid-tropospheric humidity, atmospheric instability, low vertical wind shear, a pre-existing low-level disturbance, and sufficient Coriolis force (at least 5° away from the equator).",
+      "banter_answer": "What is a tropical cyclone's absolute favorite recipe? A piping-hot ocean bath with a massive pinch of chaotic humidity! For a storm to cook up, it demands sea temperatures of at least 26.5°C down to 50 meters, a super-moist mid-troposphere, and an atmospheric setup unstable enough to throw a tantrum. It also needs minimal wind shear so its chimney doesn't get chopped off, a pre-existing low-level disturbance to get the party started, and enough distance from the equator for the Coriolis force to give it a proper spin!",
+      "caveat": null,
+      "source": ["science_reference:nasa-smd-50#chunk0"],
       "confidence": null
     },
     {
