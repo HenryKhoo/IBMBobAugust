@@ -1,45 +1,73 @@
-"""IBM watsonx.ai (+ Gemini fallback) client wrapper.
+"""IBM watsonx.ai (+ Gemini fallback/replacement) client wrapper.
 
-Wraps the two model calls the rest of the backend needs:
+Wraps the two model calls the rest of the backend needs, each independently
+switchable to Gemini via `GEMINI_API_KEY`:
 
-- an embeddings client (Granite embedding model, via langchain-ibm), for
-  the ingestion and retrieval pipeline (see the day 3 ingestion layer work
-  in the dev plan). Watsonx/Granite-only, deliberately: the Zilliz
-  collection is already indexed against Granite's vector space, so a
-  second embedding provider would produce vectors that aren't comparable
-  to the ones already stored — there's no safe fallback here, only a
-  single source of truth.
+- an embeddings client, for the ingestion and retrieval pipeline (see the
+  day 3 ingestion layer work in the dev plan). Granite (via langchain-ibm)
+  by default; Gemini's `gemini-embedding-001` (via langchain-google-genai)
+  instead once `GEMINI_API_KEY` is set — see `using_gemini_embeddings()`
+  and `get_embedding_model()`. Unlike the instruct model below, this is a
+  straight *replacement*, not a fallback chain: embeddings from different
+  providers are different vector spaces, so a Gemini query vector compared
+  against Granite-embedded document vectors (or vice versa) produces a
+  meaningless similarity score without ever raising an error. Switching
+  providers therefore always means querying a different Zilliz collection
+  too (`ZILLIZ_COLLECTION_NAME_GEMINI`, not `ZILLIZ_COLLECTION_NAME` — see
+  `app.services.vector_store.get_vector_store`), populated by re-running
+  `backend/scripts/ingest_chortlechat_corpus.py` with `GEMINI_API_KEY` set.
+  Added after watsonx's Granite embedding quota — a separate quota from
+  the instruct model's — started rejecting every retrieval call outright
+  (`token_quota_reached`), which is a fundamentally different failure than
+  the instruct model being rate-limited: there's no "try Granite, fall
+  back to Gemini" here, only "which single provider is authoritative for
+  the currently-active collection."
 - an instruct/chat client, for grounded generation in `/ask` (and, before
   the ChortleChat revamp, each habitat module's endpoint), with automatic
   failover across up to three tiers when a model errors or is
-  rate-limited. When `GEMINI_API_KEY` is set, Gemini (via
-  langchain-google-genai) is the *primary* tier and both watsonx models
-  become the failover chain instead — the watsonx/Granite trial tier's
-  rate limit was being hit too often for watsonx to serve as the first
-  attempt. With no Gemini key configured, watsonx stays primary exactly as
-  before Gemini support existed. Whichever tier actually answers, it
-  generates the exact same grounded prompt from the same retrieved passage
-  (see `app.services.chortlechat`) — the no-hallucination discipline
-  doesn't change based on which model tier answered.
+  rate-limited. When `GEMINI_API_KEY` is set, Gemini is the *primary* tier
+  and both watsonx models become the failover chain instead — the
+  watsonx/Granite trial tier's rate limit was being hit too often for
+  watsonx to serve as the first attempt. With no Gemini key configured,
+  watsonx stays primary exactly as before Gemini support existed.
+  Whichever tier actually answers, it generates the exact same grounded
+  prompt from the same retrieved passage (see `app.services.chortlechat`)
+  — the no-hallucination discipline doesn't change based on which model
+  tier answered. Unlike embeddings, a genuine fallback chain makes sense
+  here because generation is stateless per call — nothing is stored in a
+  shape tied to whichever model answered a previous question.
 
 Built from the shared `Settings` in `app.config`, so there is one place
 credentials and model ids are configured (`.env`, see `.env.example` at
 the repo root). Callers should use `get_embedding_model()` and
 `get_instruct_model()` rather than constructing `WatsonxEmbeddings` /
-`ChatWatsonx` / `ChatGoogleGenerativeAI` directly, so the whole backend
-shares one cached client per model and one place to change model ids or
-auth.
+`GoogleGenerativeAIEmbeddings` / `ChatWatsonx` / `ChatGoogleGenerativeAI`
+directly, so the whole backend shares one cached client per model and one
+place to change model ids or auth.
 """
 
 from functools import lru_cache
 
+from langchain_core.embeddings import Embeddings
 from langchain_core.runnables import Runnable
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_ibm import ChatWatsonx, WatsonxEmbeddings
 
 from app.config import settings
 
 _INSTRUCT_PARAMS = {"temperature": 0.2, "max_tokens": 512}
+
+
+def using_gemini_embeddings() -> bool:
+    """Whether embeddings currently come from Gemini rather than watsonx/Granite.
+
+    Single source of truth shared by `get_embedding_model` (which client to
+    build) and `app.services.vector_store.get_vector_store` (which Zilliz
+    collection to point at) — the two must never disagree, since mixing a
+    Gemini-embedded query against a Granite-embedded collection (or vice
+    versa) fails silently rather than raising. See the module docstring.
+    """
+    return bool(settings.GEMINI_API_KEY)
 
 
 def missing_credentials() -> list[str]:
@@ -98,9 +126,27 @@ def _chat_gemini() -> ChatGoogleGenerativeAI:
     )
 
 
+def _gemini_embed() -> GoogleGenerativeAIEmbeddings:
+    return GoogleGenerativeAIEmbeddings(
+        model=settings.GEMINI_EMBEDDING_MODEL_ID,
+        google_api_key=settings.GEMINI_API_KEY,
+    )
+
+
 @lru_cache(maxsize=1)
-def get_embedding_model() -> WatsonxEmbeddings:
-    """Return a cached Granite embeddings client for document/query embedding."""
+def get_embedding_model() -> Embeddings:
+    """Return a cached embeddings client for document/query embedding.
+
+    Gemini (`_gemini_embed`) when `GEMINI_API_KEY` is set, watsonx/Granite
+    otherwise — a straight replacement, not a fallback chain; see the
+    module docstring for why embeddings can't safely fail over the way the
+    instruct model does. Watsonx credentials are only required on the
+    watsonx branch: a Gemini-only deployment (no `WATSONX_API_KEY`/
+    `WATSONX_PROJECT_ID`) is valid here, even though `get_instruct_model`
+    still wants watsonx credentials for its own fallback tiers.
+    """
+    if using_gemini_embeddings():
+        return _gemini_embed()
     _require_credentials()
     return WatsonxEmbeddings(
         model_id=settings.WATSONX_EMBEDDING_MODEL_ID,

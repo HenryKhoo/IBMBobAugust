@@ -33,14 +33,17 @@ class _FakeRunnable:
 
 @pytest.fixture(autouse=True)
 def _reset_cache_and_credentials(monkeypatch):
-    # get_instruct_model is @lru_cache(maxsize=1) in production so the real
-    # client is built once; tests need a fresh build every time to exercise
-    # different settings combinations, so clear it before and after.
+    # get_instruct_model/get_embedding_model are @lru_cache(maxsize=1) in
+    # production so the real client is built once; tests need a fresh
+    # build every time to exercise different settings combinations, so
+    # clear both before and after.
     watsonx.get_instruct_model.cache_clear()
+    watsonx.get_embedding_model.cache_clear()
     monkeypatch.setattr(watsonx.settings, "WATSONX_API_KEY", "test-key")
     monkeypatch.setattr(watsonx.settings, "WATSONX_PROJECT_ID", "test-project")
     yield
     watsonx.get_instruct_model.cache_clear()
+    watsonx.get_embedding_model.cache_clear()
 
 
 def _stub_clients(monkeypatch):
@@ -134,6 +137,76 @@ def test_gemini_client_is_built_from_gemini_settings(monkeypatch):
     watsonx._chat_gemini()
 
     assert captured["model"] == "gemini-2.5-flash"
+    assert captured["google_api_key"] == "test-gemini-key"
+
+
+def test_using_gemini_embeddings_tracks_the_gemini_api_key_setting(monkeypatch):
+    monkeypatch.setattr(watsonx.settings, "GEMINI_API_KEY", "")
+    assert watsonx.using_gemini_embeddings() is False
+
+    monkeypatch.setattr(watsonx.settings, "GEMINI_API_KEY", "test-gemini-key")
+    assert watsonx.using_gemini_embeddings() is True
+
+
+def test_get_embedding_model_stays_on_watsonx_when_gemini_key_is_unset(monkeypatch):
+    monkeypatch.setattr(watsonx.settings, "GEMINI_API_KEY", "")
+    monkeypatch.setattr(watsonx, "WatsonxEmbeddings", lambda **kwargs: ("watsonx-embeddings", kwargs))
+    monkeypatch.setattr(
+        watsonx,
+        "_gemini_embed",
+        lambda: (_ for _ in ()).throw(AssertionError("_gemini_embed must not be called")),
+    )
+
+    result = watsonx.get_embedding_model()
+
+    assert result[0] == "watsonx-embeddings"
+    assert result[1]["model_id"] == watsonx.settings.WATSONX_EMBEDDING_MODEL_ID
+
+
+def test_get_embedding_model_switches_to_gemini_when_its_key_is_set(monkeypatch):
+    monkeypatch.setattr(watsonx.settings, "GEMINI_API_KEY", "test-gemini-key")
+    monkeypatch.setattr(watsonx, "_gemini_embed", lambda: "gemini-embeddings")
+    monkeypatch.setattr(
+        watsonx,
+        "WatsonxEmbeddings",
+        lambda **kwargs: (_ for _ in ()).throw(AssertionError("WatsonxEmbeddings must not be built")),
+    )
+
+    result = watsonx.get_embedding_model()
+
+    assert result == "gemini-embeddings"
+
+
+def test_get_embedding_model_does_not_require_watsonx_credentials_when_gemini_is_active(
+    monkeypatch,
+):
+    """A Gemini-only deployment (no watsonx creds at all) must still be able
+    to build embeddings — `_require_credentials` is only on the watsonx
+    branch. `get_instruct_model` separately still wants watsonx credentials
+    for its own fallback tiers; that's unrelated to this function."""
+    monkeypatch.setattr(watsonx.settings, "WATSONX_API_KEY", "")
+    monkeypatch.setattr(watsonx.settings, "WATSONX_PROJECT_ID", "")
+    monkeypatch.setattr(watsonx.settings, "GEMINI_API_KEY", "test-gemini-key")
+    monkeypatch.setattr(watsonx, "_gemini_embed", lambda: "gemini-embeddings")
+
+    assert watsonx.get_embedding_model() == "gemini-embeddings"
+
+
+def test_gemini_embed_client_is_built_from_gemini_settings(monkeypatch):
+    monkeypatch.setattr(watsonx.settings, "GEMINI_API_KEY", "test-gemini-key")
+    monkeypatch.setattr(watsonx.settings, "GEMINI_EMBEDDING_MODEL_ID", "gemini-embedding-001")
+
+    captured = {}
+
+    class _FakeGoogleGenerativeAIEmbeddings:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    monkeypatch.setattr(watsonx, "GoogleGenerativeAIEmbeddings", _FakeGoogleGenerativeAIEmbeddings)
+
+    watsonx._gemini_embed()
+
+    assert captured["model"] == "gemini-embedding-001"
     assert captured["google_api_key"] == "test-gemini-key"
 
 

@@ -110,6 +110,51 @@ def test_escape_expr_string_literal_is_a_no_op_on_a_plain_value():
     assert vector_store.escape_expr_string_literal("session-abc-123") == "session-abc-123"
 
 
+class _FakeZillizClass:
+    """Stand-in for `langchain_milvus.Zilliz` — records the kwargs it was
+    constructed with so a test can assert on `collection_name` without a
+    real Zilliz connection."""
+
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+
+
+def test_get_vector_store_uses_the_watsonx_collection_when_gemini_embeddings_are_off(
+    monkeypatch,
+):
+    vector_store.get_vector_store.cache_clear()
+    monkeypatch.setattr(vector_store.settings, "ZILLIZ_URI", "test-uri")
+    monkeypatch.setattr(vector_store.settings, "ZILLIZ_TOKEN", "test-token")
+    monkeypatch.setattr(vector_store.settings, "ZILLIZ_COLLECTION_NAME", "chortlechat")
+    monkeypatch.setattr(vector_store.settings, "ZILLIZ_COLLECTION_NAME_GEMINI", "chortlechat_gemini")
+    monkeypatch.setattr(vector_store, "using_gemini_embeddings", lambda: False)
+    monkeypatch.setattr(vector_store, "get_embedding_model", lambda: "watsonx-embeddings")
+    monkeypatch.setattr(vector_store, "Zilliz", _FakeZillizClass)
+
+    store = vector_store.get_vector_store()
+
+    assert store.kwargs["collection_name"] == "chortlechat"
+    assert store.kwargs["embedding_function"] == "watsonx-embeddings"
+    vector_store.get_vector_store.cache_clear()
+
+
+def test_get_vector_store_uses_the_gemini_collection_when_gemini_embeddings_are_on(monkeypatch):
+    vector_store.get_vector_store.cache_clear()
+    monkeypatch.setattr(vector_store.settings, "ZILLIZ_URI", "test-uri")
+    monkeypatch.setattr(vector_store.settings, "ZILLIZ_TOKEN", "test-token")
+    monkeypatch.setattr(vector_store.settings, "ZILLIZ_COLLECTION_NAME", "chortlechat")
+    monkeypatch.setattr(vector_store.settings, "ZILLIZ_COLLECTION_NAME_GEMINI", "chortlechat_gemini")
+    monkeypatch.setattr(vector_store, "using_gemini_embeddings", lambda: True)
+    monkeypatch.setattr(vector_store, "get_embedding_model", lambda: "gemini-embeddings")
+    monkeypatch.setattr(vector_store, "Zilliz", _FakeZillizClass)
+
+    store = vector_store.get_vector_store()
+
+    assert store.kwargs["collection_name"] == "chortlechat_gemini"
+    assert store.kwargs["embedding_function"] == "gemini-embeddings"
+    vector_store.get_vector_store.cache_clear()
+
+
 class _FakeStoreQuotaRejection:
     """Mimics langchain-ibm/ibm-watsonx-ai's behavior when the embedding
     provider rejects a call outright — e.g. the `token_quota_reached` 403

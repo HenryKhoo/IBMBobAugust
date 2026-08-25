@@ -6,7 +6,7 @@ from functools import lru_cache
 from langchain_milvus import Zilliz
 
 from app.config import settings
-from app.services.watsonx import get_embedding_model
+from app.services.watsonx import get_embedding_model, using_gemini_embeddings
 
 logger = logging.getLogger(__name__)
 
@@ -59,10 +59,27 @@ def _require_credentials() -> None:
 
 @lru_cache(maxsize=1)
 def get_vector_store() -> Zilliz:
+    """Return a cached Zilliz client, pointed at whichever collection matches
+    the currently-active embedding provider.
+
+    `ZILLIZ_COLLECTION_NAME_GEMINI` when `using_gemini_embeddings()` is true,
+    `ZILLIZ_COLLECTION_NAME` otherwise — deliberately never a choice made
+    independently of `get_embedding_model()`'s own choice, since a
+    collection embedded by one provider queried with the other's embedding
+    function produces a meaningless similarity score without raising any
+    error (see `app.services.watsonx`'s module docstring). Both settings
+    default to distinct values (`..._gemini` suffix) so switching providers
+    can never silently collide with the other's collection.
+    """
     _require_credentials()
+    collection_name = (
+        settings.ZILLIZ_COLLECTION_NAME_GEMINI
+        if using_gemini_embeddings()
+        else settings.ZILLIZ_COLLECTION_NAME
+    )
     return Zilliz(
         embedding_function=get_embedding_model(),
-        collection_name=settings.ZILLIZ_COLLECTION_NAME,
+        collection_name=collection_name,
         connection_args={
             "uri": settings.ZILLIZ_URI,
             "token": settings.ZILLIZ_TOKEN,

@@ -30,7 +30,8 @@ cp .env.example .env           # from repo root
 Fill in `.env` with:
 - `WATSONX_API_KEY`, `WATSONX_PROJECT_ID` — IBM watsonx.ai credentials
 - `ZILLIZ_URI`, `ZILLIZ_TOKEN` — Zilliz Cloud (Milvus) credentials
-- `GEMINI_API_KEY` — optional. When set, this is the primary model for `/ask` generation, with both watsonx models demoted to an automatic fallback (watsonx's own rate limit was being hit too often to trust as the first attempt). Leave blank to keep watsonx as primary. `GEMINI_API` is also accepted as an alternate name. Get a key at https://aistudio.google.com/apikey.
+- `GEMINI_API_KEY` — optional. When set, this affects generation and embeddings differently (see `backend/app/services/watsonx.py`): for `/ask` generation it's a primary model with both watsonx models demoted to an automatic fallback (watsonx's own rate limit was being hit too often to trust as the first attempt); for embeddings it *replaces* watsonx/Granite outright, since embeddings from different providers can't safely fail over into each other — and it switches retrieval to a separate Zilliz collection (`ZILLIZ_COLLECTION_NAME_GEMINI`) that has to actually be populated first. Leave blank to keep watsonx as primary for both. `GEMINI_API` is also accepted as an alternate name. Get a key at https://aistudio.google.com/apikey.
+- If you do set `GEMINI_API_KEY`, run `python backend/scripts/ingest_chortlechat_corpus.py` once (from `backend/`, venv active, `.env` configured) before asking any real questions — it re-embeds the existing corpus with Gemini and populates `ZILLIZ_COLLECTION_NAME_GEMINI`. The corpus is already fetched locally at `backend/data/chortlechat_corpus.json`, so this doesn't hit NASA/HuggingFace again, just Gemini + Zilliz.
 
 Ask Henry for these values — they're not in the repo.
 

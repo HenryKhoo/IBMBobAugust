@@ -26,9 +26,9 @@ Demo video: [add the demo video link]
 
 ![ChortleChat architecture: development, ingestion, and runtime pipeline](docs/tech-stack-diagram.png)
 
-### Retrieval-augmented generation — IBM Granite embeddings + Zilliz
+### Retrieval-augmented generation — IBM Granite embeddings + Zilliz (or Gemini)
 
-NASA SMD Q&A benchmark passages are chunked and embedded with IBM's Granite embedding model on watsonx.ai, then indexed in Zilliz Cloud (managed Milvus) as `science_reference` documents. Every answer ChortleChat gives is generated from a passage retrieved from that index, never from the model's own memory, which is what keeps every response traceable back to a real source instead of a guess.
+NASA SMD Q&A benchmark passages are chunked and embedded — with IBM's Granite embedding model on watsonx.ai by default, or with Gemini's `gemini-embedding-001` when a Gemini API key is configured, added after watsonx's Granite embedding quota started rejecting retrieval calls outright — then indexed in Zilliz Cloud (managed Milvus) as `science_reference` documents. The two embedding providers are never mixed in one collection: switching providers means re-ingesting into a separate collection built for that provider (`backend/scripts/ingest_chortlechat_corpus.py`), not just changing a setting, since a query embedded by one provider compared against documents embedded by the other produces a meaningless similarity score rather than an error. Every answer ChortleChat gives is generated from a passage retrieved from that index, never from the model's own memory, which is what keeps every response traceable back to a real source instead of a guess.
 
 ### Grounded generation — IBM watsonx.ai
 

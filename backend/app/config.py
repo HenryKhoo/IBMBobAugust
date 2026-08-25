@@ -28,10 +28,30 @@ class Settings:
     # incomparable to newly embedded ones. See app.services.watsonx.
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", os.getenv("GEMINI_API", ""))
     GEMINI_INSTRUCT_MODEL_ID: str = os.getenv("GEMINI_INSTRUCT_MODEL_ID", "gemini-2.5-flash")
+    # Embeddings, too, switch to Gemini once GEMINI_API_KEY is set — added
+    # after watsonx's Granite embedding quota (a separate quota from the
+    # instruct model's) started rejecting every retrieval call outright.
+    # gemini-embedding-001 is the current model; the older
+    # text-embedding-004 was deprecated and shut down in Jan 2026.
+    GEMINI_EMBEDDING_MODEL_ID: str = os.getenv("GEMINI_EMBEDDING_MODEL_ID", "gemini-embedding-001")
 
     ZILLIZ_URI: str = os.getenv("ZILLIZ_URI", "")
     ZILLIZ_TOKEN: str = os.getenv("ZILLIZ_TOKEN", "")
     ZILLIZ_COLLECTION_NAME: str = os.getenv("ZILLIZ_COLLECTION_NAME", "chortlechat")
+    # A SEPARATE collection for Gemini-embedded documents, used instead of
+    # ZILLIZ_COLLECTION_NAME whenever Gemini embeddings are active (see
+    # app.services.watsonx.using_gemini_embeddings). Deliberately never the
+    # same collection: embeddings from different providers are different
+    # vector spaces, and comparing a Gemini query vector against a
+    # Granite-embedded document vector produces a meaningless similarity
+    # score without raising any error — the retrieval equivalent of the
+    # quota failure this was added to work around, just silent instead of
+    # a 403. Defaults to ZILLIZ_COLLECTION_NAME + "_gemini" so it never
+    # collides with the existing collection by accident.
+    ZILLIZ_COLLECTION_NAME_GEMINI: str = os.getenv(
+        "ZILLIZ_COLLECTION_NAME_GEMINI",
+        os.getenv("ZILLIZ_COLLECTION_NAME", "chortlechat") + "_gemini",
+    )
 
     PORT: int = int(os.getenv("PORT", "8000"))
 
