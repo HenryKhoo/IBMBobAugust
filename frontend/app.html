@@ -373,8 +373,8 @@
     margin-top: var(--space-4);
   }
   .companion-avatar {
-    width: 88px;
-    height: 88px;
+    width: 128px;
+    height: 128px;
     border-radius: 50%;
     object-fit: cover;
     background: var(--panel);
@@ -1873,6 +1873,16 @@
   }
   function pickCompanionVoice() {
     return (
+      // "Google US English" is Chrome's default male-sounding voice and
+      // the most natural-sounding one available for long-form answers —
+      // preferred by exact name before the gendered-name heuristic below,
+      // since its own name contains no MALE_VOICE_HINTS word and would
+      // otherwise be skipped in favor of an explicitly-labeled voice like
+      // "Google UK English Male". That one is the next-best default (a
+      // refined British accent, availability permitting) if US English
+      // isn't installed.
+      companionVoices.find((v) => v.name === "Google US English") ||
+      companionVoices.find((v) => v.name === "Google UK English Male") ||
       companionVoices.find((v) => v.lang === "en-US" && isLikelyMaleVoice(v) && v.name.includes("Google")) ||
       companionVoices.find((v) => v.lang === "en-US" && isLikelyMaleVoice(v)) ||
       companionVoices.find((v) => v.lang.startsWith("en") && isLikelyMaleVoice(v)) ||
