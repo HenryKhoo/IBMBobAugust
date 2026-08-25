@@ -12,15 +12,15 @@ Wraps the two model calls the rest of the backend needs:
 - an instruct/chat client, for grounded generation in `/ask` (and, before
   the ChortleChat revamp, each habitat module's endpoint), with automatic
   failover across up to three tiers when a model errors or is
-  rate-limited: the primary watsonx model, then an optional second
-  watsonx model, then an optional Gemini model (via langchain-google-genai)
-  as a fallback that's on a wholly separate quota from watsonx's. Added
-  because the watsonx/Granite trial tier's rate limit was being hit
-  regularly during the challenge; Gemini only ever runs after both watsonx
-  attempts have already failed, and generates the exact same grounded
-  prompt watsonx would have (see `app.services.chortlechat`) — the
-  no-hallucination discipline doesn't change based on which model tier
-  answered.
+  rate-limited. When `GEMINI_API_KEY` is set, Gemini (via
+  langchain-google-genai) is the *primary* tier and both watsonx models
+  become the failover chain instead — the watsonx/Granite trial tier's
+  rate limit was being hit too often for watsonx to serve as the first
+  attempt. With no Gemini key configured, watsonx stays primary exactly as
+  before Gemini support existed. Whichever tier actually answers, it
+  generates the exact same grounded prompt from the same retrieved passage
+  (see `app.services.chortlechat`) — the no-hallucination discipline
+  doesn't change based on which model tier answered.
 
 Built from the shared `Settings` in `app.config`, so there is one place
 credentials and model ids are configured (`.env`, see `.env.example` at
@@ -114,39 +114,42 @@ def get_embedding_model() -> WatsonxEmbeddings:
 def get_instruct_model() -> Runnable:
     """Return a cached instruct chat client, with up to two failover tiers.
 
-    Primary model id comes from `WATSONX_INSTRUCT_MODEL_ID` (defaults to a
-    Mistral instruct model, see `.env.example`: this project's WML instance
-    plan does not expose a Granite chat/instruct model, only Granite
-    embeddings, so the dev plan's "Granite or Mistral" fallback wording
-    applies here).
+    Watsonx model ids come from `WATSONX_INSTRUCT_MODEL_ID` (primary,
+    defaults to a Mistral instruct model — see `.env.example`: this
+    project's WML instance plan does not expose a Granite chat/instruct
+    model, only Granite embeddings, so the dev plan's "Granite or Mistral"
+    fallback wording applies here) and `WATSONX_INSTRUCT_MODEL_FALLBACK_ID`
+    (a second watsonx model, set by default).
 
-    The returned runnable wraps the primary model with LangChain's built-in
-    `.with_fallbacks()`, trying each configured tier in order on failure —
-    unavailable, rate-limited, or withdrawn from a model catalog all count:
+    Which client is actually *primary* depends on `GEMINI_API_KEY`:
 
-    1. `WATSONX_INSTRUCT_MODEL_FALLBACK_ID` (set by default) — a second
-       watsonx model, for when the primary model specifically is
-       unavailable but the watsonx account/project itself still has quota.
-    2. `GEMINI_API_KEY` (optional, unset by default) — a Gemini model on a
-       wholly separate quota from watsonx's, tried only once both watsonx
-       attempts above have failed. This is the tier that actually helps
-       when watsonx's own rate limit is what's being hit, since tier 1 is
-       still capped by that same account.
+    - **Unset** (default): unchanged from before Gemini support existed.
+      The watsonx primary model is primary; the watsonx fallback model (if
+      set) is the one and only failover tier.
+    - **Set**: Gemini is primary instead, since watsonx's own rate limit
+      was being hit too often to trust it as the first attempt. Both
+      watsonx models become the failover chain, tried in the same relative
+      order they were tried in before Gemini existed (watsonx primary,
+      then watsonx fallback) — so a Gemini outage degrades all the way
+      back to the original watsonx-only behavior rather than failing hard.
 
-    Both tiers are independently optional: leave either/both unset to fall
-    back to a shorter chain, down to the bare primary `ChatWatsonx` client
-    if neither is configured — exactly this function's behavior before
-    Gemini support existed.
+    Either way this uses LangChain's built-in `.with_fallbacks()`, trying
+    each tier in order on failure — unavailable, rate-limited, or
+    withdrawn from a model catalog all count as a failure that advances to
+    the next tier.
     """
     _require_credentials()
-    primary = _chat_watsonx(settings.WATSONX_INSTRUCT_MODEL_ID)
+    watsonx_primary = _chat_watsonx(settings.WATSONX_INSTRUCT_MODEL_ID)
+    watsonx_fallback = (
+        _chat_watsonx(settings.WATSONX_INSTRUCT_MODEL_FALLBACK_ID)
+        if settings.WATSONX_INSTRUCT_MODEL_FALLBACK_ID
+        else None
+    )
 
-    fallbacks: list[Runnable] = []
-    if settings.WATSONX_INSTRUCT_MODEL_FALLBACK_ID:
-        fallbacks.append(_chat_watsonx(settings.WATSONX_INSTRUCT_MODEL_FALLBACK_ID))
     if settings.GEMINI_API_KEY:
-        fallbacks.append(_chat_gemini())
+        fallbacks = [watsonx_primary] + ([watsonx_fallback] if watsonx_fallback else [])
+        return _chat_gemini().with_fallbacks(fallbacks)
 
-    if not fallbacks:
-        return primary
-    return primary.with_fallbacks(fallbacks)
+    if not watsonx_fallback:
+        return watsonx_primary
+    return watsonx_primary.with_fallbacks([watsonx_fallback])
