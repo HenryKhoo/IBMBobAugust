@@ -373,8 +373,8 @@
     margin-top: var(--space-4);
   }
   .companion-avatar {
-    width: 128px;
-    height: 128px;
+    width: 176px;
+    height: 176px;
     border-radius: 50%;
     object-fit: cover;
     background: var(--panel);
@@ -387,6 +387,33 @@
   .companion-caption {
     font-size: var(--text-xs);
     color: var(--ink-faint);
+  }
+  /* Male/female companion toggle — swaps both the Web Speech API voice
+     (see GENDER_VOICE_NAME) and the lip-sync avatar frames (see
+     COMPANION_FRAMES) together, so the voice and the face on screen always
+     agree. Deliberately its own class rather than reusing .persona-toggle:
+     this picks who's speaking, not how the answer is delivered, and
+     shouldn't pick up persona's accent-color styling. */
+  .companion-gender-toggle {
+    display: inline-flex;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    margin-top: var(--space-1);
+  }
+  .companion-gender-toggle button {
+    background: transparent;
+    border: none;
+    color: var(--ink-dim);
+    padding: var(--space-1) var(--space-3);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .companion-gender-toggle button:first-child { border-radius: 999px 0 0 999px; }
+  .companion-gender-toggle button:last-child { border-radius: 0 999px 999px 0; }
+  .companion-gender-toggle button[aria-pressed="true"] {
+    background: var(--panel-2);
+    color: var(--ink);
   }
   .panel {
     background: var(--panel);
@@ -854,6 +881,10 @@
           alt="ChortleChat's mission companion avatar"
         />
         <span class="companion-caption" id="companionCaption">Standing by</span>
+        <div class="companion-gender-toggle" role="group" aria-label="Choose the companion's voice and avatar">
+          <button type="button" data-gender="male" aria-pressed="true">Male</button>
+          <button type="button" data-gender="female" aria-pressed="false">Female</button>
+        </div>
       </div>
     </header>
 
@@ -1052,6 +1083,7 @@
   const STORAGE_KEY_PERSONA = "chortlechat:persona";
   const STORAGE_KEY_HUMOR = "chortlechat:humor";
   const STORAGE_KEY_DOMAIN = "chortlechat:domain";
+  const STORAGE_KEY_COMPANION_GENDER = "chortlechat:companionGender";
 
   // sessionId is deliberately NOT persisted to localStorage — it lives only
   // for the duration of this tab, matching "Clear conversation" as the one
@@ -1063,7 +1095,16 @@
   // domain defaults to "" ("All") — the same whole-corpus behavior the
   // console had before domains existed, so a user who never touches the
   // domain picker sees no change at all.
-  const state = { persona: "baseline", humor: 50, sessionId: null, domain: "" };
+  // companionGender defaults to "male" — the original companion avatar
+  // (companion-mouth-*.jpg) and voice pairing, so a user who never touches
+  // the new toggle sees no change at all.
+  const state = {
+    persona: "baseline",
+    humor: 50,
+    sessionId: null,
+    domain: "",
+    companionGender: "male",
+  };
   let isLoading = false;
 
   const domainPickerEl = document.getElementById("domainPicker");
@@ -1510,6 +1551,7 @@
       const storedPersona = localStorage.getItem(STORAGE_KEY_PERSONA);
       const storedHumor = localStorage.getItem(STORAGE_KEY_HUMOR);
       const storedDomain = localStorage.getItem(STORAGE_KEY_DOMAIN);
+      const storedCompanionGender = localStorage.getItem(STORAGE_KEY_COMPANION_GENDER);
       if (storedPersona === "baseline" || storedPersona === "banter") {
         state.persona = storedPersona;
       }
@@ -1518,6 +1560,9 @@
       }
       if (storedDomain !== null && DOMAINS.some((d) => d.id === storedDomain)) {
         state.domain = storedDomain;
+      }
+      if (storedCompanionGender === "male" || storedCompanionGender === "female") {
+        state.companionGender = storedCompanionGender;
       }
     } catch (err) {
       // localStorage unavailable (private browsing, disabled storage) — defaults stand
@@ -1529,6 +1574,7 @@
       localStorage.setItem(STORAGE_KEY_PERSONA, state.persona);
       localStorage.setItem(STORAGE_KEY_HUMOR, String(state.humor));
       localStorage.setItem(STORAGE_KEY_DOMAIN, state.domain);
+      localStorage.setItem(STORAGE_KEY_COMPANION_GENDER, state.companionGender);
     } catch (err) {
       // ignore — nothing to persist to
     }
@@ -1599,6 +1645,10 @@
     humorInput.value = String(state.humor);
     humorVal.textContent = String(state.humor);
     syncCompanionPersona();
+    document.querySelectorAll(".companion-gender-toggle button").forEach((b) => {
+      b.setAttribute("aria-pressed", String(b.dataset.gender === state.companionGender));
+    });
+    syncCompanionAvatarFrame();
     renderDomainPicker();
     renderChipsForCurrentDomain();
   }
@@ -1631,6 +1681,22 @@
       });
       humorRow.dataset.disabled = state.persona === "baseline" ? "true" : "false";
       syncCompanionPersona();
+      persistSettings();
+    });
+  });
+
+  document.querySelectorAll(".companion-gender-toggle button").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.companionGender = btn.dataset.gender;
+      document.querySelectorAll(".companion-gender-toggle button").forEach((b) => {
+        b.setAttribute("aria-pressed", String(b === btn));
+      });
+      // Only the rest frame changes here — if the companion is mid-answer,
+      // speakCompanionAnswer's lip-sync interval reads state.companionGender
+      // on every tick, so it picks up the new face/voice pairing on the
+      // very next syllable rather than waiting for the current answer to
+      // finish.
+      syncCompanionAvatarFrame();
       persistSettings();
     });
   });
@@ -1839,14 +1905,39 @@
   // to the Web Speech API's utterance lifecycle. This never generates or
   // alters a word of the answer; it only performs and voices whatever
   // /ask already grounded and returned. See docs/companion-lipsync-proposal.md.
-  const COMPANION_MOUTH_OPEN = "/public/companion-mouth-open.jpg";
-  const COMPANION_MOUTH_CLOSED = "/public/companion-mouth-closed.jpg";
+  //
+  // Frame set and voice are both keyed by state.companionGender (see the
+  // .companion-gender-toggle wiring above) so the face on screen and the
+  // voice speaking always agree — never a female voice over the male
+  // avatar or vice versa.
+  const COMPANION_FRAMES = {
+    male: {
+      open: "/public/companion-mouth-open.jpg",
+      closed: "/public/companion-mouth-closed.jpg",
+    },
+    female: {
+      open: "/public/female_astronaut_mouth_open.png",
+      closed: "/public/female_astronaut.png",
+    },
+  };
   (function preloadCompanionFrames() {
-    [COMPANION_MOUTH_OPEN, COMPANION_MOUTH_CLOSED].forEach((src) => {
-      const img = new Image();
-      img.src = src;
+    Object.values(COMPANION_FRAMES).forEach(({ open, closed }) => {
+      [open, closed].forEach((src) => {
+        const img = new Image();
+        img.src = src;
+      });
     });
   })();
+
+  // Sets the companion avatar to its current gender's rest (mouth-closed)
+  // frame — called on load and whenever the gender toggle changes. Not
+  // called while mid-answer: speakCompanionAnswer's own lip-sync interval
+  // already re-reads state.companionGender on every tick, so a mid-answer
+  // gender switch is picked up on the very next tick instead of being
+  // overwritten one beat later by this.
+  function syncCompanionAvatarFrame() {
+    companionAvatar.src = COMPANION_FRAMES[state.companionGender].closed;
+  }
 
   let companionVoices = [];
   function populateCompanionVoices() {
@@ -1857,11 +1948,17 @@
     speechSynthesis.onvoiceschanged = populateCompanionVoices;
   }
   // The Web Speech API exposes no reliable `gender` field on a voice (it's
-  // deprecated/unimplemented across engines), so "male" has to be inferred
-  // from name — these are the common male voice names shipped by Chrome/
-  // Google, Edge/Microsoft, and Safari/macOS's speech engines. Falls back to
-  // whatever's available if none of them are installed, so this never
-  // silences the companion on a system with a smaller voice list.
+  // deprecated/unimplemented across engines), so gender here is resolved
+  // by exact voice name for Chrome's two best-sounding built-in defaults,
+  // rather than guessed from name fragments: "Google UK English Male" for
+  // male, "Google US English" for female. Falls back to a name-fragment
+  // heuristic, then to whatever's available, so an unusual system (a
+  // different browser/OS with neither Google voice installed) never
+  // silences the companion outright.
+  const GENDER_VOICE_NAME = {
+    male: "Google UK English Male",
+    female: "Google US English",
+  };
   const MALE_VOICE_HINTS = [
     "male", "david", "guy", "mark", "daniel", "alex", "fred", "aaron",
     "arthur", "gordon", "eric", "ryan", "james", "george", "brian",
@@ -1872,20 +1969,23 @@
     return MALE_VOICE_HINTS.some((hint) => name.includes(hint));
   }
   function pickCompanionVoice() {
+    const preferredName = GENDER_VOICE_NAME[state.companionGender];
+    const otherName =
+      state.companionGender === "male" ? GENDER_VOICE_NAME.female : GENDER_VOICE_NAME.male;
     return (
-      // "Google US English" is Chrome's default male-sounding voice and
-      // the most natural-sounding one available for long-form answers —
-      // preferred by exact name before the gendered-name heuristic below,
-      // since its own name contains no MALE_VOICE_HINTS word and would
-      // otherwise be skipped in favor of an explicitly-labeled voice like
-      // "Google UK English Male". That one is the next-best default (a
-      // refined British accent, availability permitting) if US English
-      // isn't installed.
-      companionVoices.find((v) => v.name === "Google US English") ||
-      companionVoices.find((v) => v.name === "Google UK English Male") ||
-      companionVoices.find((v) => v.lang === "en-US" && isLikelyMaleVoice(v) && v.name.includes("Google")) ||
-      companionVoices.find((v) => v.lang === "en-US" && isLikelyMaleVoice(v)) ||
-      companionVoices.find((v) => v.lang.startsWith("en") && isLikelyMaleVoice(v)) ||
+      companionVoices.find((v) => v.name === preferredName) ||
+      // Neither exact Google voice is installed for this OS/browser — fall
+      // back to the name-fragment heuristic (still gender-aware for male)
+      // before giving up and just picking something so the companion
+      // isn't silenced.
+      (state.companionGender === "male"
+        ? companionVoices.find((v) => v.lang === "en-US" && isLikelyMaleVoice(v) && v.name.includes("Google")) ||
+          companionVoices.find((v) => v.lang === "en-US" && isLikelyMaleVoice(v)) ||
+          companionVoices.find((v) => v.lang.startsWith("en") && isLikelyMaleVoice(v))
+        : companionVoices.find((v) => v.lang === "en-US" && !isLikelyMaleVoice(v) && v.name.includes("Google")) ||
+          companionVoices.find((v) => v.lang === "en-US" && !isLikelyMaleVoice(v)) ||
+          companionVoices.find((v) => v.lang.startsWith("en") && !isLikelyMaleVoice(v))) ||
+      companionVoices.find((v) => v.name === otherName) ||
       companionVoices.find((v) => v.lang === "en-US" && v.name.includes("Google")) ||
       companionVoices.find((v) => v.lang === "en-US") ||
       companionVoices[0]
@@ -1907,13 +2007,14 @@
       companionCaption.textContent = "Speaking";
       let mouthOpen = true;
       companionLipSyncInterval = setInterval(() => {
-        companionAvatar.src = mouthOpen ? COMPANION_MOUTH_OPEN : COMPANION_MOUTH_CLOSED;
+        const frames = COMPANION_FRAMES[state.companionGender];
+        companionAvatar.src = mouthOpen ? frames.open : frames.closed;
         mouthOpen = !mouthOpen;
       }, 150);
     };
     const restCompanion = () => {
       clearInterval(companionLipSyncInterval);
-      companionAvatar.src = COMPANION_MOUTH_CLOSED;
+      syncCompanionAvatarFrame();
       companionCaption.textContent = "Standing by";
     };
     utterance.onend = restCompanion;
