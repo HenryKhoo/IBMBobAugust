@@ -1,6 +1,8 @@
 # Preset Q&A — draft for review
 
-Grounded Baseline-voice answers for the frontend's suggested "chip" questions, sourced strictly from `backend/data/chortlechat_corpus.json`. Nothing here is wired into code yet — this is the content-prep step before building the cache-first lookup.
+Grounded Baseline-voice answers for the frontend's suggested "chip" questions, sourced strictly from `backend/data/chortlechat_corpus.json`.
+
+**Status: wired.** `app.services.chortlechat` now loads `backend/data/preset_qa.json` into a cache keyed by exact question text (entries with `use_cache: true` only) and serves `baseline_answer` on a hit — skipping just the Baseline generation call, after retrieval and the existing confidence-threshold gate have already run and passed for that question. Banter is untouched: it still always makes one live call to restyle whichever Baseline answer is in play. See `backend/tests/test_chortlechat.py`'s "Preset chip-question cache" section for the covering tests.
 
 **Count correction:** the frontend's `DOMAINS` array has **15 unique chip questions**, not 18 — "All" repeats 5 questions that also appear under their own domain, so there are only 15 distinct strings total. All 15 are covered below.
 
@@ -144,4 +146,4 @@ Source: `science_reference:nasa-smd-125#chunk0`
 - **15 questions total, not 18** — worth confirming with you before this goes further.
 - **1 with no usable source** (#3, TC formation conditions) — recommend leaving it on live RAG rather than forcing a mismatched preset.
 - **5 partial matches** (#2, #6, #9, #13, #15) where the drafted answer stays honest about what the source does and doesn't establish, rather than overclaiming to sound more complete.
-- Everything above is still watsonx/Gemini-free content prep — no JSON lookup file or `ask_chortlechat` changes yet, per your "pre-prepared first."
+- Now wired into `ask_chortlechat` (see Status note above) — this is no longer just content prep.

@@ -638,3 +638,78 @@ def test_conversation_history_endpoint_never_404s_on_an_unknown_session(monkeypa
 def test_conversation_history_endpoint_requires_session_id():
     response = client.get("/conversation/history")
     assert response.status_code == 422
+
+
+# --- Preset chip-question cache (backend/data/preset_qa.json) ----------------
+
+CACHED_QUESTION = "What ocean heat conditions favor tropical cyclone intensification?"
+CACHED_ANSWER_SNIPPET = "barrier layer thickness"
+UNCACHED_NO_MATCH_QUESTION = "What atmospheric conditions influence tropical cyclone formation?"
+
+
+def test_ask_serves_a_cached_baseline_answer_for_a_known_chip_question(monkeypatch, fake_hit):
+    fake_store = _FakeVectorStore([fake_hit])
+    fake_model = _FakeInstructModel(STUBBED_ANSWER)
+    monkeypatch.setattr(chortlechat, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(chortlechat, "get_instruct_model", lambda: fake_model)
+
+    response = chortlechat.ask_chortlechat(CACHED_QUESTION, chortlechat.AskPersona.BASELINE, humor=50)
+
+    assert response.grounded is True
+    assert CACHED_ANSWER_SNIPPET in response.answer
+    assert response.answer != STUBBED_ANSWER
+    # confidence/source still come from a real retrieval call, not the cache
+    # — the cache only ever replaces the generation step.
+    assert response.confidence == RELEVANCE_SCORE
+    assert response.source == "science_reference:nasa-smd-veggie-001#chunk0"
+    # no Baseline generation call needed on a cache hit.
+    assert fake_model.invoked_with == []
+
+
+def test_ask_banter_still_makes_a_live_call_to_restyle_a_cached_baseline_answer(
+    monkeypatch, fake_hit
+):
+    fake_store = _FakeVectorStore([fake_hit])
+    fake_model = _FakeInstructModel(STUBBED_ANSWER)
+    monkeypatch.setattr(chortlechat, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(chortlechat, "get_instruct_model", lambda: fake_model)
+
+    chortlechat.ask_chortlechat(CACHED_QUESTION, chortlechat.AskPersona.BANTER, humor=80)
+
+    # exactly one generation call — the banter restyle — no baseline call.
+    assert len(fake_model.invoked_with) == 1
+    banter_prompt = fake_model.invoked_with[0]
+    assert CACHED_ANSWER_SNIPPET in banter_prompt
+    assert "80/100" in banter_prompt
+
+
+def test_ask_does_not_trust_a_cached_question_below_the_confidence_threshold(monkeypatch):
+    weak_hit = (_FakeDocument(REFERENCE_TEXT, dict(REFERENCE_METADATA)), 0.1)
+    fake_store = _FakeVectorStore([weak_hit])
+    fake_model = _FakeInstructModel(STUBBED_ANSWER)
+    monkeypatch.setattr(chortlechat, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(chortlechat, "get_instruct_model", lambda: fake_model)
+
+    response = chortlechat.ask_chortlechat(CACHED_QUESTION, chortlechat.AskPersona.BASELINE, humor=50)
+
+    # a weak live retrieval score still wins honestly, even for a question
+    # that has a curated cache entry — the cache never overrides the gate.
+    assert response.grounded is False
+    assert response.confidence == 0.1
+    assert fake_model.invoked_with == []
+
+
+def test_ask_ignores_the_cache_for_the_documented_no_match_question(monkeypatch, fake_hit):
+    fake_store = _FakeVectorStore([fake_hit])
+    fake_model = _FakeInstructModel(STUBBED_ANSWER)
+    monkeypatch.setattr(chortlechat, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(chortlechat, "get_instruct_model", lambda: fake_model)
+
+    response = chortlechat.ask_chortlechat(
+        UNCACHED_NO_MATCH_QUESTION, chortlechat.AskPersona.BASELINE, humor=50
+    )
+
+    # this entry's use_cache is false, per preset_qa.json — falls through to
+    # normal live generation exactly as an uncached question would.
+    assert response.answer == STUBBED_ANSWER
+    assert len(fake_model.invoked_with) == 1

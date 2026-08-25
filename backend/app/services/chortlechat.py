@@ -19,6 +19,14 @@ If nothing in the corpus scores as a confident match, both personas say so
 plainly instead of guessing — same no-hallucination discipline the rest of
 this API's retrieval-backed endpoints already follow.
 
+For the fixed set of "chip" questions the frontend suggests
+(`backend/data/preset_qa.json`, drafted in `docs/preset-qa-draft.md`), a
+matching Baseline answer is served from that curated cache instead of a
+fresh generation call, once retrieval has confirmed a real, above-threshold
+match for the question exactly as it would for any other question — see
+`_PRESET_CACHE`. Banter still always makes its own live call to restyle
+whichever Baseline answer is in play, cached or generated.
+
 Conversational memory (`app.services.memory`) sits on top of this in two
 stages, tried in order:
 
@@ -42,6 +50,9 @@ and `app.services.memory`'s module docstring.
 """
 
 from __future__ import annotations
+
+import json
+from pathlib import Path
 
 from app.schemas import (
     AskPersona,
@@ -109,6 +120,38 @@ _FALLBACK_BANTER = (
     "I've got nothing solid on that one. Nothing in the corpus backs it up, "
     "so I'm not going to make something up just to sound clever."
 )
+
+# Cache-first lookup for the frontend's suggested "chip" questions — see
+# backend/data/preset_qa.json's own _readme and docs/preset-qa-draft.md for
+# how each entry was drafted and verified against the corpus. This is a
+# latency/consistency shortcut for a known, fixed set of questions, not a
+# second source of truth: retrieval and the confidence-threshold gate below
+# still run exactly as before, so a cached question that the live corpus
+# can no longer support (a re-ingest, a threshold change) honestly falls
+# back instead of blindly trusting a stale cache entry. Only the Baseline
+# generation call is skipped on a hit — Banter still makes its usual live
+# call to restyle whichever baseline_answer is in play (cached or
+# generated), so "Banter never invents a fact" holds exactly as it always
+# has. Keyed by the exact chip question text (stripped/lowercased for a
+# forgiving match); only entries flagged `use_cache: true` are included —
+# the one no_match entry in the file is documentation, not real cache
+# config.
+_PRESET_QA_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "preset_qa.json"
+
+
+def _load_preset_cache() -> dict[str, dict]:
+    if not _PRESET_QA_PATH.exists():
+        return {}
+    with _PRESET_QA_PATH.open() as f:
+        data = json.load(f)
+    return {
+        entry["question"].strip().lower(): entry
+        for entry in data.get("entries", [])
+        if entry.get("use_cache")
+    }
+
+
+_PRESET_CACHE = _load_preset_cache()
 
 
 def _humor_label(humor: int) -> str:
@@ -293,11 +336,20 @@ def ask_chortlechat(
         session.add_turn(ConversationRole.ASSISTANT, response.answer, persona=persona)
         return response
 
-    baseline_prompt = _BASELINE_PROMPT.format(
-        history=history, passage=chunk.page_content, question=question
-    )
-    baseline_message = get_instruct_model().invoke(baseline_prompt)
-    baseline_answer = str(baseline_message.content).strip()
+    preset = _PRESET_CACHE.get(question.strip().lower())
+    if preset is not None:
+        # Cache hit on a known chip question: reuse the curated,
+        # corpus-verified answer instead of a fresh generation call.
+        # Confidence/source above still came from a real retrieval this
+        # call — the cache only replaces the generation step, not the
+        # grounding check.
+        baseline_answer = preset["baseline_answer"]
+    else:
+        baseline_prompt = _BASELINE_PROMPT.format(
+            history=history, passage=chunk.page_content, question=question
+        )
+        baseline_message = get_instruct_model().invoke(baseline_prompt)
+        baseline_answer = str(baseline_message.content).strip()
 
     if persona == AskPersona.BASELINE:
         final_answer = baseline_answer
