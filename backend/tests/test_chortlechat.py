@@ -147,6 +147,36 @@ def test_ask_falls_back_honestly_when_nothing_is_retrieved(monkeypatch):
     assert fake_model.invoked_with == []
 
 
+def test_ask_falls_back_honestly_when_the_embedding_provider_rejects_the_call(monkeypatch):
+    """End-to-end regression test for the live `token_quota_reached` 500:
+    watsonx's embedding call raising mid-retrieval must reach the caller as
+    the same honest "no grounded answer" response an ordinary unmatched
+    question gets, not an unhandled 500. Deliberately does not mock
+    `relevance_score_hits_or_empty` — the real one (imported by
+    `chortlechat`) has to be the thing that catches this, exercising the
+    fix at the same layer `ask_chortlechat` actually calls through.
+    """
+
+    class _RejectingVectorStore:
+        def similarity_search_with_relevance_scores(self, query, **kwargs):
+            raise RuntimeError(
+                'Failure during generate. Status code: 403, body: {"errors":'
+                '[{"code":"token_quota_reached","message":"Request of 1 token(s) '
+                'from quota was rejected"}]}'
+            )
+
+    fake_model = _FakeInstructModel(STUBBED_ANSWER)
+    monkeypatch.setattr(chortlechat, "get_vector_store", lambda: _RejectingVectorStore())
+    monkeypatch.setattr(chortlechat, "get_instruct_model", lambda: fake_model)
+
+    response = chortlechat.ask_chortlechat("What is Veggie?", chortlechat.AskPersona.BASELINE, humor=50)
+
+    assert response.grounded is False
+    assert response.answer == "No grounded answer for that."
+    # never asked the model to guess, and never let the exception escape.
+    assert fake_model.invoked_with == []
+
+
 def test_ask_falls_back_below_confidence_threshold_with_persona_specific_wording(
     monkeypatch,
 ):

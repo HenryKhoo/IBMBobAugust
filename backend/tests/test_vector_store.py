@@ -110,6 +110,36 @@ def test_escape_expr_string_literal_is_a_no_op_on_a_plain_value():
     assert vector_store.escape_expr_string_literal("session-abc-123") == "session-abc-123"
 
 
+class _FakeStoreQuotaRejection:
+    """Mimics langchain-ibm/ibm-watsonx-ai's behavior when the embedding
+    provider rejects a call outright — e.g. the `token_quota_reached` 403
+    a live deployment hit on watsonx's text-embeddings endpoint. This is a
+    real class of exception (`ibm_watsonx_ai.wml_client_error.ApiRequestFailure`
+    in production), not a `ValueError`, and previously propagated all the
+    way up to an unhandled 500 on `/ask` rather than degrading to "no
+    hits" the way a missing index already did.
+    """
+
+    def similarity_search_with_relevance_scores(self, query, **kwargs):
+        raise RuntimeError(
+            'Failure during generate. Status code: 403, body: {"errors":'
+            '[{"code":"token_quota_reached","message":"Request of 1 token(s) '
+            'from quota was rejected"}]}'
+        )
+
+
+def test_relevance_score_hits_or_empty_returns_empty_on_a_provider_failure():
+    """A non-ValueError failure from the embedding/search call — a quota
+    rejection, an outage, a network blip — degrades to no hits rather than
+    crashing the request, so `ask_chortlechat`'s existing honest
+    no-grounded-answer response handles it like any other unmatched
+    question instead of a raw 500 reaching the console."""
+    hits = vector_store.relevance_score_hits_or_empty(
+        _FakeStoreQuotaRejection(), "query text", k=1, expr="doc_type == 'science_reference'"
+    )
+    assert hits == []
+
+
 def test_relevance_score_hits_or_empty_passes_through_real_hits():
     fake_store = _FakeZillizStore(ids=[])  # unused here, just needs the right method
     fake_store.similarity_search_with_relevance_scores = lambda query, **kwargs: [

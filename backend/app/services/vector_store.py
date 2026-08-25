@@ -101,6 +101,38 @@ def escape_expr_string_literal(value: str) -> str:
 
 
 def relevance_score_hits_or_empty(store, query: str, *, k: int, expr: str) -> list[tuple]:
+    """Run a relevance-scored similarity search, degrading to "no hits" on failure.
+
+    This is the single low-level chokepoint every embedding-backed search
+    in this codebase goes through — the main `/ask` retrieval, conversational
+    history recall, and history listing (`app.services.memory`) all call
+    this rather than `store.similarity_search_with_relevance_scores`
+    directly — so handling failure here covers all three uniformly instead
+    of duplicating a try/except at each call site.
+
+    Two failure modes degrade to `[]` rather than raising:
+
+    - No index yet (`ValueError` mentioning "index params"): nothing has
+      been ingested for this doc_type, a normal state before/between
+      ingestion runs.
+    - Any other exception from the underlying call — an embedding
+      provider's quota rejection, a Zilliz outage, a network blip. This
+      turned a routine "provider is temporarily unavailable" into an
+      unhandled 500 in production (see the `token_quota_reached` incident
+      on watsonx's text-embeddings endpoint this was added for): the
+      request had already gotten past `_require_credentials()`, so
+      whatever went wrong happened mid-call, where the caller can't
+      distinguish it from "the corpus genuinely has no match" without this
+      catch. Treating it as "no hits" lets `ask_chortlechat`'s existing
+      honest no-grounded-answer response handle it exactly like any other
+      unmatched question, rather than surfacing a raw error. The real
+      exception is still logged at `error` with a full traceback — this
+      only changes what the *caller* sees, not what's recorded server-side.
+
+    An unrelated `ValueError` (i.e. not the no-index case) still re-raises:
+    that's a real bug, not a "nothing matched" condition, and should fail
+    loudly rather than silently returning an empty result set.
+    """
     try:
         return store.similarity_search_with_relevance_scores(query, k=k, expr=expr)
     except ValueError as exc:
@@ -111,5 +143,14 @@ def relevance_score_hits_or_empty(store, query: str, *, k: int, expr: str) -> li
             "expr=%r (nothing ingested for this doc_type?) — treating as no hits: %s",
             expr,
             exc,
+        )
+        return []
+    except Exception:
+        logger.error(
+            "similarity_search_with_relevance_scores failed for expr=%r — treating "
+            "as no hits rather than failing the request (e.g. an embedding "
+            "provider quota rejection or outage). See traceback for the actual cause.",
+            expr,
+            exc_info=True,
         )
         return []
