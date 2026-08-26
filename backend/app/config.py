@@ -65,13 +65,14 @@ class Settings:
     # product from the consumer speechify.com reading app — free tier is
     # 50,000 characters/month, no card required (speechify.ai/pricing).
     SPEECHIFY_API_KEY: str = os.getenv("SPEECHIFY_API_KEY", "")
-    SPEECHIFY_MODEL: str = os.getenv("SPEECHIFY_MODEL", "simba-english")
+    SPEECHIFY_MODEL: str = os.getenv("SPEECHIFY_MODEL", "simba-3.0")
     # Four voice IDs, not two: persona (baseline/banter) AND gender
     # (male/female) each get their own dimension, so Banter actually
-    # *sounds* different, not just reads different (jokier) text. All four
-    # are empty placeholders until picked by ear via
-    # `GET /v1/voices?type=shared&locale=en-US&model=simba-english` — see
-    # speechify-voice-plan.md §5 for why the banter pair is a stock
+    # *sounds* different, not just reads different (jokier) text. Defaults
+    # here are empty placeholders on purpose — pick real values via
+    # `GET /v1/voices?type=shared&locale=en-US&model=simba-3.0` (real
+    # values, e.g. jacob/evelyn/george/geffenv1, live in .env, not here) —
+    # see speechify-voice-plan.md §5 for why the banter pair is a stock
     # laid-back/hype-vibe voice rather than an actual celebrity voice
     # (Speechify's licensed celebrity voices, e.g. Snoop Dogg, are a
     # consumer-app-only feature, absent from every tier of the developer
