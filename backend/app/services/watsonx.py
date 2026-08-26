@@ -42,14 +42,17 @@ backend shares one cached client per model and one place to change model
 ids or auth.
 """
 
+import logging
 from functools import lru_cache
 
 from langchain_core.embeddings import Embeddings
-from langchain_core.runnables import Runnable
+from langchain_core.runnables import Runnable, RunnableLambda
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_ibm import ChatWatsonx, WatsonxEmbeddings
 
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 _INSTRUCT_PARAMS = {"temperature": 0.2, "max_tokens": 512}
 
@@ -173,6 +176,34 @@ def get_embedding_model() -> Embeddings:
     )
 
 
+def _logged(model: Runnable, label: str) -> Runnable:
+    """Wrap an instruct-model tier so ITS OWN failure gets logged as it happens.
+
+    `get_instruct_model()` chains tiers with LangChain's `.with_fallbacks()`,
+    which -- confirmed by reading `RunnableWithFallbacks.invoke()` directly --
+    only ever re-raises the *first* tier's exception if every tier fails,
+    silently discarding whatever every later tier actually failed with.
+    Confirmed live 2026-08-26: watsonx primary and fallback both failed with
+    a visible `token_quota_reached` (the watsonx SDK prints that itself,
+    independent of langchain), then the new Gemini tier ALSO failed for some
+    separate reason that never reached the logs or the user, because
+    `.with_fallbacks()` re-raised the original watsonx error instead of
+    Gemini's. Wrapping each tier here means every tier's own failure is
+    logged the moment it happens, regardless of which one `.with_fallbacks()`
+    ultimately chooses to re-raise -- so a "why did /ask 500?" investigation
+    never again has to guess which tier actually caused it.
+    """
+
+    def _invoke_and_log(prompt):
+        try:
+            return model.invoke(prompt)
+        except Exception as e:
+            logger.warning("Instruct tier %r failed: %s: %s", label, type(e).__name__, e)
+            raise
+
+    return RunnableLambda(_invoke_and_log)
+
+
 @lru_cache(maxsize=1)
 def get_instruct_model() -> Runnable:
     """Return a cached instruct chat client, with up to two failover tiers.
@@ -202,17 +233,24 @@ def get_instruct_model() -> Runnable:
        persisted vector, so there's no "different vector space" hazard to
        worry about here.
 
+    Every tier is wrapped with `_logged()` before chaining (see its
+    docstring), so if all tiers fail, whichever exception `.with_fallbacks()`
+    re-raises is only ever the LAST thing that went wrong on the user-facing
+    side -- the full story, one line per tier, is always in the logs first.
+
     Leave both `WATSONX_INSTRUCT_MODEL_FALLBACK_ID` and `GEMINI_API_KEY`
     unset to get the bare primary `ChatWatsonx` client back, unchanged from
-    before either fallback tier existed.
+    before either fallback tier existed -- not wrapped in `_logged()`, since
+    there is no fallback to log a transition to.
     """
     _require_credentials()
     primary = _chat_watsonx(settings.WATSONX_INSTRUCT_MODEL_ID)
-    fallbacks: list[Runnable] = []
+    tiers: list[tuple[str, Runnable]] = [("watsonx primary", primary)]
     if settings.WATSONX_INSTRUCT_MODEL_FALLBACK_ID:
-        fallbacks.append(_chat_watsonx(settings.WATSONX_INSTRUCT_MODEL_FALLBACK_ID))
+        tiers.append(("watsonx fallback", _chat_watsonx(settings.WATSONX_INSTRUCT_MODEL_FALLBACK_ID)))
     if settings.GEMINI_API_KEY:
-        fallbacks.append(_gemini_chat())
-    if not fallbacks:
+        tiers.append(("gemini fallback", _gemini_chat()))
+    if len(tiers) == 1:
         return primary
-    return primary.with_fallbacks(fallbacks)
+    logged = [_logged(model, label) for label, model in tiers]
+    return logged[0].with_fallbacks(logged[1:])
