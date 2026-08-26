@@ -226,15 +226,18 @@
     color: inherit;
   }
   .sidebar-entry-meta { font-size: var(--text-xs); color: var(--ink-faint); display: flex; gap: var(--space-2); }
-  .sidebar-entry-actions { display: flex; gap: 2px; flex-shrink: 0; }
+  .sidebar-entry-actions { display: flex; gap: var(--space-1); flex-shrink: 0; }
   .sidebar-entry-action-btn {
+    /* 32px clears the WCAG 2.2 AA 24px target-size minimum with room to
+       spare — these used to be 22px with a 2px gap, easy to mis-tap next
+       to each other on the narrow-viewport overlay sidebar. */
     flex-shrink: 0;
     background: transparent;
     border: 1px solid var(--line);
     color: var(--ink-faint);
     border-radius: 999px;
-    width: 22px;
-    height: 22px;
+    width: 32px;
+    height: 32px;
     line-height: 1;
     font-size: var(--text-xs);
     cursor: pointer;
@@ -416,9 +419,13 @@
     background: var(--panel-2);
     color: var(--ink);
   }
+  .companion-controls { display: flex; align-items: center; gap: var(--space-2); }
   /* Pause/resume the companion's speech mid-answer — see
      speakCompanionAnswer's onboundary handling. Disabled whenever nothing
-     is actually speaking, so there's never a pause with nothing to pause. */
+     is actually speaking, so there's never a pause with nothing to pause.
+     Shared styling with #companionMuteBtn below: same control family, one
+     reacts to playback already in progress, the other prevents it ahead
+     of time. */
   .companion-pause-btn {
     background: transparent;
     border: 1px solid var(--line);
@@ -431,6 +438,11 @@
   }
   .companion-pause-btn:hover:not(:disabled) { color: var(--ink); border-color: var(--ink-dim); }
   .companion-pause-btn:disabled { opacity: 0.35; cursor: default; }
+  #companionMuteBtn[aria-pressed="true"] {
+    background: var(--accent-baseline-wash);
+    color: var(--accent-baseline-text);
+    border-color: var(--accent-baseline);
+  }
   .panel {
     background: var(--panel);
     border: 1px solid var(--line);
@@ -797,12 +809,18 @@
   }
 
   /* Mobile pass: stack controls instead of relying on incidental wrapping,
-     shrink the display headline so it can't overflow a narrow viewport. */
+     shrink the display headline so it can't overflow a narrow viewport, and
+     shrink the header/mascot chrome so there's less to scroll past before
+     reaching the actual question input — the core task of the page. */
   @media (max-width: 480px) {
     body { padding: var(--space-6) 0 var(--space-8); }
     .shell { padding: 0 var(--space-3); }
     .footer-inner { padding: var(--space-6) var(--space-3); }
+    header { margin-bottom: var(--space-4); }
     header h1 { font-size: 2.25rem; }
+    .companion { margin-top: var(--space-2); }
+    .companion-avatar { width: 120px; height: 120px; }
+    .domain-picker { margin-bottom: var(--space-3); }
     .controls-row { flex-direction: column; align-items: stretch; }
     .humor-row { min-width: 0; }
     .clear-btn { margin-left: 0; }
@@ -863,15 +881,29 @@
           alt="ChortleChat's mission companion avatar"
         />
         <span class="companion-caption" id="companionCaption">Standing by</span>
-        <button
-          type="button"
-          class="companion-pause-btn"
-          id="companionPauseBtn"
-          disabled
-          aria-label="Pause the companion's voice"
-        >
-          Pause
-        </button>
+        <div class="companion-controls">
+          <button
+            type="button"
+            class="companion-pause-btn"
+            id="companionPauseBtn"
+            disabled
+            aria-label="Pause the companion's voice"
+          >
+            Pause
+          </button>
+          <!-- Persistent opt-out: without this, every answer (including the
+               "nothing grounded" fallback) spoke aloud automatically with no
+               way to silence it ahead of time — Pause only reacts after
+               playback has already started. -->
+          <button
+            type="button"
+            class="companion-pause-btn"
+            id="companionMuteBtn"
+            aria-pressed="false"
+          >
+            Mute voice
+          </button>
+        </div>
         <!-- Plays Speechify audio when POST /speak succeeds; hidden, driven
              entirely by speakCompanionAnswer/companionPauseBtn — see the
              companion lip-sync section further down. -->
@@ -906,12 +938,12 @@
           </button>
         </div>
         <div class="humor-row" data-disabled="true" id="humorRow">
-          <label for="humor">Humor</label>
+          <label for="humor" id="humorLabel">Humor</label>
           <input type="range" id="humor" min="0" max="100" value="50" />
           <output id="humorVal">50</output>
         </div>
         <button type="button" class="clear-btn" id="historyBtn" disabled aria-expanded="false">Conversation history</button>
-        <button type="button" class="clear-btn" id="clearBtn" disabled>Clear conversation</button>
+        <button type="button" class="clear-btn" id="clearBtn" disabled>New conversation</button>
       </div>
 
       <!-- Read-only browse panel for this session's past turns — see
@@ -1049,10 +1081,12 @@
   const STORAGE_KEY_HUMOR = "chortlechat:humor";
   const STORAGE_KEY_DOMAIN = "chortlechat:domain";
   const STORAGE_KEY_COMPANION_GENDER = "chortlechat:companionGender";
+  const STORAGE_KEY_COMPANION_MUTED = "chortlechat:companionMuted";
 
   // sessionId is deliberately NOT persisted to localStorage — it lives only
-  // for the duration of this tab, matching "Clear conversation" as the one
-  // and only way to deliberately end a conversation. Set from the first
+  // for the duration of this tab, matching "New conversation" as the one
+  // and only way to deliberately detach from the current conversation. Set
+  // from the first
   // /ask response's session_id (server-generated), then sent back on every
   // subsequent turn so the backend's conversational memory (short-term
   // in-process, and long-term in Zilliz for grounded exchanges) can attach
@@ -1069,6 +1103,7 @@
     sessionId: null,
     domain: "",
     companionGender: "male",
+    companionMuted: false,
   };
 
   // Companion avatar frame set, keyed by state.companionGender — declared
@@ -1101,6 +1136,7 @@
   const questionInput = document.getElementById("question");
   const sendBtn = document.getElementById("sendBtn");
   const humorRow = document.getElementById("humorRow");
+  const humorLabel = document.getElementById("humorLabel");
   const humorInput = document.getElementById("humor");
   const humorVal = document.getElementById("humorVal");
   const chipsEl = document.getElementById("chips");
@@ -1114,6 +1150,7 @@
   const companionAvatar = document.getElementById("companionAvatar");
   const companionCaption = document.getElementById("companionCaption");
   const companionPauseBtn = document.getElementById("companionPauseBtn");
+  const companionMuteBtn = document.getElementById("companionMuteBtn");
   const companionAudio = document.getElementById("companionAudio");
 
   const appLayout = document.getElementById("appLayout");
@@ -1412,9 +1449,9 @@
     questionInput.focus();
   }
 
-  // Shared by the sidebar's "+ New conversation" button and the existing
-  // "Clear conversation" button (see clearBtn's listener below) so there's
-  // one definition of what ending the current conversation means, reused
+  // Shared by the sidebar's "+ New conversation" button and the controls
+  // row's "New conversation" button (see clearBtn's listener below) so
+  // there's one definition of what ending the current conversation means, reused
   // rather than duplicated.
   function startNewConversation() {
     logEl.innerHTML = "";
@@ -1432,6 +1469,7 @@
       const storedHumor = localStorage.getItem(STORAGE_KEY_HUMOR);
       const storedDomain = localStorage.getItem(STORAGE_KEY_DOMAIN);
       const storedCompanionGender = localStorage.getItem(STORAGE_KEY_COMPANION_GENDER);
+      const storedCompanionMuted = localStorage.getItem(STORAGE_KEY_COMPANION_MUTED);
       if (storedPersona === "baseline" || storedPersona === "banter") {
         state.persona = storedPersona;
       }
@@ -1444,6 +1482,9 @@
       if (storedCompanionGender === "male" || storedCompanionGender === "female" || storedCompanionGender === "cat") {
         state.companionGender = storedCompanionGender;
       }
+      if (storedCompanionMuted === "1") {
+        state.companionMuted = true;
+      }
     } catch (err) {
       // localStorage unavailable (private browsing, disabled storage) — defaults stand
     }
@@ -1455,6 +1496,7 @@
       localStorage.setItem(STORAGE_KEY_HUMOR, String(state.humor));
       localStorage.setItem(STORAGE_KEY_DOMAIN, state.domain);
       localStorage.setItem(STORAGE_KEY_COMPANION_GENDER, state.companionGender);
+      localStorage.setItem(STORAGE_KEY_COMPANION_MUTED, state.companionMuted ? "1" : "0");
     } catch (err) {
       // ignore — nothing to persist to
     }
@@ -1494,9 +1536,9 @@
 
   // Switching domain mid-conversation would silently change what the *next*
   // answer is grounded in without the prior turns in the log having been
-  // asked under that scope — the same reasoning that makes "Clear
-  // conversation" the one deliberate way to end a conversation. Cheapest
-  // safe behavior: changing domains starts fresh, exactly like Clear.
+  // asked under that scope — the same reasoning that makes "New
+  // conversation" the one deliberate way to detach from a conversation.
+  // Cheapest safe behavior: changing domains starts fresh, exactly like it.
   // A confirm() gate guards this: without it, clicking a domain pill mid-
   // conversation wiped the visible log with no warning, which read as data
   // loss even though the conversation is still recoverable from the
@@ -1532,11 +1574,26 @@
     }
   }
 
+  // Humor only does anything under the Banter persona; disabling the slider
+  // alone (opacity + pointer-events:none) left that unexplained, and since
+  // pointer-events:none also blocks the native hover tooltip, a `title`
+  // attribute wouldn't have helped — the label text itself has to say why.
+  function updateHumorAvailability() {
+    const disabled = state.persona === "baseline";
+    humorRow.dataset.disabled = String(disabled);
+    humorLabel.textContent = disabled ? "Humor (Banter only)" : "Humor";
+  }
+
+  function updateCompanionMuteButton() {
+    companionMuteBtn.setAttribute("aria-pressed", String(state.companionMuted));
+    companionMuteBtn.textContent = state.companionMuted ? "Unmute voice" : "Mute voice";
+  }
+
   function applyPersistedSettings() {
     document.querySelectorAll(".persona-toggle button").forEach((b) => {
       b.setAttribute("aria-pressed", String(b.dataset.persona === state.persona));
     });
-    humorRow.dataset.disabled = state.persona === "baseline" ? "true" : "false";
+    updateHumorAvailability();
     humorInput.value = String(state.humor);
     humorVal.textContent = String(state.humor);
     syncCompanionPersona();
@@ -1544,6 +1601,7 @@
       b.setAttribute("aria-pressed", String(b.dataset.gender === state.companionGender));
     });
     syncCompanionAvatarFrame();
+    updateCompanionMuteButton();
     renderDomainPicker();
     renderChipsForCurrentDomain();
   }
@@ -1574,10 +1632,24 @@
       document.querySelectorAll(".persona-toggle button").forEach((b) => {
         b.setAttribute("aria-pressed", String(b === btn));
       });
-      humorRow.dataset.disabled = state.persona === "baseline" ? "true" : "false";
+      updateHumorAvailability();
       syncCompanionPersona();
       persistSettings();
     });
+  });
+
+  companionMuteBtn.addEventListener("click", () => {
+    state.companionMuted = !state.companionMuted;
+    updateCompanionMuteButton();
+    persistSettings();
+    // Muting mid-answer stops it immediately rather than just silencing the
+    // *next* one — otherwise a user muting to get quiet would still hear
+    // out whatever's already playing.
+    if (state.companionMuted) {
+      if (window.speechSynthesis) speechSynthesis.cancel();
+      companionAudio.pause();
+      restCompanionAudio();
+    }
   });
 
   document.querySelectorAll(".companion-gender-toggle button").forEach((btn) => {
@@ -1603,10 +1675,11 @@
   });
 
   clearBtn.addEventListener("click", () => {
-    // Ending the conversation client-side only clears the DOM; forgetting
-    // sessionId is what actually starts a new one — the next question
-    // omits session_id, so the backend mints a brand-new session rather
-    // than silently continuing the one that was just "cleared" on screen.
+    // Detaching from the conversation client-side only clears the DOM; the
+    // conversation itself isn't deleted — it stays in the sidebar and can
+    // be reopened. Forgetting sessionId is what actually starts a new one —
+    // the next question omits session_id, so the backend mints a
+    // brand-new session rather than silently continuing this one.
     startNewConversation();
     questionInput.focus();
   });
@@ -1994,7 +2067,7 @@
   }
 
   function speakCompanionAnswer(text) {
-    if (!text) return;
+    if (!text || state.companionMuted) return;
 
     companionSuppressEnd = false;
     if (window.speechSynthesis) speechSynthesis.cancel();
@@ -2102,7 +2175,8 @@
 
     // The avatar performs whatever /ask already grounded and generated —
     // including the honest no-match fallback text, spoken the same as any
-    // other answer, never silently. See speakCompanionAnswer above.
+    // other answer unless the user has deliberately muted it. See
+    // speakCompanionAnswer above.
     companionEl.dataset.persona = persona;
     speakCompanionAnswer(answer);
 
