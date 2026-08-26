@@ -6,7 +6,7 @@ Run once, from the repo root:
 
 Every existing corpus document's text begins with a "Source: <topic>"
 line (see fetch_chortlechat_corpus.py's `_flatten`). This maps each of the
-24 distinct topic strings actually present in the committed corpus to one
+25 distinct topic strings actually present in the committed corpus to one
 of the five `Domain` values (mission-based domain selection), writes
 `domain` onto every document in place, and prints a per-domain count
 summary so the classification is reviewable at a glance rather than a
@@ -81,6 +81,14 @@ TOPIC_TO_DOMAIN: dict[str, Domain] = {
     "Drylines": Domain.OTHER,
     "Severe weather": Domain.OTHER,
     "mesoscale forecasting, severe thunderstorms": Domain.OTHER,
+    # Added 2026-08-26: the Prithvi-EO-1.0, Prithvi-EO-2.0-300M, Prithvi-WxC-1.0,
+    # and IBM Granite Geospatial model-card sources (proposal doc "Database
+    # Enhancement Design"). These are about NASA/IBM's own AI models, not a
+    # specific hazard domain, so they land in the same real catch-all bucket
+    # as the other cross-cutting topics above rather than being force-fit
+    # into tropical cyclone / dust / climate reconstruction / environmental
+    # hazards.
+    "IBM Granite / NASA Prithvi Geospatial AI Models": Domain.OTHER,
 }
 
 _SOURCE_LINE = re.compile(r"^Source: (.+)$", re.MULTILINE)
