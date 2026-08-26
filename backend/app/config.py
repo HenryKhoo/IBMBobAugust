@@ -30,6 +30,12 @@ class Settings:
     # gemini-embedding-001 is the current model; the older
     # text-embedding-004 was deprecated and shut down in Jan 2026.
     GEMINI_EMBEDDING_MODEL_ID: str = os.getenv("GEMINI_EMBEDDING_MODEL_ID", "gemini-embedding-001")
+    # Generation-side Gemini fallback tier -- see get_instruct_model() in
+    # app/services/watsonx.py. Only used when GEMINI_API_KEY is set AND
+    # every watsonx instruct tier has failed; not the primary in any case.
+    # gemini-3.6-flash is the current general-purpose stable Flash model as
+    # of Aug 2026 (2.0/2.5-era Flash ids have since been retired).
+    GEMINI_INSTRUCT_MODEL_ID: str = os.getenv("GEMINI_INSTRUCT_MODEL_ID", "gemini-3.6-flash")
 
     ZILLIZ_URI: str = os.getenv("ZILLIZ_URI", "")
     ZILLIZ_TOKEN: str = os.getenv("ZILLIZ_TOKEN", "")

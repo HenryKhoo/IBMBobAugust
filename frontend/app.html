@@ -2278,7 +2278,22 @@
       }),
     });
     if (!response.ok) {
-      throw new Error(`Request failed (${response.status})`);
+      // A response that actually arrived -- even an error one -- means the
+      // backend IS running and reachable; this is a server-side failure
+      // while answering, not a connectivity problem. Tag the thrown error
+      // with `status` so submitQuestion's catch block can tell the two
+      // apart instead of reporting every failure as "is the server
+      // running?", which is actively wrong for e.g. an upstream model
+      // provider's quota being exhausted.
+      let detail = null;
+      try {
+        detail = (await response.json())?.detail ?? null;
+      } catch {
+        // Body wasn't JSON (or was empty) -- fall through with detail=null.
+      }
+      const err = new Error(detail || `Request failed (${response.status})`);
+      err.status = response.status;
+      throw err;
     }
     return response.json();
   }
@@ -2308,10 +2323,16 @@
       renderSidebarList();
     } catch (err) {
       typingEl.remove();
-      addErrorBubble(
-        "Couldn't reach the ChortleChat backend, is the server running on " + API_BASE_URL + "?",
-        () => submitQuestion(question)
-      );
+      // `err.status` is only set in askChortleChat's !response.ok branch --
+      // that means a real response came back, so the backend is up and
+      // reachable and this is a server-side failure while answering (e.g.
+      // the instruct model's provider quota is exhausted), not the backend
+      // being unreachable. Only a bare fetch failure (no `status`) is
+      // actually "can't reach it."
+      const message = err.status
+        ? `ChortleChat hit an error answering that (${err.status}): ${err.message}`
+        : "Couldn't reach the ChortleChat backend, is the server running on " + API_BASE_URL + "?";
+      addErrorBubble(message, () => submitQuestion(question));
       console.error(err);
     } finally {
       isLoading = false;
