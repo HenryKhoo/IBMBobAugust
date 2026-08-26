@@ -130,26 +130,43 @@ def _gemini_chat() -> ChatGoogleGenerativeAI:
     for the watsonx tiers), expressed in langchain-google-genai's own kwarg
     names rather than watsonx's `params` dict shape.
 
-    `thinking_budget=0` disables gemini-3.6-flash's extended-thinking mode
-    outright -- confirmed live on 2026-08-26: with thinking on, hidden
-    reasoning tokens ate into `max_output_tokens` before the visible answer
-    got any, producing answers truncated mid-sentence, and the returned
-    message `.content` came back as a list of content blocks (a `text`
-    part plus an opaque `signature`-carrying thought part) rather than the
-    plain string every watsonx tier returns -- see
-    `app.services.chortlechat._message_text`, which every caller of
-    `get_instruct_model().invoke(...)` must go through instead of
-    `str(message.content)` for exactly this reason. Flash-tier Gemini
-    models support fully disabling thinking this way (Pro-tier models do
-    not); a short "restate this one already-retrieved passage" task has no
-    need for multi-step reasoning regardless.
+    gemini-3.6-flash's extended-thinking mode is the same problem it always
+    was: with thinking on, hidden reasoning tokens eat into
+    `max_output_tokens` before the visible answer gets any, producing
+    answers truncated mid-sentence, and the returned message `.content`
+    comes back as a list of content blocks (a `text` part plus an opaque
+    `signature`-carrying thought part) rather than the plain string every
+    watsonx tier returns -- see `app.services.chortlechat._message_text`,
+    which every caller of `get_instruct_model().invoke(...)` must go
+    through instead of `str(message.content)` for exactly this reason.
+
+    How to turn thinking down is NOT the same across Gemini generations,
+    though, and this bit us live on 2026-08-26: the first fix here was a
+    top-level `thinking_budget=0` kwarg, which worked for Gemini 2.5 but
+    made gemini-3.6-flash reject every request outright with a bare
+    `400 INVALID_ARGUMENT` (no field name in the message -- confirmed by
+    inspecting `ChatGoogleGenerativeAI._build_base_generation_config()`
+    directly: `thinking_budget=0` serializes to
+    `ThinkingConfig(thinking_budget=0)`, and Gemini 3.x's API rejects
+    `thinkingConfig.thinkingBudget` as deprecated). Gemini 3.x replaced the
+    token-budget knob with a coarser `thinking_level` enum instead
+    (`minimal`/`low`/`medium`/`high`; requires langchain-google-genai
+    >=4.2.6, confirmed installed). `thinking_config={"thinking_level":
+    "minimal"}` serializes to `ThinkingConfig(thinking_level=MINIMAL)` --
+    verified directly the same way -- with no `thinking_budget` field at
+    all, so nothing deprecated ever reaches the request. `minimal` is the
+    closest thing Gemini 3.x flash offers to the old "disable thinking
+    outright" intent; there is no true zero/off level for this model
+    generation. If Gemini ever adds one, or this project moves off
+    gemini-3.6-flash to a 2.5-era model where `thinking_budget=0` is valid
+    again, this is the one place to change.
     """
     return ChatGoogleGenerativeAI(
         model=settings.GEMINI_INSTRUCT_MODEL_ID,
         google_api_key=settings.GEMINI_API_KEY,
         temperature=_INSTRUCT_PARAMS["temperature"],
         max_output_tokens=_INSTRUCT_PARAMS["max_tokens"],
-        thinking_budget=0,
+        thinking_config={"thinking_level": "minimal"},
     )
 
 

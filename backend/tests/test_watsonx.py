@@ -163,6 +163,34 @@ def test_instruct_model_logs_each_failed_tier_before_with_fallbacks_reraises(mon
     assert any("gemini fallback" in m and "gemini down too" in m for m in logged_messages)
 
 
+def test_gemini_chat_uses_thinking_level_not_the_deprecated_thinking_budget_kwarg(monkeypatch):
+    """Added 2026-08-26 (round 5): a live /ask call showed the Gemini
+    fallback tier failing with a bare `400 INVALID_ARGUMENT` the moment it
+    was actually reached. Root cause: `_gemini_chat()` passed
+    `thinking_budget=0`, which is valid for Gemini 2.5 but deprecated for
+    Gemini 3.x models (gemini-3.6-flash is this project's configured
+    GEMINI_INSTRUCT_MODEL_ID) -- the API rejects a request whose
+    thinkingConfig carries `thinkingBudget` at all on that model
+    generation. The fix is `thinking_config={"thinking_level": "minimal"}`,
+    the closest Gemini 3.x equivalent of "turn thinking down as far as
+    possible". This locks that shape in directly against the real
+    ChatGoogleGenerativeAI class (not a stub) so a future edit that
+    reintroduces `thinking_budget` fails loudly here instead of only in a
+    live call.
+    """
+    monkeypatch.setattr(watsonx.settings, "GEMINI_API_KEY", "test-gemini-key")
+    monkeypatch.setattr(watsonx.settings, "GEMINI_INSTRUCT_MODEL_ID", "gemini-3.6-flash")
+
+    client = watsonx._gemini_chat()
+
+    assert client.thinking_budget is None
+    assert client.thinking_config == {"thinking_level": "minimal"}
+    generation_config = client._build_base_generation_config(stop=None)
+    thinking_config = generation_config["thinking_config"]
+    assert thinking_config.thinking_budget is None
+    assert str(thinking_config.thinking_level) == "ThinkingLevel.MINIMAL"
+
+
 def test_using_gemini_embeddings_tracks_the_gemini_api_key_setting(monkeypatch):
     monkeypatch.setattr(watsonx.settings, "GEMINI_API_KEY", "")
     assert watsonx.using_gemini_embeddings() is False
