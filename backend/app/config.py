@@ -6,7 +6,7 @@ load_dotenv(override=True)
 
 
 class Settings:
-    APP_NAME: str = "ChortleChat"
+    APP_NAME: str = "C.O.S.M.O.S."
 
     WATSONX_API_KEY: str = os.getenv("WATSONX_API_KEY", "")
     WATSONX_PROJECT_ID: str = os.getenv("WATSONX_PROJECT_ID", "")
@@ -39,7 +39,7 @@ class Settings:
 
     ZILLIZ_URI: str = os.getenv("ZILLIZ_URI", "")
     ZILLIZ_TOKEN: str = os.getenv("ZILLIZ_TOKEN", "")
-    ZILLIZ_COLLECTION_NAME: str = os.getenv("ZILLIZ_COLLECTION_NAME", "chortlechat")
+    ZILLIZ_COLLECTION_NAME: str = os.getenv("ZILLIZ_COLLECTION_NAME", "cosmos")
     # A SEPARATE collection for Gemini-embedded documents, used instead of
     # ZILLIZ_COLLECTION_NAME whenever Gemini embeddings are active (see
     # app.services.watsonx.using_gemini_embeddings). Deliberately never the
@@ -52,7 +52,7 @@ class Settings:
     # collides with the existing collection by accident.
     ZILLIZ_COLLECTION_NAME_GEMINI: str = os.getenv(
         "ZILLIZ_COLLECTION_NAME_GEMINI",
-        os.getenv("ZILLIZ_COLLECTION_NAME", "chortlechat") + "_gemini",
+        os.getenv("ZILLIZ_COLLECTION_NAME", "cosmos") + "_gemini",
     )
 
     PORT: int = int(os.getenv("PORT", "8000"))

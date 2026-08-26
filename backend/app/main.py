@@ -1,4 +1,4 @@
-"""FastAPI application entrypoint for ChortleChat."""
+"""FastAPI application entrypoint for C.O.S.M.O.S."""
 
 import logging
 
@@ -24,7 +24,7 @@ from app.schemas import (
 from app.services import audio_cache, memory, speechify
 from app.services.ingestion import ingest_and_upsert
 from app.services.query import run_query
-from app.services.chortlechat import ask_chortlechat
+from app.services.cosmos import ask_cosmos
 from app.services.vector_store import get_vector_store
 from app.services.vector_store import missing_credentials as zilliz_missing_credentials
 from app.services.watsonx import missing_credentials as watsonx_missing_credentials
@@ -117,8 +117,8 @@ def health(response: Response) -> HealthResponse:
 def ingest(request: IngestRequest) -> IngestResponse:
     """Chunk, embed with Granite, and upsert documents into Zilliz.
 
-    See `backend/scripts/fetch_chortlechat_corpus.py` and
-    `backend/scripts/ingest_chortlechat_corpus.py` for the dev-time path that
+    See `backend/scripts/fetch_cosmos_corpus.py` and
+    `backend/scripts/ingest_cosmos_corpus.py` for the dev-time path that
     populates the corpus this endpoint also accepts documents through
     directly.
     """
@@ -131,7 +131,7 @@ def query(request: QueryRequest) -> QueryResponse:
     """Search the embedded corpus directly and return matching passages.
 
     A transparency tool alongside /ask — "see the actual source passages,"
-    not ChortleChat's main interface. Retrieval only, no generation step: a
+    not C.O.S.M.O.S.'s main interface. Retrieval only, no generation step: a
     question that matches nothing in the corpus is a valid, empty result
     set rather than an error.
     """
@@ -143,7 +143,7 @@ def ask(request: AskRequest) -> AskResponse:
     """Answer a space-science question, grounded in the ingested corpus.
 
     Never 404s: an unmatched question is a valid, honest "no grounded
-    answer" response (see `app.services.chortlechat.ask_chortlechat`), not an
+    answer" response (see `app.services.cosmos.ask_cosmos`), not an
     error to raise — the no-hallucination protection this API's other
     endpoints get from a 404 is already built into that fallback response
     itself here.
@@ -151,7 +151,7 @@ def ask(request: AskRequest) -> AskResponse:
     `request.session_id` opts into conversational memory across calls to
     this endpoint — see `AskRequest.session_id` and `app.services.memory`.
     """
-    return ask_chortlechat(
+    return ask_cosmos(
         request.question, request.persona, request.humor, request.session_id, request.domain
     )
 
@@ -187,7 +187,7 @@ def speak(request: SpeakRequest) -> SpeakResponse:
     unconfigured or its free tier is exhausted for the month.
 
     Deliberately not folded into `GET /health`'s `missing_config`: voice is
-    a presentation enhancement layered on top of ChortleChat's actual
+    a presentation enhancement layered on top of C.O.S.M.O.S.'s actual
     product (grounded answers) — an environment missing `SPEECHIFY_API_KEY`
     is still a fully healthy Q&A service, just one voiced by the browser
     instead of Speechify.

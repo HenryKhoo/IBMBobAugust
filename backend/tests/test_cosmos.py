@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from app import main
 from app.main import app
 from app.schemas import Domain
-from app.services import chortlechat
+from app.services import cosmos
 from tests.conftest import _FakeDocument, _FakeInstructModel, _FakeMessage
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -70,7 +70,7 @@ def fake_hit() -> tuple[_FakeDocument, float]:
 
 class _DomainAwareFakeVectorStore(_FakeVectorStore):
     """Like `_FakeVectorStore`, but distinguishes a domain-scoped call from
-    the domain-less retry `ask_chortlechat` makes when a domain search comes
+    the domain-less retry `ask_cosmos` makes when a domain search comes
     back empty — needed only by the domain-fallback tests below; every
     other test's `_FakeVectorStore` has no reason to care which expr it
     got, so this stays local rather than replacing the shared fake.
@@ -93,13 +93,13 @@ class _DomainAwareFakeVectorStore(_FakeVectorStore):
 def test_ask_baseline_returns_grounded_answer_and_source(monkeypatch, fake_hit):
     fake_store = _FakeVectorStore([fake_hit])
     fake_model = _FakeInstructModel(STUBBED_ANSWER)
-    monkeypatch.setattr(chortlechat, "get_vector_store", lambda: fake_store)
-    monkeypatch.setattr(chortlechat, "get_instruct_model", lambda: fake_model)
+    monkeypatch.setattr(cosmos, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(cosmos, "get_instruct_model", lambda: fake_model)
 
-    response = chortlechat.ask_chortlechat("What is Veggie?", chortlechat.AskPersona.BASELINE, humor=50)
+    response = cosmos.ask_cosmos("What is Veggie?", cosmos.AskPersona.BASELINE, humor=50)
 
     assert response.answer == STUBBED_ANSWER
-    assert response.persona == chortlechat.AskPersona.BASELINE
+    assert response.persona == cosmos.AskPersona.BASELINE
     assert response.grounded is True
     assert response.confidence == RELEVANCE_SCORE
     assert response.source == "science_reference:nasa-smd-veggie-001#chunk0"
@@ -118,10 +118,10 @@ def test_ask_banter_restyles_the_baseline_answer_without_regenerating_the_fact(
     """
     fake_store = _FakeVectorStore([fake_hit])
     fake_model = _FakeInstructModel(STUBBED_ANSWER)
-    monkeypatch.setattr(chortlechat, "get_vector_store", lambda: fake_store)
-    monkeypatch.setattr(chortlechat, "get_instruct_model", lambda: fake_model)
+    monkeypatch.setattr(cosmos, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(cosmos, "get_instruct_model", lambda: fake_model)
 
-    chortlechat.ask_chortlechat("What is Veggie?", chortlechat.AskPersona.BANTER, humor=80)
+    cosmos.ask_cosmos("What is Veggie?", cosmos.AskPersona.BANTER, humor=80)
 
     # two generation calls: the baseline fact, then the banter restyle.
     assert len(fake_model.invoked_with) == 2
@@ -134,10 +134,10 @@ def test_ask_banter_restyles_the_baseline_answer_without_regenerating_the_fact(
 def test_ask_falls_back_honestly_when_nothing_is_retrieved(monkeypatch):
     fake_store = _FakeVectorStore([])
     fake_model = _FakeInstructModel(STUBBED_ANSWER)
-    monkeypatch.setattr(chortlechat, "get_vector_store", lambda: fake_store)
-    monkeypatch.setattr(chortlechat, "get_instruct_model", lambda: fake_model)
+    monkeypatch.setattr(cosmos, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(cosmos, "get_instruct_model", lambda: fake_model)
 
-    response = chortlechat.ask_chortlechat("anything", chortlechat.AskPersona.BASELINE, humor=50)
+    response = cosmos.ask_cosmos("anything", cosmos.AskPersona.BASELINE, humor=50)
 
     assert response.grounded is False
     assert response.confidence is None
@@ -153,8 +153,8 @@ def test_ask_falls_back_honestly_when_the_embedding_provider_rejects_the_call(mo
     the same honest "no grounded answer" response an ordinary unmatched
     question gets, not an unhandled 500. Deliberately does not mock
     `relevance_score_hits_or_empty` — the real one (imported by
-    `chortlechat`) has to be the thing that catches this, exercising the
-    fix at the same layer `ask_chortlechat` actually calls through.
+    `cosmos`) has to be the thing that catches this, exercising the
+    fix at the same layer `ask_cosmos` actually calls through.
     """
 
     class _RejectingVectorStore:
@@ -166,10 +166,10 @@ def test_ask_falls_back_honestly_when_the_embedding_provider_rejects_the_call(mo
             )
 
     fake_model = _FakeInstructModel(STUBBED_ANSWER)
-    monkeypatch.setattr(chortlechat, "get_vector_store", lambda: _RejectingVectorStore())
-    monkeypatch.setattr(chortlechat, "get_instruct_model", lambda: fake_model)
+    monkeypatch.setattr(cosmos, "get_vector_store", lambda: _RejectingVectorStore())
+    monkeypatch.setattr(cosmos, "get_instruct_model", lambda: fake_model)
 
-    response = chortlechat.ask_chortlechat("What is Veggie?", chortlechat.AskPersona.BASELINE, humor=50)
+    response = cosmos.ask_cosmos("What is Veggie?", cosmos.AskPersona.BASELINE, humor=50)
 
     assert response.grounded is False
     assert response.answer == "No grounded answer for that."
@@ -183,13 +183,13 @@ def test_ask_falls_back_below_confidence_threshold_with_persona_specific_wording
     weak_hit = (_FakeDocument(REFERENCE_TEXT, dict(REFERENCE_METADATA)), 0.1)
     fake_store = _FakeVectorStore([weak_hit])
     fake_model = _FakeInstructModel(STUBBED_ANSWER)
-    monkeypatch.setattr(chortlechat, "get_vector_store", lambda: fake_store)
-    monkeypatch.setattr(chortlechat, "get_instruct_model", lambda: fake_model)
+    monkeypatch.setattr(cosmos, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(cosmos, "get_instruct_model", lambda: fake_model)
 
-    baseline_response = chortlechat.ask_chortlechat(
-        "anything", chortlechat.AskPersona.BASELINE, humor=50
+    baseline_response = cosmos.ask_cosmos(
+        "anything", cosmos.AskPersona.BASELINE, humor=50
     )
-    banter_response = chortlechat.ask_chortlechat("anything", chortlechat.AskPersona.BANTER, humor=50)
+    banter_response = cosmos.ask_cosmos("anything", cosmos.AskPersona.BANTER, humor=50)
 
     assert baseline_response.grounded is False
     assert baseline_response.confidence == 0.1
@@ -204,12 +204,12 @@ def test_ask_falls_back_below_confidence_threshold_with_persona_specific_wording
 def test_ask_scopes_retrieval_to_the_requested_domain(monkeypatch, fake_hit):
     fake_store = _FakeVectorStore([fake_hit])
     fake_model = _FakeInstructModel(STUBBED_ANSWER)
-    monkeypatch.setattr(chortlechat, "get_vector_store", lambda: fake_store)
-    monkeypatch.setattr(chortlechat, "get_instruct_model", lambda: fake_model)
+    monkeypatch.setattr(cosmos, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(cosmos, "get_instruct_model", lambda: fake_model)
 
-    chortlechat.ask_chortlechat(
+    cosmos.ask_cosmos(
         "What is Veggie?",
-        chortlechat.AskPersona.BASELINE,
+        cosmos.AskPersona.BASELINE,
         humor=50,
         domain=Domain.TROPICAL_CYCLONE_DYNAMICS,
     )
@@ -230,12 +230,12 @@ def test_ask_falls_back_to_the_whole_corpus_when_a_domain_has_nothing_indexed(mo
     strong_hit = (_FakeDocument(REFERENCE_TEXT, dict(REFERENCE_METADATA)), RELEVANCE_SCORE)
     fake_store = _DomainAwareFakeVectorStore(hits=[strong_hit], domain_hits=[])
     fake_model = _FakeInstructModel(STUBBED_ANSWER)
-    monkeypatch.setattr(chortlechat, "get_vector_store", lambda: fake_store)
-    monkeypatch.setattr(chortlechat, "get_instruct_model", lambda: fake_model)
+    monkeypatch.setattr(cosmos, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(cosmos, "get_instruct_model", lambda: fake_model)
 
-    response = chortlechat.ask_chortlechat(
+    response = cosmos.ask_cosmos(
         "What is Veggie?",
-        chortlechat.AskPersona.BASELINE,
+        cosmos.AskPersona.BASELINE,
         humor=50,
         domain=Domain.SAHARAN_DUST,
     )
@@ -261,12 +261,12 @@ def test_ask_falls_back_to_the_whole_corpus_when_a_domain_search_finds_only_a_we
     strong_hit_elsewhere = (_FakeDocument(REFERENCE_TEXT, dict(REFERENCE_METADATA)), 0.95)
     fake_store = _DomainAwareFakeVectorStore(hits=[strong_hit_elsewhere], domain_hits=[weak_hit])
     fake_model = _FakeInstructModel(STUBBED_ANSWER)
-    monkeypatch.setattr(chortlechat, "get_vector_store", lambda: fake_store)
-    monkeypatch.setattr(chortlechat, "get_instruct_model", lambda: fake_model)
+    monkeypatch.setattr(cosmos, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(cosmos, "get_instruct_model", lambda: fake_model)
 
-    response = chortlechat.ask_chortlechat(
+    response = cosmos.ask_cosmos(
         "anything",
-        chortlechat.AskPersona.BASELINE,
+        cosmos.AskPersona.BASELINE,
         humor=50,
         domain=Domain.CLIMATE_RECONSTRUCTION,
     )
@@ -288,12 +288,12 @@ def test_ask_falls_back_honestly_when_the_whole_corpus_retry_is_also_weak(monkey
     also_weak_hit = (_FakeDocument(REFERENCE_TEXT, dict(REFERENCE_METADATA)), 0.2)
     fake_store = _DomainAwareFakeVectorStore(hits=[also_weak_hit], domain_hits=[weak_hit])
     fake_model = _FakeInstructModel(STUBBED_ANSWER)
-    monkeypatch.setattr(chortlechat, "get_vector_store", lambda: fake_store)
-    monkeypatch.setattr(chortlechat, "get_instruct_model", lambda: fake_model)
+    monkeypatch.setattr(cosmos, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(cosmos, "get_instruct_model", lambda: fake_model)
 
-    response = chortlechat.ask_chortlechat(
+    response = cosmos.ask_cosmos(
         "anything",
-        chortlechat.AskPersona.BASELINE,
+        cosmos.AskPersona.BASELINE,
         humor=50,
         domain=Domain.CLIMATE_RECONSTRUCTION,
     )
@@ -307,10 +307,10 @@ def test_ask_falls_back_honestly_when_the_whole_corpus_retry_is_also_weak(monkey
 def test_ask_without_a_domain_makes_exactly_one_retrieval_call(monkeypatch, fake_hit):
     fake_store = _FakeVectorStore([fake_hit])
     fake_model = _FakeInstructModel(STUBBED_ANSWER)
-    monkeypatch.setattr(chortlechat, "get_vector_store", lambda: fake_store)
-    monkeypatch.setattr(chortlechat, "get_instruct_model", lambda: fake_model)
+    monkeypatch.setattr(cosmos, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(cosmos, "get_instruct_model", lambda: fake_model)
 
-    chortlechat.ask_chortlechat("What is Veggie?", chortlechat.AskPersona.BASELINE, humor=50)
+    cosmos.ask_cosmos("What is Veggie?", cosmos.AskPersona.BASELINE, humor=50)
 
     assert fake_store.calls[0]["expr"] == "doc_type == 'science_reference'"
     assert len(fake_store.calls) == 1
@@ -319,8 +319,8 @@ def test_ask_without_a_domain_makes_exactly_one_retrieval_call(monkeypatch, fake
 def test_endpoint_accepts_a_domain_and_rejects_an_unknown_one(monkeypatch, fake_hit):
     fake_store = _FakeVectorStore([fake_hit])
     fake_model = _FakeInstructModel(STUBBED_ANSWER)
-    monkeypatch.setattr(chortlechat, "get_vector_store", lambda: fake_store)
-    monkeypatch.setattr(chortlechat, "get_instruct_model", lambda: fake_model)
+    monkeypatch.setattr(cosmos, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(cosmos, "get_instruct_model", lambda: fake_model)
 
     ok = client.post(
         "/ask", json={"question": "What is Veggie?", "domain": "environmental_hazards"}
@@ -337,8 +337,8 @@ def test_endpoint_accepts_a_domain_and_rejects_an_unknown_one(monkeypatch, fake_
 def test_endpoint_happy_path_matches_api_contract_shape(monkeypatch, fake_hit):
     fake_store = _FakeVectorStore([fake_hit])
     fake_model = _FakeInstructModel(STUBBED_ANSWER)
-    monkeypatch.setattr(chortlechat, "get_vector_store", lambda: fake_store)
-    monkeypatch.setattr(chortlechat, "get_instruct_model", lambda: fake_model)
+    monkeypatch.setattr(cosmos, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(cosmos, "get_instruct_model", lambda: fake_model)
 
     response = client.post("/ask", json={"question": "What is Veggie?", "persona": "baseline"})
 
@@ -362,8 +362,8 @@ def test_endpoint_happy_path_matches_api_contract_shape(monkeypatch, fake_hit):
 def test_endpoint_never_404s_on_no_match(monkeypatch):
     fake_store = _FakeVectorStore([])
     fake_model = _FakeInstructModel(STUBBED_ANSWER)
-    monkeypatch.setattr(chortlechat, "get_vector_store", lambda: fake_store)
-    monkeypatch.setattr(chortlechat, "get_instruct_model", lambda: fake_model)
+    monkeypatch.setattr(cosmos, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(cosmos, "get_instruct_model", lambda: fake_model)
 
     response = client.post("/ask", json={"question": "anything"})
 
@@ -374,8 +374,8 @@ def test_endpoint_never_404s_on_no_match(monkeypatch):
 def test_endpoint_defaults_persona_to_baseline_and_humor_to_fifty(monkeypatch, fake_hit):
     fake_store = _FakeVectorStore([fake_hit])
     fake_model = _FakeInstructModel(STUBBED_ANSWER)
-    monkeypatch.setattr(chortlechat, "get_vector_store", lambda: fake_store)
-    monkeypatch.setattr(chortlechat, "get_instruct_model", lambda: fake_model)
+    monkeypatch.setattr(cosmos, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(cosmos, "get_instruct_model", lambda: fake_model)
 
     response = client.post("/ask", json={"question": "What is Veggie?"})
 
@@ -401,11 +401,11 @@ def test_endpoint_rejects_invalid_requests(payload):
 def test_ask_without_session_id_starts_a_fresh_session_each_time(monkeypatch, fake_hit):
     fake_store = _FakeVectorStore([fake_hit])
     fake_model = _FakeInstructModel(STUBBED_ANSWER)
-    monkeypatch.setattr(chortlechat, "get_vector_store", lambda: fake_store)
-    monkeypatch.setattr(chortlechat, "get_instruct_model", lambda: fake_model)
+    monkeypatch.setattr(cosmos, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(cosmos, "get_instruct_model", lambda: fake_model)
 
-    first = chortlechat.ask_chortlechat("What is Veggie?", chortlechat.AskPersona.BASELINE, humor=50)
-    second = chortlechat.ask_chortlechat("What is Veggie?", chortlechat.AskPersona.BASELINE, humor=50)
+    first = cosmos.ask_cosmos("What is Veggie?", cosmos.AskPersona.BASELINE, humor=50)
+    second = cosmos.ask_cosmos("What is Veggie?", cosmos.AskPersona.BASELINE, humor=50)
 
     assert first.session_id != second.session_id
     # no history block on either call — each is the first question of its
@@ -417,13 +417,13 @@ def test_ask_without_session_id_starts_a_fresh_session_each_time(monkeypatch, fa
 def test_ask_with_session_id_replays_prior_turns_into_the_next_prompt(monkeypatch, fake_hit):
     fake_store = _FakeVectorStore([fake_hit])
     fake_model = _FakeInstructModel(STUBBED_ANSWER)
-    monkeypatch.setattr(chortlechat, "get_vector_store", lambda: fake_store)
-    monkeypatch.setattr(chortlechat, "get_instruct_model", lambda: fake_model)
+    monkeypatch.setattr(cosmos, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(cosmos, "get_instruct_model", lambda: fake_model)
 
-    first = chortlechat.ask_chortlechat("What is Veggie?", chortlechat.AskPersona.BASELINE, humor=50)
-    second = chortlechat.ask_chortlechat(
+    first = cosmos.ask_cosmos("What is Veggie?", cosmos.AskPersona.BASELINE, humor=50)
+    second = cosmos.ask_cosmos(
         "What does it grow?",
-        chortlechat.AskPersona.BASELINE,
+        cosmos.AskPersona.BASELINE,
         humor=50,
         session_id=first.session_id,
     )
@@ -438,10 +438,10 @@ def test_ask_with_session_id_replays_prior_turns_into_the_next_prompt(monkeypatc
 def test_ask_records_fallback_turns_in_session_history_too(monkeypatch):
     fake_store = _FakeVectorStore([])
     fake_model = _FakeInstructModel(STUBBED_ANSWER)
-    monkeypatch.setattr(chortlechat, "get_vector_store", lambda: fake_store)
-    monkeypatch.setattr(chortlechat, "get_instruct_model", lambda: fake_model)
+    monkeypatch.setattr(cosmos, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(cosmos, "get_instruct_model", lambda: fake_model)
 
-    first = chortlechat.ask_chortlechat("anything", chortlechat.AskPersona.BASELINE, humor=50)
+    first = cosmos.ask_cosmos("anything", cosmos.AskPersona.BASELINE, humor=50)
     from app.services import memory
 
     session = memory.get_or_create_session(first.session_id)
@@ -456,10 +456,10 @@ def test_ask_records_fallback_turns_in_session_history_too(monkeypatch):
 def test_ask_persists_a_grounded_exchange_to_zilliz_as_conversation_turn(monkeypatch, fake_hit):
     fake_store = _FakeVectorStore([fake_hit])
     fake_model = _FakeInstructModel(STUBBED_ANSWER)
-    monkeypatch.setattr(chortlechat, "get_vector_store", lambda: fake_store)
-    monkeypatch.setattr(chortlechat, "get_instruct_model", lambda: fake_model)
+    monkeypatch.setattr(cosmos, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(cosmos, "get_instruct_model", lambda: fake_model)
 
-    response = chortlechat.ask_chortlechat("What is Veggie?", chortlechat.AskPersona.BASELINE, humor=50)
+    response = cosmos.ask_cosmos("What is Veggie?", cosmos.AskPersona.BASELINE, humor=50)
 
     assert len(fake_store.add_texts_calls) == 1
     call = fake_store.add_texts_calls[0]
@@ -476,10 +476,10 @@ def test_ask_persists_a_grounded_exchange_to_zilliz_as_conversation_turn(monkeyp
 def test_ask_does_not_persist_a_fallback_turn(monkeypatch):
     fake_store = _FakeVectorStore([])
     fake_model = _FakeInstructModel(STUBBED_ANSWER)
-    monkeypatch.setattr(chortlechat, "get_vector_store", lambda: fake_store)
-    monkeypatch.setattr(chortlechat, "get_instruct_model", lambda: fake_model)
+    monkeypatch.setattr(cosmos, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(cosmos, "get_instruct_model", lambda: fake_model)
 
-    chortlechat.ask_chortlechat("anything", chortlechat.AskPersona.BASELINE, humor=50)
+    cosmos.ask_cosmos("anything", cosmos.AskPersona.BASELINE, humor=50)
 
     assert fake_store.add_texts_calls == []
 
@@ -492,10 +492,10 @@ def test_ask_survives_a_zilliz_write_failure_during_persistence(monkeypatch, fak
         raise RuntimeError("Zilliz is unreachable")
 
     fake_store.add_texts = _raise
-    monkeypatch.setattr(chortlechat, "get_vector_store", lambda: fake_store)
-    monkeypatch.setattr(chortlechat, "get_instruct_model", lambda: fake_model)
+    monkeypatch.setattr(cosmos, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(cosmos, "get_instruct_model", lambda: fake_model)
 
-    response = chortlechat.ask_chortlechat("What is Veggie?", chortlechat.AskPersona.BASELINE, humor=50)
+    response = cosmos.ask_cosmos("What is Veggie?", cosmos.AskPersona.BASELINE, humor=50)
 
     # the /ask response is unaffected by the persistence failure — it's
     # logged and swallowed, not raised.
@@ -509,12 +509,12 @@ def test_ask_survives_a_zilliz_write_failure_during_persistence(monkeypatch, fak
 def test_ask_reports_history_source_none_on_a_fresh_first_question(monkeypatch, fake_hit):
     fake_store = _FakeVectorStore([fake_hit])
     fake_model = _FakeInstructModel(STUBBED_ANSWER)
-    monkeypatch.setattr(chortlechat, "get_vector_store", lambda: fake_store)
-    monkeypatch.setattr(chortlechat, "get_instruct_model", lambda: fake_model)
+    monkeypatch.setattr(cosmos, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(cosmos, "get_instruct_model", lambda: fake_model)
 
-    response = chortlechat.ask_chortlechat("What is Veggie?", chortlechat.AskPersona.BASELINE, humor=50)
+    response = cosmos.ask_cosmos("What is Veggie?", cosmos.AskPersona.BASELINE, humor=50)
 
-    assert response.history_source == chortlechat.HistorySource.NONE
+    assert response.history_source == cosmos.HistorySource.NONE
     # a fresh session has nothing recoverable — no history-recall round
     # trip should even be attempted.
     assert not any("conversation_turn" in call.get("expr", "") for call in fake_store.calls)
@@ -525,15 +525,15 @@ def test_ask_reports_history_source_session_memory_for_an_in_window_followup(
 ):
     fake_store = _FakeVectorStore([fake_hit])
     fake_model = _FakeInstructModel(STUBBED_ANSWER)
-    monkeypatch.setattr(chortlechat, "get_vector_store", lambda: fake_store)
-    monkeypatch.setattr(chortlechat, "get_instruct_model", lambda: fake_model)
+    monkeypatch.setattr(cosmos, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(cosmos, "get_instruct_model", lambda: fake_model)
 
-    first = chortlechat.ask_chortlechat("What is Veggie?", chortlechat.AskPersona.BASELINE, humor=50)
-    second = chortlechat.ask_chortlechat(
-        "What does it grow?", chortlechat.AskPersona.BASELINE, humor=50, session_id=first.session_id
+    first = cosmos.ask_cosmos("What is Veggie?", cosmos.AskPersona.BASELINE, humor=50)
+    second = cosmos.ask_cosmos(
+        "What does it grow?", cosmos.AskPersona.BASELINE, humor=50, session_id=first.session_id
     )
 
-    assert second.history_source == chortlechat.HistorySource.SESSION_MEMORY
+    assert second.history_source == cosmos.HistorySource.SESSION_MEMORY
 
 
 def test_ask_recovers_history_from_zilliz_when_the_session_window_is_empty(monkeypatch, fake_hit):
@@ -558,17 +558,17 @@ def test_ask_recovers_history_from_zilliz_when_the_session_window_is_empty(monke
     )
     fake_store = _FakeVectorStore([fake_hit], history_hits=[history_hit])
     fake_model = _FakeInstructModel(STUBBED_ANSWER)
-    monkeypatch.setattr(chortlechat, "get_vector_store", lambda: fake_store)
-    monkeypatch.setattr(chortlechat, "get_instruct_model", lambda: fake_model)
+    monkeypatch.setattr(cosmos, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(cosmos, "get_instruct_model", lambda: fake_model)
 
-    response = chortlechat.ask_chortlechat(
+    response = cosmos.ask_cosmos(
         "What does it grow?",
-        chortlechat.AskPersona.BASELINE,
+        cosmos.AskPersona.BASELINE,
         humor=50,
         session_id="resumed-session",
     )
 
-    assert response.history_source == chortlechat.HistorySource.HISTORY_RETRIEVAL
+    assert response.history_source == cosmos.HistorySource.HISTORY_RETRIEVAL
     prompt = fake_model.invoked_with[0]
     assert "Conversation so far" in prompt
     assert "What is Veggie?" in prompt
@@ -586,11 +586,11 @@ def test_ask_history_recall_is_scoped_to_the_caller_s_own_session_id_even_with_q
     """
     fake_store = _FakeVectorStore([fake_hit], history_hits=[])
     fake_model = _FakeInstructModel(STUBBED_ANSWER)
-    monkeypatch.setattr(chortlechat, "get_vector_store", lambda: fake_store)
-    monkeypatch.setattr(chortlechat, "get_instruct_model", lambda: fake_model)
+    monkeypatch.setattr(cosmos, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(cosmos, "get_instruct_model", lambda: fake_model)
 
     malicious_id = "abc' or doc_type == 'science_reference"
-    chortlechat.ask_chortlechat("anything", chortlechat.AskPersona.BASELINE, humor=50, session_id=malicious_id)
+    cosmos.ask_cosmos("anything", cosmos.AskPersona.BASELINE, humor=50, session_id=malicious_id)
 
     history_call = next(c for c in fake_store.calls if "conversation_turn" in c.get("expr", ""))
     assert "doc_id == 'abc\\' or doc_type == \\'science_reference'" in history_call["expr"]
@@ -602,8 +602,8 @@ def test_ask_history_recall_is_scoped_to_the_caller_s_own_session_id_even_with_q
 def test_conversation_history_endpoint_returns_the_live_session(monkeypatch, fake_hit):
     fake_store = _FakeVectorStore([fake_hit])
     fake_model = _FakeInstructModel(STUBBED_ANSWER)
-    monkeypatch.setattr(chortlechat, "get_vector_store", lambda: fake_store)
-    monkeypatch.setattr(chortlechat, "get_instruct_model", lambda: fake_model)
+    monkeypatch.setattr(cosmos, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(cosmos, "get_instruct_model", lambda: fake_model)
 
     ask_response = client.post("/ask", json={"question": "What is Veggie?"}).json()
 
@@ -678,16 +678,16 @@ def test_conversation_history_endpoint_requires_session_id():
 # tests can't silently drift from the actual preset content.
 
 CACHED_QUESTION = "What ocean heat conditions favor tropical cyclone intensification?"
-_CACHED_ENTRY = chortlechat._PRESET_CACHE[CACHED_QUESTION.strip().lower()]
+_CACHED_ENTRY = cosmos._PRESET_CACHE[CACHED_QUESTION.strip().lower()]
 
 
 def test_ask_serves_a_cached_baseline_answer_without_touching_retrieval(monkeypatch, fake_hit):
     fake_store = _FakeVectorStore([fake_hit])
     fake_model = _FakeInstructModel(STUBBED_ANSWER)
-    monkeypatch.setattr(chortlechat, "get_vector_store", lambda: fake_store)
-    monkeypatch.setattr(chortlechat, "get_instruct_model", lambda: fake_model)
+    monkeypatch.setattr(cosmos, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(cosmos, "get_instruct_model", lambda: fake_model)
 
-    response = chortlechat.ask_chortlechat(CACHED_QUESTION, chortlechat.AskPersona.BASELINE, humor=50)
+    response = cosmos.ask_cosmos(CACHED_QUESTION, cosmos.AskPersona.BASELINE, humor=50)
 
     assert response.grounded is True
     assert response.answer == _CACHED_ENTRY["baseline_answer"]
@@ -706,10 +706,10 @@ def test_ask_serves_a_cached_baseline_answer_without_touching_retrieval(monkeypa
 def test_ask_serves_a_cached_banter_answer_without_any_generation_call(monkeypatch, fake_hit):
     fake_store = _FakeVectorStore([fake_hit])
     fake_model = _FakeInstructModel(STUBBED_ANSWER)
-    monkeypatch.setattr(chortlechat, "get_vector_store", lambda: fake_store)
-    monkeypatch.setattr(chortlechat, "get_instruct_model", lambda: fake_model)
+    monkeypatch.setattr(cosmos, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(cosmos, "get_instruct_model", lambda: fake_model)
 
-    response = chortlechat.ask_chortlechat(CACHED_QUESTION, chortlechat.AskPersona.BANTER, humor=80)
+    response = cosmos.ask_cosmos(CACHED_QUESTION, cosmos.AskPersona.BANTER, humor=80)
 
     assert response.grounded is True
     assert response.answer == _CACHED_ENTRY["banter_answer"]
@@ -736,10 +736,10 @@ def test_ask_serves_a_cached_answer_even_when_the_vector_store_would_fail(monkey
             raise RuntimeError("vector store is unreachable")
 
     fake_model = _FakeInstructModel(STUBBED_ANSWER)
-    monkeypatch.setattr(chortlechat, "get_vector_store", lambda: _RejectingVectorStore())
-    monkeypatch.setattr(chortlechat, "get_instruct_model", lambda: fake_model)
+    monkeypatch.setattr(cosmos, "get_vector_store", lambda: _RejectingVectorStore())
+    monkeypatch.setattr(cosmos, "get_instruct_model", lambda: fake_model)
 
-    response = chortlechat.ask_chortlechat(CACHED_QUESTION, chortlechat.AskPersona.BASELINE, humor=50)
+    response = cosmos.ask_cosmos(CACHED_QUESTION, cosmos.AskPersona.BASELINE, humor=50)
 
     assert response.grounded is True
     assert response.answer == _CACHED_ENTRY["baseline_answer"]
@@ -759,18 +759,18 @@ def test_ask_serves_the_honest_fallback_for_a_cached_no_match_question(monkeypat
     """
     no_match_question = "a preset question the corpus does not actually answer"
     monkeypatch.setitem(
-        chortlechat._PRESET_CACHE, no_match_question, {"grounded": False, "use_cache": True}
+        cosmos._PRESET_CACHE, no_match_question, {"grounded": False, "use_cache": True}
     )
     fake_store = _FakeVectorStore([fake_hit])
     fake_model = _FakeInstructModel(STUBBED_ANSWER)
-    monkeypatch.setattr(chortlechat, "get_vector_store", lambda: fake_store)
-    monkeypatch.setattr(chortlechat, "get_instruct_model", lambda: fake_model)
+    monkeypatch.setattr(cosmos, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(cosmos, "get_instruct_model", lambda: fake_model)
 
-    baseline_response = chortlechat.ask_chortlechat(
-        no_match_question, chortlechat.AskPersona.BASELINE, humor=50
+    baseline_response = cosmos.ask_cosmos(
+        no_match_question, cosmos.AskPersona.BASELINE, humor=50
     )
-    banter_response = chortlechat.ask_chortlechat(
-        no_match_question, chortlechat.AskPersona.BANTER, humor=50
+    banter_response = cosmos.ask_cosmos(
+        no_match_question, cosmos.AskPersona.BANTER, humor=50
     )
 
     assert baseline_response.grounded is False

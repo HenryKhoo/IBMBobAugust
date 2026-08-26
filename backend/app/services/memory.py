@@ -1,8 +1,8 @@
 """Conversational memory for POST /ask — short-term (in-process) and long-term (Zilliz).
 
-ChortleChat's `/ask` endpoint is otherwise stateless — each call is graded
+C.O.S.M.O.S.'s `/ask` endpoint is otherwise stateless — each call is graded
 independently on its own retrieval and its own generation (see
-`app.services.chortlechat`). This module adds two layers on top so a natural
+`app.services.cosmos`). This module adds two layers on top so a natural
 follow-up ("what does it eat?" after "tell me about Snoopy the rat") can be
 answered without the caller re-stating the whole question:
 
@@ -27,13 +27,13 @@ answered without the caller re-stating the whole question:
   turn carries no source and nothing worth recalling later, so it's kept in
   the short-term window only.
 
-The grounding discipline in `app.services.chortlechat` is unchanged by either
+The grounding discipline in `app.services.cosmos` is unchanged by either
 layer: history only ever helps the model interpret what a follow-up
 question *means*. It never supplies a fact directly, and it never
 substitutes for retrieval — every generated answer is still produced
 strictly from whatever `science_reference` passage the *current* question
-retrieves. A wrong or stale memory can make ChortleChat answer the wrong
-question; it can never make ChortleChat state an ungrounded claim.
+retrieves. A wrong or stale memory can make C.O.S.M.O.S. answer the wrong
+question; it can never make C.O.S.M.O.S. state an ungrounded claim.
 
 Short-term storage is bounded two ways: `_MAX_TURNS` trims each session's
 own window, and `_MAX_SESSIONS` bounds memory growth by evicting the
@@ -192,7 +192,7 @@ def persist_grounded_exchange(
 ) -> None:
     """Write one grounded question/answer exchange into Zilliz as long-term history.
 
-    Only ever called for a grounded exchange (see `app.services.chortlechat`)
+    Only ever called for a grounded exchange (see `app.services.cosmos`)
     — a fallback "no grounded answer" turn has no source and nothing worth
     recalling later, so it's never persisted here, only kept in the
     short-term window.
@@ -235,7 +235,7 @@ def persist_grounded_exchange(
 def recall_relevant_history(store, session_id: str, question: str, *, k: int = _HISTORY_RECALL_K):
     """Search Zilliz for this session's own past exchanges most relevant to `question`.
 
-    Used by `app.services.chortlechat.ask_chortlechat` only when the in-process
+    Used by `app.services.cosmos.ask_cosmos` only when the in-process
     short-term window is empty for this `session_id` — i.e. session memory
     has nothing (an unrecognized id, an evicted session, or a fresh
     process after a restart), but grounded history for this same session

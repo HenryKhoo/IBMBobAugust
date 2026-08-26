@@ -1,9 +1,9 @@
-"""Grounded generation for POST /ask — ChortleChat's two-persona Q&A engine.
+"""Grounded generation for POST /ask — C.O.S.M.O.S.'s two-persona Q&A engine.
 
-ChortleChat answers real space-science questions, grounded in the ingested
+C.O.S.M.O.S. answers real space-science questions, grounded in the ingested
 NASA SMD Q&A corpus (`doc_type == 'science_reference'`; see
-`backend/scripts/fetch_chortlechat_corpus.py` and
-`backend/scripts/ingest_chortlechat_corpus.py` for how it gets into Zilliz).
+`backend/scripts/fetch_cosmos_corpus.py` and
+`backend/scripts/ingest_cosmos_corpus.py` for how it gets into Zilliz).
 Two voices are available — Baseline (direct, no commentary) and Banter (the
 same fact, delivered with personality) — but only one of them ever touches
 the actual claim: the grounded answer is generated exactly once, strictly
@@ -49,7 +49,7 @@ stages, tried in order:
    in context. This is the common case for an active conversation.
 2. Long-term history retrieval: only when that window is empty for this
    `session_id` (an unrecognized/evicted id, or a fresh process after a
-   restart) does ChortleChat fall back to searching Zilliz for this same
+   restart) does C.O.S.M.O.S. fall back to searching Zilliz for this same
    session's own grounded exchanges from earlier — see
    `app.services.memory.recall_relevant_history`.
 
@@ -203,7 +203,7 @@ def _history_block(turns: list[ConversationTurn]) -> str:
 
     Empty string — not e.g. "Conversation so far:\\n(none)" — when there's
     no history yet, so the first question in a session sees byte-for-byte
-    the same prompt ChortleChat always used before this feature existed. No
+    the same prompt C.O.S.M.O.S. always used before this feature existed. No
     regression for the common single-question case.
 
     This is included so the model can resolve a follow-up's pronouns and
@@ -346,7 +346,7 @@ def _preset_response(
     )
 
 
-def ask_chortlechat(
+def ask_cosmos(
     question: str,
     persona: AskPersona,
     humor: int,

@@ -1,4 +1,4 @@
-# API Contract — ChortleChat
+# API Contract — C.O.S.M.O.S. (Companion Operating System for Mission Orbit Support)
 
 Short-form endpoint reference for judges and contributors.
 
@@ -47,8 +47,8 @@ fail at the endpoint.
 
 Chunks, embeds with Granite, and upserts documents into Zilliz. Today the
 only accepted `type` is `science_reference` (the NASA SMD Q&A corpus
-ChortleChat is grounded in — see `backend/scripts/fetch_chortlechat_corpus.py`
-and `backend/scripts/ingest_chortlechat_corpus.py` for the dev-time path that
+C.O.S.M.O.S. is grounded in — see `backend/scripts/fetch_cosmos_corpus.py`
+and `backend/scripts/ingest_cosmos_corpus.py` for the dev-time path that
 already populates this).
 
 **Request**
@@ -72,7 +72,7 @@ already populates this).
 ### POST /query
 
 Retrieval only, no generation — a transparency tool alongside `/ask` for
-inspecting the actual source passages a question matches, not ChortleChat's
+inspecting the actual source passages a question matches, not C.O.S.M.O.S.'s
 main interface. Searches the full ingested corpus with no `doc_type`
 filter and returns the best-matching passages with source references. An
 empty `results` list is a valid response (nothing in the corpus matches),

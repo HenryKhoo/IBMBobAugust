@@ -1,26 +1,26 @@
-"""One-time reclassification: tag backend/data/chortlechat_corpus.json with `domain`.
+"""One-time reclassification: tag backend/data/cosmos_corpus.json with `domain`.
 
 Run once, from the repo root:
 
     python backend/scripts/tag_corpus_domains.py
 
 Every existing corpus document's text begins with a "Source: <topic>"
-line (see fetch_chortlechat_corpus.py's `_flatten`). This maps each of the
+line (see fetch_cosmos_corpus.py's `_flatten`). This maps each of the
 25 distinct topic strings actually present in the committed corpus to one
 of the five `Domain` values (mission-based domain selection), writes
 `domain` onto every document in place, and prints a per-domain count
 summary so the classification is reviewable at a glance rather than a
 silent, unverifiable transform.
 
-This only rewrites backend/data/chortlechat_corpus.json — it does not touch
-Zilliz. Re-run backend/scripts/ingest_chortlechat_corpus.py afterward (with
+This only rewrites backend/data/cosmos_corpus.json — it does not touch
+Zilliz. Re-run backend/scripts/ingest_cosmos_corpus.py afterward (with
 real WATSONX_*/ZILLIZ_* credentials configured) to actually get `domain`
 into the vector store's metadata; until that re-ingest happens, /ask and
 /query's domain filter has nothing tagged to match against and will fall
 back to an unscoped search for every domain (see
-app.services.chortlechat._retrieval_expr's fallback).
+app.services.cosmos._retrieval_expr's fallback).
 
-If a future corpus refresh (re-running fetch_chortlechat_corpus.py) ever
+If a future corpus refresh (re-running fetch_cosmos_corpus.py) ever
 introduces a `Source:` topic not listed in TOPIC_TO_DOMAIN below, this
 raises rather than silently defaulting it to "other" — a new topic should
 be a deliberate classification decision, not a side effect of forgetting
@@ -39,10 +39,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.schemas import Domain  # noqa: E402
 
-CORPUS_PATH = Path(__file__).resolve().parent.parent / "data" / "chortlechat_corpus.json"
+CORPUS_PATH = Path(__file__).resolve().parent.parent / "data" / "cosmos_corpus.json"
 
 # Every "Source: <topic>" string present in the corpus as fetched by
-# fetch_chortlechat_corpus.py, classified by hand against the five domains a
+# fetch_cosmos_corpus.py, classified by hand against the five domains a
 # user picks from before asking a question. Topics genuinely span more
 # than one theme (e.g. the two "Airborne Dust, Tropical Cyclone[s], ..."
 # topics) are placed by their primary subject — dust's effect on cyclones
@@ -104,7 +104,7 @@ def _topic_of(text: str) -> str:
 def main() -> None:
     if not CORPUS_PATH.exists():
         raise SystemExit(
-            f"{CORPUS_PATH} not found. Run backend/scripts/fetch_chortlechat_corpus.py first."
+            f"{CORPUS_PATH} not found. Run backend/scripts/fetch_cosmos_corpus.py first."
         )
 
     documents = json.loads(CORPUS_PATH.read_text())
@@ -132,7 +132,7 @@ def main() -> None:
     for domain in Domain:
         print(f"  {domain.value:<28} {counts.get(domain.value, 0)}")
     print(
-        f"\nWrote {CORPUS_PATH}. Re-run backend/scripts/ingest_chortlechat_corpus.py "
+        f"\nWrote {CORPUS_PATH}. Re-run backend/scripts/ingest_cosmos_corpus.py "
         "(with real credentials) to get these tags into Zilliz."
     )
 

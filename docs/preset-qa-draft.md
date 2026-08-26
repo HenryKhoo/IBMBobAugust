@@ -1,8 +1,8 @@
 # Preset Q&A — draft for review
 
-Grounded Baseline- and Banter-voice answers for the frontend's suggested "chip" questions, sourced strictly from `backend/data/chortlechat_corpus.json`.
+Grounded Baseline- and Banter-voice answers for the frontend's suggested "chip" questions, sourced strictly from `backend/data/cosmos_corpus.json`.
 
-**Status: wired, as a demo cache-first path, for both personas.** `app.services.chortlechat` loads `backend/data/preset_qa.json` into a cache keyed by exact question text and, on a hit, answers straight from `baseline_answer` or `banter_answer` — whichever the request's persona asked for — with no retrieval call, no confidence-threshold gate, and no generation call for either persona. All 15 questions are covered, including the one the corpus doesn't actually answer (see #3 below), so a demo run never depends on a live vector store or instruct model for any suggested chip. `confidence` stays `None` on every cache-hit response (same meaning it already carries for "nothing was retrieved," which is literally true here). See `backend/tests/test_chortlechat.py`'s "Preset chip-question cache" section for the covering tests.
+**Status: wired, as a demo cache-first path, for both personas.** `app.services.cosmos` loads `backend/data/preset_qa.json` into a cache keyed by exact question text and, on a hit, answers straight from `baseline_answer` or `banter_answer` — whichever the request's persona asked for — with no retrieval call, no confidence-threshold gate, and no generation call for either persona. All 15 questions are covered, including the one the corpus doesn't actually answer (see #3 below), so a demo run never depends on a live vector store or instruct model for any suggested chip. `confidence` stays `None` on every cache-hit response (same meaning it already carries for "nothing was retrieved," which is literally true here). See `backend/tests/test_cosmos.py`'s "Preset chip-question cache" section for the covering tests.
 
 **Count correction:** the frontend's `DOMAINS` array has **15 unique chip questions**, not 18 — "All" repeats 5 questions that also appear under their own domain, so there are only 15 distinct strings total. All 15 are covered below.
 
@@ -205,4 +205,4 @@ Source: `science_reference:nasa-smd-125#chunk0`
 - **1 with no usable source** (#3, TC formation conditions) — now cached to the honest fallback rather than left on live retrieval, so it never depends on a live vector store either.
 - **5 partial matches** (#2, #6, #9, #13, #15) where the drafted answer stays honest about what the source does and doesn't establish, rather than overclaiming to sound more complete. Every Banter restyle inherits the same honesty — it never adds a claim Baseline's version didn't already make.
 - **Every Banter answer now opens with an actual joke** (a one-liner or pun on the question's topic), not just a witty aside — see the intro note above.
-- Wired into `ask_chortlechat` for both personas (see Status note above) — this is no longer just content prep.
+- Wired into `ask_cosmos` for both personas (see Status note above) — this is no longer just content prep.

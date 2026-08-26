@@ -22,7 +22,7 @@ import uuid
 from pathlib import Path
 from tempfile import gettempdir
 
-_CACHE_DIR = Path(gettempdir()) / "chortlechat_speech_cache"
+_CACHE_DIR = Path(gettempdir()) / "cosmos_speech_cache"
 _CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 # One companion answer's clip is at most a few seconds of speech and is

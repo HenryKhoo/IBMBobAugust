@@ -125,15 +125,15 @@ def test_get_vector_store_uses_the_watsonx_collection_when_gemini_embeddings_are
     vector_store.get_vector_store.cache_clear()
     monkeypatch.setattr(vector_store.settings, "ZILLIZ_URI", "test-uri")
     monkeypatch.setattr(vector_store.settings, "ZILLIZ_TOKEN", "test-token")
-    monkeypatch.setattr(vector_store.settings, "ZILLIZ_COLLECTION_NAME", "chortlechat")
-    monkeypatch.setattr(vector_store.settings, "ZILLIZ_COLLECTION_NAME_GEMINI", "chortlechat_gemini")
+    monkeypatch.setattr(vector_store.settings, "ZILLIZ_COLLECTION_NAME", "cosmos")
+    monkeypatch.setattr(vector_store.settings, "ZILLIZ_COLLECTION_NAME_GEMINI", "cosmos_gemini")
     monkeypatch.setattr(vector_store, "using_gemini_embeddings", lambda: False)
     monkeypatch.setattr(vector_store, "get_embedding_model", lambda: "watsonx-embeddings")
     monkeypatch.setattr(vector_store, "Zilliz", _FakeZillizClass)
 
     store = vector_store.get_vector_store()
 
-    assert store.kwargs["collection_name"] == "chortlechat"
+    assert store.kwargs["collection_name"] == "cosmos"
     assert store.kwargs["embedding_function"] == "watsonx-embeddings"
     vector_store.get_vector_store.cache_clear()
 
@@ -142,15 +142,15 @@ def test_get_vector_store_uses_the_gemini_collection_when_gemini_embeddings_are_
     vector_store.get_vector_store.cache_clear()
     monkeypatch.setattr(vector_store.settings, "ZILLIZ_URI", "test-uri")
     monkeypatch.setattr(vector_store.settings, "ZILLIZ_TOKEN", "test-token")
-    monkeypatch.setattr(vector_store.settings, "ZILLIZ_COLLECTION_NAME", "chortlechat")
-    monkeypatch.setattr(vector_store.settings, "ZILLIZ_COLLECTION_NAME_GEMINI", "chortlechat_gemini")
+    monkeypatch.setattr(vector_store.settings, "ZILLIZ_COLLECTION_NAME", "cosmos")
+    monkeypatch.setattr(vector_store.settings, "ZILLIZ_COLLECTION_NAME_GEMINI", "cosmos_gemini")
     monkeypatch.setattr(vector_store, "using_gemini_embeddings", lambda: True)
     monkeypatch.setattr(vector_store, "get_embedding_model", lambda: "gemini-embeddings")
     monkeypatch.setattr(vector_store, "Zilliz", _FakeZillizClass)
 
     store = vector_store.get_vector_store()
 
-    assert store.kwargs["collection_name"] == "chortlechat_gemini"
+    assert store.kwargs["collection_name"] == "cosmos_gemini"
     assert store.kwargs["embedding_function"] == "gemini-embeddings"
     vector_store.get_vector_store.cache_clear()
 
@@ -176,7 +176,7 @@ class _FakeStoreQuotaRejection:
 def test_relevance_score_hits_or_empty_returns_empty_on_a_provider_failure():
     """A non-ValueError failure from the embedding/search call — a quota
     rejection, an outage, a network blip — degrades to no hits rather than
-    crashing the request, so `ask_chortlechat`'s existing honest
+    crashing the request, so `ask_cosmos`'s existing honest
     no-grounded-answer response handles it like any other unmatched
     question instead of a raw 500 reaching the console."""
     hits = vector_store.relevance_score_hits_or_empty(

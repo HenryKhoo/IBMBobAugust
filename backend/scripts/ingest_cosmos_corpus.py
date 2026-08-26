@@ -1,12 +1,12 @@
-"""Dev-time ingest: backend/data/chortlechat_corpus.json -> Zilliz.
+"""Dev-time ingest: backend/data/cosmos_corpus.json -> Zilliz.
 
 Run once, from the repo root, with the venv active and .env configured
 with real WATSONX_*/ZILLIZ_* (and, on the Gemini embedding path,
 GEMINI_API_KEY) credentials (this hits live services):
 
-    python backend/scripts/ingest_chortlechat_corpus.py
+    python backend/scripts/ingest_cosmos_corpus.py
 
-Reads the flattened corpus fetch_chortlechat_corpus.py produced, builds one
+Reads the flattened corpus fetch_cosmos_corpus.py produced, builds one
 MissionDocument (doc_type=science_reference) per entry, chunks it exactly
 the way POST /ingest does (`app.services.ingestion.chunk_documents`), then
 upserts those chunks into Zilliz in paced batches — see `_DOC_BATCH_SIZE`
@@ -42,7 +42,7 @@ from app.services.ingestion import chunk_documents  # noqa: E402
 from app.services.vector_store import upsert_chunks  # noqa: E402
 from app.services.watsonx import using_gemini_embeddings  # noqa: E402
 
-CORPUS_PATH = Path(__file__).resolve().parent.parent / "data" / "chortlechat_corpus.json"
+CORPUS_PATH = Path(__file__).resolve().parent.parent / "data" / "cosmos_corpus.json"
 
 # Gemini's free tier caps embed_content at 100 requests/minute (see
 # .env.example's Gemini section) — sending the whole corpus's chunks in one
@@ -63,7 +63,7 @@ def main() -> None:
     if not CORPUS_PATH.exists():
         raise SystemExit(
             f"{CORPUS_PATH} not found. Run "
-            "backend/scripts/fetch_chortlechat_corpus.py first."
+            "backend/scripts/fetch_cosmos_corpus.py first."
         )
 
     raw_documents = json.loads(CORPUS_PATH.read_text())

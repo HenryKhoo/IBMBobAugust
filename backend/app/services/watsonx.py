@@ -13,11 +13,11 @@ Wraps the two model calls the rest of the backend needs:
   without ever raising an error. Switching providers therefore always means
   querying a different Zilliz collection too (`ZILLIZ_COLLECTION_NAME_GEMINI`,
   not `ZILLIZ_COLLECTION_NAME` — see `app.services.vector_store.get_vector_store`),
-  populated by re-running `backend/scripts/ingest_chortlechat_corpus.py`
+  populated by re-running `backend/scripts/ingest_cosmos_corpus.py`
   with `GEMINI_API_KEY` set. Added after watsonx's Granite embedding quota
   started rejecting every retrieval call outright (`token_quota_reached`).
 - an instruct/chat client, for grounded generation in `/ask` (and, before
-  the ChortleChat revamp, each habitat module's endpoint). `WATSONX_INSTRUCT_MODEL_ID`
+  the C.O.S.M.O.S. revamp, each habitat module's endpoint). `WATSONX_INSTRUCT_MODEL_ID`
   is primary; `WATSONX_INSTRUCT_MODEL_FALLBACK_ID`, if set, is a second
   watsonx tier via LangChain's `.with_fallbacks()`. A prior version of this
   module argued generation never actually failed in production, so a
@@ -164,7 +164,7 @@ def _gemini_chat() -> ChatGoogleGenerativeAI:
     answers truncated mid-sentence, and the returned message `.content`
     comes back as a list of content blocks (a `text` part plus an opaque
     `signature`-carrying thought part) rather than the plain string every
-    watsonx tier returns -- see `app.services.chortlechat._message_text`,
+    watsonx tier returns -- see `app.services.cosmos._message_text`,
     which every caller of `get_instruct_model().invoke(...)` must go
     through instead of `str(message.content)` for exactly this reason.
 

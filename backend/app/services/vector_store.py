@@ -11,7 +11,7 @@ from app.services.watsonx import get_embedding_model, using_gemini_embeddings
 logger = logging.getLogger(__name__)
 
 # Explicit so every process that builds a Zilliz client -- the FastAPI
-# server (query-side) and backend/scripts/ingest_chortlechat_corpus.py
+# server (query-side) and backend/scripts/ingest_cosmos_corpus.py
 # (write-side) alike -- agrees on the metric type without either one having
 # to guess. Without this, whichever process happens to *create* the
 # collection (first `add_texts()` call) silently defaults to L2, and every
@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 # existing index change metric type in place. If ZILLIZ_COLLECTION_NAME
 # already has data ingested under the old L2 default, drop it first with
 # backend/scripts/reset_zilliz_collection.py, then re-run
-# backend/scripts/ingest_chortlechat_corpus.py so it's recreated with this
+# backend/scripts/ingest_cosmos_corpus.py so it's recreated with this
 # metric type baked in.
 _INDEX_PARAMS = {"metric_type": "COSINE", "index_type": "AUTOINDEX", "params": {}}
 
@@ -140,7 +140,7 @@ def relevance_score_hits_or_empty(store, query: str, *, k: int, expr: str) -> li
       request had already gotten past `_require_credentials()`, so
       whatever went wrong happened mid-call, where the caller can't
       distinguish it from "the corpus genuinely has no match" without this
-      catch. Treating it as "no hits" lets `ask_chortlechat`'s existing
+      catch. Treating it as "no hits" lets `ask_cosmos`'s existing
       honest no-grounded-answer response handle it exactly like any other
       unmatched question, rather than surfacing a raw error. The real
       exception is still logged at `error` with a full traceback — this
