@@ -2118,6 +2118,19 @@
   // unavailable or its free tier is exhausted for the month.
   let companionUsingSpeechify = false;
   let companionSpeechMarks = [];
+  // Tracks the object URL currently assigned to companionAudio.src so it
+  // can be revoked before the next one replaces it -- otherwise each
+  // answer leaks a Blob for the life of the page.
+  let companionAudioObjectUrl = null;
+
+  // A `data:audio/...;base64,...` URL is blocked by this app's CSP
+  // (media-src doesn't list the data: scheme), so the base64 Speechify
+  // returns is decoded into a Blob and played via a blob: URL instead --
+  // blob: satisfies media-src 'self'.
+  function base64ToObjectUrl(base64, mimeType) {
+    const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+    return URL.createObjectURL(new Blob([bytes], { type: mimeType }));
+  }
 
   // Marks-driven lip sync: on every <audio> timeupdate, the mouth is open
   // exactly while currentTime falls inside some mark's [start_time,
@@ -2155,7 +2168,9 @@
   function playCompanionSpeechifyAudio(audioData, audioFormat, speechMarks) {
     companionUsingSpeechify = true;
     companionSpeechMarks = speechMarks || [];
-    companionAudio.src = `data:audio/${audioFormat || "mp3"};base64,${audioData}`;
+    if (companionAudioObjectUrl) URL.revokeObjectURL(companionAudioObjectUrl);
+    companionAudioObjectUrl = base64ToObjectUrl(audioData, `audio/${audioFormat || "mp3"}`);
+    companionAudio.src = companionAudioObjectUrl;
     companionCaption.textContent = "Speaking";
     companionPauseBtn.disabled = false;
     companionPauseBtn.textContent = "Pause";
