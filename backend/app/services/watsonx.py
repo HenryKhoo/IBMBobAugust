@@ -43,6 +43,7 @@ ids or auth.
 """
 
 import logging
+import re
 from functools import lru_cache
 
 from langchain_core.embeddings import Embeddings
@@ -123,6 +124,33 @@ def _gemini_embed() -> GoogleGenerativeAIEmbeddings:
     )
 
 
+_GEMINI_MODEL_VERSION_RE = re.compile(r"^gemini-(\d+)\.")
+
+
+def _require_gemini_3x_model(model_id: str) -> None:
+    """Raise loudly if `model_id` isn't a Gemini 3.x model.
+
+    `_gemini_chat()` hardcodes `thinking_config={"thinking_level":
+    "minimal"}`, which only Gemini 3.x accepts -- see that function's
+    docstring for the `thinking_budget` (2.5) vs `thinking_level` (3.x)
+    history. `GEMINI_INSTRUCT_MODEL_ID` is a plain env var an operator can
+    repoint at a 2.5-era model at any time; without this check, doing so
+    would silently reproduce the exact bare `400 INVALID_ARGUMENT` this
+    project already spent two rounds chasing down, and only surface at the
+    first live call instead of here, at client-construction time.
+    """
+    match = _GEMINI_MODEL_VERSION_RE.match(model_id)
+    if not match or int(match.group(1)) < 3:
+        raise RuntimeError(
+            f"GEMINI_INSTRUCT_MODEL_ID={model_id!r} is not a Gemini 3.x model, but "
+            "_gemini_chat() hardcodes thinking_config={'thinking_level': 'minimal'}, "
+            "which only Gemini 3.x accepts -- Gemini 2.5-era models reject it "
+            "with a bare 400 INVALID_ARGUMENT and need thinking_budget=0 instead. "
+            "Point GEMINI_INSTRUCT_MODEL_ID at a gemini-3.x model, or update "
+            "_gemini_chat() for the new model generation's thinking-control API."
+        )
+
+
 def _gemini_chat() -> ChatGoogleGenerativeAI:
     """Build the Gemini chat client used as get_instruct_model()'s last fallback tier.
 
@@ -159,8 +187,12 @@ def _gemini_chat() -> ChatGoogleGenerativeAI:
     outright" intent; there is no true zero/off level for this model
     generation. If Gemini ever adds one, or this project moves off
     gemini-3.6-flash to a 2.5-era model where `thinking_budget=0` is valid
-    again, this is the one place to change.
+    again, this is the one place to change -- and `_require_gemini_3x_model()`
+    below is what stops `GEMINI_INSTRUCT_MODEL_ID` drifting onto a 2.5-era
+    model without that change also happening: it fails loudly here, at
+    client-construction time, instead of at the first live call.
     """
+    _require_gemini_3x_model(settings.GEMINI_INSTRUCT_MODEL_ID)
     return ChatGoogleGenerativeAI(
         model=settings.GEMINI_INSTRUCT_MODEL_ID,
         google_api_key=settings.GEMINI_API_KEY,

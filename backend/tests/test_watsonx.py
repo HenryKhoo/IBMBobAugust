@@ -193,6 +193,35 @@ def test_gemini_chat_uses_thinking_level_not_the_deprecated_thinking_budget_kwar
     assert str(thinking_config.thinking_level) == "ThinkingLevel.MINIMAL"
 
 
+def test_gemini_chat_raises_if_model_id_is_not_gemini_3x(monkeypatch):
+    """See issue #3: GEMINI_INSTRUCT_MODEL_ID is a plain env var an operator
+    can repoint at a 2.5-era model at any time, which would silently
+    reproduce the exact 400 INVALID_ARGUMENT the previous test's docstring
+    describes -- but only once a live call actually reached Gemini.
+    _require_gemini_3x_model() must catch that at client-construction time
+    instead."""
+    monkeypatch.setattr(watsonx.settings, "GEMINI_API_KEY", "test-gemini-key")
+    monkeypatch.setattr(watsonx.settings, "GEMINI_INSTRUCT_MODEL_ID", "gemini-2.5-flash")
+
+    with pytest.raises(RuntimeError, match="not a Gemini 3.x model"):
+        watsonx._gemini_chat()
+
+
+def test_gemini_chat_raises_on_an_unversioned_or_unrecognized_model_id(monkeypatch):
+    monkeypatch.setattr(watsonx.settings, "GEMINI_API_KEY", "test-gemini-key")
+    monkeypatch.setattr(watsonx.settings, "GEMINI_INSTRUCT_MODEL_ID", "gemini-pro")
+
+    with pytest.raises(RuntimeError, match="not a Gemini 3.x model"):
+        watsonx._gemini_chat()
+
+
+def test_gemini_chat_accepts_other_gemini_3x_models_not_just_3_6(monkeypatch):
+    monkeypatch.setattr(watsonx.settings, "GEMINI_API_KEY", "test-gemini-key")
+    monkeypatch.setattr(watsonx.settings, "GEMINI_INSTRUCT_MODEL_ID", "gemini-3.0-pro")
+
+    watsonx._gemini_chat()  # must not raise
+
+
 def test_using_gemini_embeddings_tracks_the_gemini_api_key_setting(monkeypatch):
     monkeypatch.setattr(watsonx.settings, "GEMINI_API_KEY", "")
     assert watsonx.using_gemini_embeddings() is False
