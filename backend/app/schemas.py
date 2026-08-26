@@ -326,14 +326,17 @@ class SpeakRequest(BaseModel):
     """Request body for POST /speak.
 
     `gender` pairs with the frontend's existing `state.companionGender`
-    toggle (avatar + voice), unchanged in meaning. `persona` reuses
+    toggle (avatar + voice) — a misnomer now that "cat" is a third option
+    alongside male/female, kept as-is rather than renamed to avoid
+    rippling the field name through the frontend and `app.services.speechify`
+    for a cosmetic fix. `persona` reuses
     `AskPersona` rather than a separate vocabulary — it's the *second* axis
     voice selection is keyed on (see `app.services.speechify`), since
     Banter now gets its own voice, not just its own text.
     """
 
     text: str = Field(min_length=1, max_length=2000)
-    gender: Literal["male", "female"] = "female"
+    gender: Literal["male", "female", "cat"] = "female"
     persona: AskPersona = AskPersona.BASELINE
 
 

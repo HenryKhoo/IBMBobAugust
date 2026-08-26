@@ -66,10 +66,10 @@ class Settings:
     # 50,000 characters/month, no card required (speechify.ai/pricing).
     SPEECHIFY_API_KEY: str = os.getenv("SPEECHIFY_API_KEY", "")
     SPEECHIFY_MODEL: str = os.getenv("SPEECHIFY_MODEL", "simba-3.0")
-    # Four voice IDs, not two: persona (baseline/banter) AND gender
-    # (male/female) each get their own dimension, so Banter actually
-    # *sounds* different, not just reads different (jokier) text. Defaults
-    # here are empty placeholders on purpose — pick real values via
+    # Five voice IDs, not six: male/female get the persona (baseline/banter)
+    # AND companion treatment — their own voice pair each, so Banter
+    # actually *sounds* different, not just reads different (jokier) text.
+    # Defaults here are empty placeholders on purpose — pick real values via
     # `GET /v1/voices?type=shared&locale=en-US&model=simba-3.0` (real
     # values, e.g. jacob/evelyn/george/geffenv1, live in .env, not here) —
     # see speechify-voice-plan.md §5 for why the banter pair is a stock
@@ -77,10 +77,20 @@ class Settings:
     # (Speechify's licensed celebrity voices, e.g. Snoop Dogg, are a
     # consumer-app-only feature, absent from every tier of the developer
     # API's voice catalog).
+    #
+    # Cat gets ONE voice, not a baseline/banter pair: rather than sourcing
+    # and auditioning a second "playful" cat voice from the catalog (which
+    # would need the same by-ear pass as the pairs above, sight unseen),
+    # persona is instead expressed by dynamically pitch/rate-shifting this
+    # single voice via SSML for Banter only — see
+    # `app.services.speechify._cat_banter_input`. Baseline cat gets this
+    # voice completely unmodified (plain text input, Speechify's own
+    # medium/medium prosody defaults).
     SPEECHIFY_VOICE_ID_BASELINE_MALE: str = os.getenv("SPEECHIFY_VOICE_ID_BASELINE_MALE", "")
     SPEECHIFY_VOICE_ID_BASELINE_FEMALE: str = os.getenv("SPEECHIFY_VOICE_ID_BASELINE_FEMALE", "")
     SPEECHIFY_VOICE_ID_BANTER_MALE: str = os.getenv("SPEECHIFY_VOICE_ID_BANTER_MALE", "")
     SPEECHIFY_VOICE_ID_BANTER_FEMALE: str = os.getenv("SPEECHIFY_VOICE_ID_BANTER_FEMALE", "")
+    SPEECHIFY_VOICE_ID_CAT: str = os.getenv("SPEECHIFY_VOICE_ID_CAT", "")
 
 
 settings = Settings()

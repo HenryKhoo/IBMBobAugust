@@ -192,7 +192,7 @@ server-side; the frontend never talks to Speechify directly.
 ```json
 {
   "text": "string",
-  "gender": "male | female",
+  "gender": "male | female | cat",
   "persona": "baseline | banter"
 }
 ```
@@ -301,16 +301,28 @@ error state — the companion should never go silent just because a
 month's free-tier character quota (50,000/month) is exhausted or the
 credential was never set up.
 
-Voice selection is keyed on **both** `gender` and `persona`, via four
-separate `SPEECHIFY_VOICE_ID_*` settings — Banter gets its own voice pair,
-distinct from Baseline's, so the two personas actually sound different and
-not just read different (jokier) text. The Banter voice is chosen to be a
-stock catalog voice with a laid-back, energetic delivery, not a licensed
-celebrity voice: Speechify's celebrity voices (e.g. its Snoop Dogg voice)
-are a feature of its consumer reading app only, absent from every tier of
-the developer API this backend calls, and cloning a real person's voice
-without consent is a rights problem independent of which product does the
-cloning.
+Voice selection is keyed on **both** `gender` (male/female/cat) and
+`persona`, via five separate `SPEECHIFY_VOICE_ID_*` settings. For male and
+female, Banter gets its own voice, distinct from Baseline's, so the two
+personas actually sound different and not just read different (jokier)
+text. That Banter voice is chosen to be a stock catalog voice with a
+laid-back, energetic delivery, not a licensed celebrity voice: Speechify's
+celebrity voices (e.g. its Snoop Dogg voice) are a feature of its consumer
+reading app only, absent from every tier of the developer API this backend
+calls, and cloning a real person's voice without consent is a rights
+problem independent of which product does the cloning.
+
+Cat is the exception: one voice (`SPEECHIFY_VOICE_ID_CAT`), not a pair.
+Persona is instead expressed by dynamically pitch/rate-shifting that same
+voice at call time via SSML — Banter gets `<prosody pitch="+10%"
+rate="+12%">` wrapped around the answer text for a bright, quick "humour
+voice"; Baseline gets the same voice with plain, unwrapped text (Speechify's
+own default medium/medium prosody) for a flat, deadpan delivery. This
+avoids sourcing and auditioning a second "playful" cat voice from the
+catalog sight unseen — see `app.services.speechify._cat_banter_input`.
+Speechify's `<prosody>` tag only accepts keyword (`x-slow`..`x-fast`) or
+percentage values, not the multiplier/semitone syntax some other TTS APIs
+use.
 
 ## Conventions
 

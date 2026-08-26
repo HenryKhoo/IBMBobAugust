@@ -388,7 +388,7 @@
     font-size: var(--text-xs);
     color: var(--ink-faint);
   }
-  /* Male/female companion toggle — swaps both the Web Speech API voice
+  /* Male/female/cat companion toggle — swaps both the Web Speech API voice
      (see GENDER_VOICE_NAME) and the lip-sync avatar frames (see
      COMPANION_FRAMES) together, so the voice and the face on screen always
      agree. Deliberately its own class rather than reusing .persona-toggle:
@@ -912,6 +912,7 @@
         <div class="companion-gender-toggle" role="group" aria-label="Choose the companion's voice and avatar">
           <button type="button" data-gender="male" aria-pressed="true">Male</button>
           <button type="button" data-gender="female" aria-pressed="false">Female</button>
+          <button type="button" data-gender="cat" aria-pressed="false">Cat</button>
         </div>
       </div>
     </header>
@@ -1150,6 +1151,10 @@
     female: {
       open: "/public/female_astronaut_mouth_open.png",
       closed: "/public/female_astronaut.png",
+    },
+    cat: {
+      open: "/public/cat-char-mouth-open-2.png",
+      closed: "/public/cat-char-mouth-open-1.png",
     },
   };
   let isLoading = false;
@@ -1610,7 +1615,7 @@
       if (storedDomain !== null && DOMAINS.some((d) => d.id === storedDomain)) {
         state.domain = storedDomain;
       }
-      if (storedCompanionGender === "male" || storedCompanionGender === "female") {
+      if (storedCompanionGender === "male" || storedCompanionGender === "female" || storedCompanionGender === "cat") {
         state.companionGender = storedCompanionGender;
       }
     } catch (err) {
@@ -2009,6 +2014,17 @@
     return MALE_VOICE_HINTS.some((hint) => name.includes(hint));
   }
   function pickCompanionVoice() {
+    // "cat" has no Web-Speech-API voice of its own to key off (there's no
+    // gender-style signal to look for the way male/female have their name
+    // heuristics below) — it just skips straight to the generic
+    // any-decent-English-voice tail every branch already falls back to.
+    if (state.companionGender === "cat") {
+      return (
+        companionVoices.find((v) => v.lang === "en-US" && v.name.includes("Google")) ||
+        companionVoices.find((v) => v.lang === "en-US") ||
+        companionVoices[0]
+      );
+    }
     const preferredName = GENDER_VOICE_NAME[state.companionGender];
     const otherName =
       state.companionGender === "male" ? GENDER_VOICE_NAME.female : GENDER_VOICE_NAME.male;

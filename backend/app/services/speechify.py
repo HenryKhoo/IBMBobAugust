@@ -13,8 +13,9 @@ still a fully healthy Q&A service (see why `GET /health` does not fold
 this in, in `app.main.speak`'s docstring) — the frontend just falls back
 to the browser's own `SpeechSynthesis` API instead of a Speechify voice.
 
-Voice selection is keyed on BOTH persona and gender, not gender alone —
-see the four `SPEECHIFY_VOICE_ID_*` settings in `app.config`. Banter gets
+Voice selection is keyed on BOTH persona and companion ("gender": male,
+female, or cat), not the companion alone — see the five
+`SPEECHIFY_VOICE_ID_*` settings in `app.config`. Male/female Banter gets
 its own voice pair so the two personas actually sound different, not just
 read different (jokier) text — deliberately NOT a real celebrity voice:
 Speechify's licensed celebrity voices (e.g. Snoop Dogg) are a
@@ -22,11 +23,17 @@ consumer-app-only feature, absent from every tier of the developer API's
 voice catalog, and cloning a real, identifiable person's voice without
 their consent is a right-of-publicity problem regardless of which product
 does the cloning. See speechify-voice-plan.md §5.
+
+Cat is the exception to the voice-pair pattern: one voice
+(`SPEECHIFY_VOICE_ID_CAT`), persona-shifted at call time via SSML instead
+of a second sourced voice — see `_cat_banter_input` and
+`_CAT_BANTER_PROSODY` below.
 """
 
 import logging
 from dataclasses import dataclass, field
 from typing import Literal
+from xml.sax.saxutils import escape
 
 import httpx
 
@@ -68,7 +75,33 @@ _VOICE_ID_SETTINGS = {
     ("baseline", "female"): "SPEECHIFY_VOICE_ID_BASELINE_FEMALE",
     ("banter", "male"): "SPEECHIFY_VOICE_ID_BANTER_MALE",
     ("banter", "female"): "SPEECHIFY_VOICE_ID_BANTER_FEMALE",
+    # Deliberately the SAME setting for both personas — cat has one voice,
+    # not a pair; Banter's distinctness comes from _cat_banter_input's SSML
+    # prosody shift below, applied at call time, not from a second voice_id.
+    ("baseline", "cat"): "SPEECHIFY_VOICE_ID_CAT",
+    ("banter", "cat"): "SPEECHIFY_VOICE_ID_CAT",
 }
+
+# Percentages only -- confirmed against docs.speechify.ai while building
+# this: Speechify's <prosody> SSML tag takes keywords (x-slow..x-fast) or
+# percentage values, NOT the multiplier (1.12x) or semitone (+2st) syntax
+# other TTS APIs use. +10%/+12% is deliberately modest -- enough to read as
+# a bright, quick "humour voice" without tipping into a chipmunk effect or
+# hurting intelligibility. There is no equivalent lever for Baseline: it
+# gets this same cat voice with plain-text input, i.e. Speechify's own
+# medium/medium prosody defaults -- a deadpan contrast against Banter's
+# lift, not a second modifier to tune.
+_CAT_BANTER_PROSODY = '<speak><prosody pitch="+10%" rate="+12%">{text}</prosody></speak>'
+
+
+def _cat_banter_input(text: str) -> str:
+    """Wrap `text` in SSML so the cat's one voice gets a pitch/rate lift for
+    Banter, instead of needing a second, separately-sourced "playful" voice
+    ID. `text` is XML-escaped first since it's LLM-generated prose that may
+    contain `&`, `<`, or `>` -- those would otherwise be parsed as SSML
+    markup instead of spoken literally.
+    """
+    return _CAT_BANTER_PROSODY.format(text=escape(text))
 
 
 class SpeechifySynthesisError(RuntimeError):
@@ -90,7 +123,7 @@ def _voice_id(persona: str, gender: str) -> str:
     return getattr(settings, _voice_setting_name(persona, gender))
 
 
-def missing_credentials(persona: Literal["baseline", "banter"], gender: Literal["male", "female"]) -> list[str]:
+def missing_credentials(persona: Literal["baseline", "banter"], gender: Literal["male", "female", "cat"]) -> list[str]:
     """Return the names of settings required to voice this persona/gender combo.
 
     Checked per-combo, not for all four voice IDs at once: an operator may
@@ -155,7 +188,7 @@ def _parse_speech_marks(body: dict) -> list[SpeechMarkChunk]:
 
 def synthesize_speech(
     text: str,
-    gender: Literal["male", "female"],
+    gender: Literal["male", "female", "cat"],
     persona: Literal["baseline", "banter"],
 ) -> SynthesizedSpeech:
     """Call Speechify's /v1/audio/speech and return audio + word-level marks.
@@ -174,11 +207,16 @@ def synthesize_speech(
         )
         text = text[:_MAX_INPUT_CHARS]
 
+    # Truncate the plain text above, THEN wrap in SSML -- _MAX_INPUT_CHARS
+    # backstops Speechify's answer-length cap, not the cat's markup
+    # overhead, so the wrapper tags must never count against it.
+    input_text = _cat_banter_input(text) if (gender, persona) == ("cat", "banter") else text
+
     try:
         response = httpx.post(
             _SPEECH_ENDPOINT,
             json={
-                "input": text,
+                "input": input_text,
                 "voice_id": _voice_id(persona, gender),
                 "model": settings.SPEECHIFY_MODEL,
                 "audio_format": "mp3",
