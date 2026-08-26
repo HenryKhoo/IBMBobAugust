@@ -247,6 +247,37 @@ def _retrieval_strength(relevance_score: float) -> float:
     return round(max(0.0, min(1.0, relevance_score)), 2)
 
 
+def _message_text(message) -> str:
+    """Extract plain answer text from a chat model's response message.
+
+    `message.content` is a plain `str` for every watsonx tier this project
+    uses, but not every provider guarantees that -- Gemini's fallback tier
+    (`get_instruct_model`'s third tier, added 2026-08-26) can return a
+    `list` of content blocks instead: a `text` part plus, when its
+    extended-thinking mode is on, a `thought`-carrying part with an opaque
+    `signature` blob for cross-turn continuity. Naively `str()`-ing that
+    list dumps the whole structure -- signature included -- straight into
+    the user-facing answer, which is exactly what happened live before this
+    existed (see `app.services.watsonx._gemini_chat`'s docstring, which
+    also disables thinking outright so this case should be rare going
+    forward). This concatenates only genuine `text` parts, in order,
+    regardless of which shape the active provider/tier returned, so a
+    future provider swap or an un-set `thinking_budget` degrades to
+    garbled-but-present text instead of a wall of base64.
+    """
+    content = message.content
+    if isinstance(content, str):
+        return content.strip()
+    if isinstance(content, list):
+        parts = [
+            block.get("text", "")
+            for block in content
+            if isinstance(block, dict) and block.get("type") == "text"
+        ]
+        return "".join(parts).strip()
+    return str(content).strip()
+
+
 def _fallback_response(
     persona: AskPersona,
     confidence: float | None,
@@ -407,7 +438,7 @@ def ask_chortlechat(
         history=history, passage=chunk.page_content, question=question
     )
     baseline_message = get_instruct_model().invoke(baseline_prompt)
-    baseline_answer = str(baseline_message.content).strip()
+    baseline_answer = _message_text(baseline_message)
 
     if persona == AskPersona.BASELINE:
         final_answer = baseline_answer
@@ -416,7 +447,7 @@ def ask_chortlechat(
             humor=humor, humor_label=_humor_label(humor), baseline_answer=baseline_answer
         )
         banter_message = get_instruct_model().invoke(banter_prompt)
-        final_answer = str(banter_message.content).strip()
+        final_answer = _message_text(banter_message)
 
     source = _source_line(chunk.metadata)
     session.add_turn(ConversationRole.ASSISTANT, final_answer, persona=persona, source=source)

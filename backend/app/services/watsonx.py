@@ -126,12 +126,27 @@ def _gemini_chat() -> ChatGoogleGenerativeAI:
     Same temperature/max-output-length intent as `_INSTRUCT_PARAMS` (used
     for the watsonx tiers), expressed in langchain-google-genai's own kwarg
     names rather than watsonx's `params` dict shape.
+
+    `thinking_budget=0` disables gemini-3.6-flash's extended-thinking mode
+    outright -- confirmed live on 2026-08-26: with thinking on, hidden
+    reasoning tokens ate into `max_output_tokens` before the visible answer
+    got any, producing answers truncated mid-sentence, and the returned
+    message `.content` came back as a list of content blocks (a `text`
+    part plus an opaque `signature`-carrying thought part) rather than the
+    plain string every watsonx tier returns -- see
+    `app.services.chortlechat._message_text`, which every caller of
+    `get_instruct_model().invoke(...)` must go through instead of
+    `str(message.content)` for exactly this reason. Flash-tier Gemini
+    models support fully disabling thinking this way (Pro-tier models do
+    not); a short "restate this one already-retrieved passage" task has no
+    need for multi-step reasoning regardless.
     """
     return ChatGoogleGenerativeAI(
         model=settings.GEMINI_INSTRUCT_MODEL_ID,
         google_api_key=settings.GEMINI_API_KEY,
         temperature=_INSTRUCT_PARAMS["temperature"],
         max_output_tokens=_INSTRUCT_PARAMS["max_tokens"],
+        thinking_budget=0,
     )
 
 
