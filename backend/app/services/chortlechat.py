@@ -33,10 +33,12 @@ generation time — it's just not generated live for these questions. Every
 cached `banter_answer` opens with an actual short joke on the question's
 topic (style inspired by the Kaggle "Short Jokes" dataset; see
 `backend/data/preset_qa.json`'s `_readme`) — jokes are commentary, not a
-claim, so they don't touch the "no new fact" rule either way. The one
-genuinely unanswerable chip question is cached too, routed straight to the
-same honest fallback every other unanswerable question gets — see
-`_PRESET_CACHE` and `_preset_response`.
+claim, so they don't touch the "no new fact" rule either way. All 15 chip
+questions currently have a genuine grounded answer (see
+`preset_qa.json`'s `summary` block: `no_match: 0`), but a cache entry can
+still carry `grounded: false` if a future chip question doesn't clear the
+bar — it would route straight to the same honest fallback every other
+unanswerable question gets — see `_PRESET_CACHE` and `_preset_response`.
 
 Conversational memory (`app.services.memory`) sits on top of this in two
 stages, tried in order:
