@@ -57,5 +57,29 @@ class Settings:
 
     PORT: int = int(os.getenv("PORT", "8000"))
 
+    # Speechify TTS for the companion's spoken answers — additive and
+    # degrade-safe, not a required credential like watsonx/Zilliz above:
+    # leaving SPEECHIFY_API_KEY blank keeps the companion on the frontend's
+    # existing Web Speech API path (see app/services/speechify.py and
+    # speechify-voice-plan.md). api.speechify.ai is a separate developer-API
+    # product from the consumer speechify.com reading app — free tier is
+    # 50,000 characters/month, no card required (speechify.ai/pricing).
+    SPEECHIFY_API_KEY: str = os.getenv("SPEECHIFY_API_KEY", "")
+    SPEECHIFY_MODEL: str = os.getenv("SPEECHIFY_MODEL", "simba-english")
+    # Four voice IDs, not two: persona (baseline/banter) AND gender
+    # (male/female) each get their own dimension, so Banter actually
+    # *sounds* different, not just reads different (jokier) text. All four
+    # are empty placeholders until picked by ear via
+    # `GET /v1/voices?type=shared&locale=en-US&model=simba-english` — see
+    # speechify-voice-plan.md §5 for why the banter pair is a stock
+    # laid-back/hype-vibe voice rather than an actual celebrity voice
+    # (Speechify's licensed celebrity voices, e.g. Snoop Dogg, are a
+    # consumer-app-only feature, absent from every tier of the developer
+    # API's voice catalog).
+    SPEECHIFY_VOICE_ID_BASELINE_MALE: str = os.getenv("SPEECHIFY_VOICE_ID_BASELINE_MALE", "")
+    SPEECHIFY_VOICE_ID_BASELINE_FEMALE: str = os.getenv("SPEECHIFY_VOICE_ID_BASELINE_FEMALE", "")
+    SPEECHIFY_VOICE_ID_BANTER_MALE: str = os.getenv("SPEECHIFY_VOICE_ID_BANTER_MALE", "")
+    SPEECHIFY_VOICE_ID_BANTER_FEMALE: str = os.getenv("SPEECHIFY_VOICE_ID_BANTER_FEMALE", "")
+
 
 settings = Settings()

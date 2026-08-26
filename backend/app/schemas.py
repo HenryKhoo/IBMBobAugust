@@ -16,6 +16,7 @@ that decision.
 """
 
 from enum import Enum
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -319,3 +320,49 @@ class AskResponse(BaseModel):
     source: str | None = None
     session_id: str
     history_source: HistorySource = HistorySource.NONE
+
+
+class SpeakRequest(BaseModel):
+    """Request body for POST /speak.
+
+    `gender` pairs with the frontend's existing `state.companionGender`
+    toggle (avatar + voice), unchanged in meaning. `persona` reuses
+    `AskPersona` rather than a separate vocabulary — it's the *second* axis
+    voice selection is keyed on (see `app.services.speechify`), since
+    Banter now gets its own voice, not just its own text.
+    """
+
+    text: str = Field(min_length=1, max_length=2000)
+    gender: Literal["male", "female"] = "female"
+    persona: AskPersona = AskPersona.BASELINE
+
+
+class SpeechMarkChunk(BaseModel):
+    """One word-level timing entry from Speechify's speech marks.
+
+    Drives the companion's mouth puppet off real word boundaries
+    (`audio.currentTime` between `start_time`/`end_time`, in milliseconds)
+    instead of the blind 150ms flap timer used for the Web Speech
+    fallback — see `frontend/app.html`'s companion lip-sync section.
+    """
+
+    start_time: int
+    end_time: int
+    start: int
+    end: int
+    value: str
+
+
+class SpeakResponse(BaseModel):
+    """Response body for POST /speak.
+
+    `audio_data` is base64-encoded audio in `audio_format`, passed through
+    from Speechify as-is — the backend never decodes/re-encodes it, only
+    relays it. `speech_marks` is empty when Speechify's response didn't
+    include usable timing data; the frontend degrades to its flap-timer
+    lip sync in that case rather than failing to speak at all.
+    """
+
+    audio_data: str
+    audio_format: str
+    speech_marks: list[SpeechMarkChunk] = Field(default_factory=list)

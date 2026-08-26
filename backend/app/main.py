@@ -2,7 +2,7 @@
 
 import logging
 
-from fastapi import FastAPI, Response, status
+from fastapi import FastAPI, HTTPException, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -18,8 +18,10 @@ from app.schemas import (
     IngestResponse,
     QueryRequest,
     QueryResponse,
+    SpeakRequest,
+    SpeakResponse,
 )
-from app.services import memory
+from app.services import memory, speechify
 from app.services.ingestion import ingest_and_upsert
 from app.services.query import run_query
 from app.services.chortlechat import ask_chortlechat
@@ -170,3 +172,33 @@ def conversation_history(session_id: str) -> ConversationHistoryResponse:
     """
     turns, source = memory.get_conversation_history(get_vector_store, session_id)
     return ConversationHistoryResponse(session_id=session_id, turns=turns, source=source)
+
+
+@app.post("/speak", response_model=SpeakResponse)
+def speak(request: SpeakRequest) -> SpeakResponse:
+    """Voice a companion answer via Speechify, when configured.
+
+    Returns 503 (not 500) when `SPEECHIFY_API_KEY` or the requested
+    persona/gender's voice ID is unset, and 502 when Speechify itself
+    rejected or failed the request — two distinct causes the frontend can
+    tell apart, though it falls back to the browser's own `SpeechSynthesis`
+    API either way (see `frontend/app.html`'s `speakCompanionAnswer`). The
+    companion should never go silent just because Speechify is
+    unconfigured or its free tier is exhausted for the month.
+
+    Deliberately not folded into `GET /health`'s `missing_config`: voice is
+    a presentation enhancement layered on top of ChortleChat's actual
+    product (grounded answers) — an environment missing `SPEECHIFY_API_KEY`
+    is still a fully healthy Q&A service, just one voiced by the browser
+    instead of Speechify.
+    """
+    missing = speechify.missing_credentials(request.persona.value, request.gender)
+    if missing:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Speechify not configured: missing {', '.join(missing)}",
+        )
+    try:
+        return speechify.synthesize_speech(request.text, request.gender, request.persona.value)
+    except speechify.SpeechifySynthesisError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc

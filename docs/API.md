@@ -9,8 +9,8 @@ together whenever the contract changes.
 
 ## Endpoints
 
-Five endpoints: `GET /health`, `POST /ingest`, `POST /query`, `POST /ask`,
-and `GET /conversation/history`.
+Six endpoints: `GET /health`, `POST /ingest`, `POST /query`, `POST /ask`,
+`GET /conversation/history`, and `POST /speak`.
 
 ### GET /health
 
@@ -181,6 +181,56 @@ GET /conversation/history?session_id=string
 an `assistant` turn. See "Conversational memory" below for what `source`
 means and its limitations.
 
+### POST /speak
+
+Voices a companion answer via Speechify's TTS API, when configured — an
+additive, optional feature layered on top of the actual product, not a
+required credential like watsonx/Zilliz. Holds `SPEECHIFY_API_KEY`
+server-side; the frontend never talks to Speechify directly.
+
+**Request**
+```json
+{
+  "text": "string",
+  "gender": "male | female",
+  "persona": "baseline | banter"
+}
+```
+
+`gender` pairs with the companion's existing avatar/voice toggle.
+`persona` picks a *different voice*, not just different text — Banter has
+its own voice pair from Baseline's, so the two personas actually sound
+different (see "Companion voice" below).
+
+**Response — HTTP 200**
+```json
+{
+  "audio_data": "string",
+  "audio_format": "mp3",
+  "speech_marks": [
+    { "start_time": 0, "end_time": 200, "start": 0, "end": 4, "value": "string" }
+  ]
+}
+```
+
+`audio_data` is base64-encoded audio in `audio_format`, relayed from
+Speechify as-is. `speech_marks` is word-level timing (milliseconds) used
+to drive the companion's mouth puppet off real word boundaries instead of
+a fixed timer; it's an empty list when Speechify's response didn't include
+usable timing data.
+
+**Response — not configured (HTTP 503)** or **Speechify failed (HTTP 502)**
+```json
+{ "detail": "string" }
+```
+
+503 means `SPEECHIFY_API_KEY` or the requested persona/gender's voice ID
+is unset; 502 means the request reached Speechify and Speechify itself
+rejected or failed it (bad key, exhausted quota, etc). The frontend treats
+both the same way — fall back to the browser's own `SpeechSynthesis` API —
+but the distinction matters for diagnosing a deployment. Deliberately not
+folded into `GET /health`'s `missing_config`: see that section above.
+
 ## Conversational memory
 
 `/ask` is stateful across calls that share a `session_id`, in two layers:
@@ -234,6 +284,29 @@ answer" that would really just mean "nothing tagged for this domain." A
 domain search that does find something, even below the confidence
 threshold, is a real "no grounded answer in this domain" and is not
 retried.
+
+## Companion voice
+
+`POST /speak` voices a companion answer with Speechify when
+`SPEECHIFY_API_KEY` and the requested persona/gender's voice ID are
+configured; otherwise (including a `.env` that never sets
+`SPEECHIFY_API_KEY` at all) the frontend falls back to the browser's own
+`SpeechSynthesis` API, exactly how this companion behaved before Speechify
+integration existed. This is deliberate degrade-safe behavior, not an
+error state — the companion should never go silent just because a
+month's free-tier character quota (50,000/month) is exhausted or the
+credential was never set up.
+
+Voice selection is keyed on **both** `gender` and `persona`, via four
+separate `SPEECHIFY_VOICE_ID_*` settings — Banter gets its own voice pair,
+distinct from Baseline's, so the two personas actually sound different and
+not just read different (jokier) text. The Banter voice is chosen to be a
+stock catalog voice with a laid-back, energetic delivery, not a licensed
+celebrity voice: Speechify's celebrity voices (e.g. its Snoop Dogg voice)
+are a feature of its consumer reading app only, absent from every tier of
+the developer API this backend calls, and cloning a real person's voice
+without consent is a rights problem independent of which product does the
+cloning.
 
 ## Conventions
 

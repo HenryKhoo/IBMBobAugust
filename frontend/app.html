@@ -905,6 +905,10 @@
         >
           Pause
         </button>
+        <!-- Plays Speechify audio when POST /speak succeeds; hidden, driven
+             entirely by speakCompanionAnswer/companionPauseBtn — see the
+             companion lip-sync section further down. -->
+        <audio id="companionAudio" hidden></audio>
         <div class="companion-gender-toggle" role="group" aria-label="Choose the companion's voice and avatar">
           <button type="button" data-gender="male" aria-pressed="true">Male</button>
           <button type="button" data-gender="female" aria-pressed="false">Female</button>
@@ -1169,6 +1173,7 @@
   const companionAvatar = document.getElementById("companionAvatar");
   const companionCaption = document.getElementById("companionCaption");
   const companionPauseBtn = document.getElementById("companionPauseBtn");
+  const companionAudio = document.getElementById("companionAudio");
 
   const appLayout = document.getElementById("appLayout");
   const sidebarToggleBtn = document.getElementById("sidebarToggleBtn");
@@ -2031,7 +2036,11 @@
   // outer scope (not inside speakCompanionAnswer) so the pause/resume
   // button below can stop and restart the same puppet without needing its
   // own copy of this state — pausing mid-answer doesn't end the utterance,
-  // it just needs the mouth to stop moving until resumed.
+  // it just needs the mouth to stop moving until resumed. This is the
+  // fallback flap timer: used whenever Web Speech is speaking (no marks
+  // exist there), and also if a Speechify response ever comes back with an
+  // empty speech_marks list, so the mouth still animates instead of
+  // freezing mid-answer.
   let companionLipSyncInterval = null;
   let companionMouthOpen = true;
   function startCompanionLipSync() {
@@ -2053,7 +2062,9 @@
   // how far it got via `onboundary` (which fires per word with a charIndex
   // into the text), then "resume" by speaking a fresh utterance built from
   // the remaining text. Same voice, just a new utterance object every time
-  // we stop and start.
+  // we stop and start. This whole scheme is Web-Speech-only — it's the
+  // fallback branch now that Speechify (below) is the primary path; the
+  // Speechify branch just uses <audio>'s real, working pause()/play().
   let companionSpeechText = "";
   let companionSpeechVoice = null;
   let companionBoundaryOffset = 0; // where the *current* utterance's text starts within companionSpeechText
@@ -2096,23 +2107,130 @@
     speechSynthesis.speak(utterance);
   }
 
-  function speakCompanionAnswer(text) {
-    if (!window.speechSynthesis || !text) return;
+  // --- Speechify (server-side TTS) branch ---------------------------------
+  //
+  // POST /speak holds SPEECHIFY_API_KEY server-side and returns base64
+  // audio + word-level speech_marks (see backend/app/services/speechify.py
+  // and speechify-voice-plan.md). speakCompanionAnswer below tries this
+  // first and falls back to the Web Speech path above on ANY failure —
+  // network error, 503 "not configured", 502 "Speechify itself failed" —
+  // so the companion never goes silent just because Speechify is
+  // unavailable or its free tier is exhausted for the month.
+  let companionUsingSpeechify = false;
+  let companionSpeechMarks = [];
 
-    companionSuppressEnd = false;
-    speechSynthesis.cancel();
+  // Marks-driven lip sync: on every <audio> timeupdate, the mouth is open
+  // exactly while currentTime falls inside some mark's [start_time,
+  // end_time) window (both in milliseconds) and closed otherwise — real
+  // word boundaries and gaps, not a blind timer. No-ops (leaves the flap
+  // timer running instead) when companionSpeechMarks is empty; see
+  // startCompanionLipSync's comment above.
+  function updateCompanionLipSyncFromMarks() {
+    if (!companionUsingSpeechify || !companionSpeechMarks.length) return;
+    const ms = companionAudio.currentTime * 1000;
+    const frames = COMPANION_FRAMES[state.companionGender];
+    const speaking = companionSpeechMarks.some((mark) => ms >= mark.start_time && ms < mark.end_time);
+    companionAvatar.src = speaking ? frames.open : frames.closed;
+  }
+  companionAudio.addEventListener("timeupdate", updateCompanionLipSyncFromMarks);
+
+  function restCompanionAudio() {
     clearInterval(companionLipSyncInterval);
+    syncCompanionAvatarFrame();
+    companionCaption.textContent = "Standing by";
+    companionPauseBtn.disabled = true;
     companionPauseBtn.textContent = "Pause";
+  }
+  companionAudio.addEventListener("ended", restCompanionAudio);
+  // Distinct from "ended": this is Speechify's *audio itself* failing to
+  // decode/play after a successful /speak call (a bad audio_format, a
+  // corrupt response, ...) — falls back to Web Speech the same as a failed
+  // /speak call itself, rather than just going quiet. See
+  // fallBackToWebSpeech below.
+  companionAudio.addEventListener("error", () => {
+    clearInterval(companionLipSyncInterval);
+    fallBackToWebSpeech();
+  });
 
-    companionSpeechText = text;
+  function playCompanionSpeechifyAudio(audioData, audioFormat, speechMarks) {
+    companionUsingSpeechify = true;
+    companionSpeechMarks = speechMarks || [];
+    companionAudio.src = `data:audio/${audioFormat || "mp3"};base64,${audioData}`;
+    companionCaption.textContent = "Speaking";
+    companionPauseBtn.disabled = false;
+    companionPauseBtn.textContent = "Pause";
+    // No marks came back (e.g. Speechify's response omitted them) — flap on
+    // the fixed timer instead of leaving the mouth frozen for the whole
+    // answer; updateCompanionLipSyncFromMarks no-ops in this case.
+    if (!companionSpeechMarks.length) startCompanionLipSync();
+    // play() returns a Promise that rejects on a bad/unsupported source or
+    // a blocked autoplay -- the <audio> element's own "error" listener
+    // above already handles falling back to Web Speech for the failure
+    // case, so this just needs to not leave the rejection unhandled.
+    companionAudio.play().catch(() => {});
+  }
+
+  // Falls back to the browser's own voice exactly as this companion worked
+  // before Speechify existed — used both when POST /speak itself fails
+  // (not configured, quota exhausted, network error) and when Speechify's
+  // audio comes back but then fails to decode/play (the <audio> "error"
+  // listener above). The companion should never go silent for either
+  // reason.
+  function fallBackToWebSpeech() {
+    if (!window.speechSynthesis) return;
+    companionUsingSpeechify = false;
     companionSpeechVoice = pickCompanionVoice();
     speakCompanionFrom(0);
   }
 
-  // Pause/resume the companion's speech. See the note above speakCompanionFrom
-  // for why this cancels and re-speaks from a remembered word boundary
-  // instead of calling the native speechSynthesis.pause()/resume().
+  function speakCompanionAnswer(text) {
+    if (!text) return;
+
+    companionSuppressEnd = false;
+    if (window.speechSynthesis) speechSynthesis.cancel();
+    companionAudio.pause();
+    clearInterval(companionLipSyncInterval);
+    companionUsingSpeechify = false;
+    companionSpeechMarks = [];
+    companionPauseBtn.textContent = "Pause";
+    companionSpeechText = text;
+
+    fetch(`${API_BASE_URL}/speak`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, gender: state.companionGender, persona: state.persona }),
+    })
+      .then((response) => {
+        if (!response.ok) throw new Error(`POST /speak failed: ${response.status}`);
+        return response.json();
+      })
+      .then(({ audio_data, audio_format, speech_marks }) => {
+        playCompanionSpeechifyAudio(audio_data, audio_format, speech_marks);
+      })
+      .catch(() => {
+        // Speechify not configured, its free tier exhausted, or a network
+        // error reaching our own backend.
+        fallBackToWebSpeech();
+      });
+  }
+
+  // Pause/resume the companion's speech. The Speechify branch just uses
+  // <audio>'s real pause()/play() — no remembered offset needed. The Web
+  // Speech branch still cancels and re-speaks from a remembered word
+  // boundary; see the note above speakCompanionFrom for why.
   companionPauseBtn.addEventListener("click", () => {
+    if (companionUsingSpeechify) {
+      if (companionPauseBtn.textContent === "Resume") {
+        companionAudio.play().catch(() => {});
+        companionCaption.textContent = "Speaking";
+        companionPauseBtn.textContent = "Pause";
+      } else {
+        companionAudio.pause();
+        companionCaption.textContent = "Paused";
+        companionPauseBtn.textContent = "Resume";
+      }
+      return;
+    }
     if (!window.speechSynthesis) return;
     if (companionPauseBtn.textContent === "Resume") {
       clearInterval(companionLipSyncInterval);

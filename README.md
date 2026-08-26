@@ -15,7 +15,7 @@ The North Star is the landing page for **ChortleChat**, a grounded NASA Earth-sc
 3. Pick a domain to explore — Tropical Cyclone Dynamics, Saharan Dust, Climate Reconstruction, Environmental Hazards, or Other — or leave it on **All**. This scopes the suggested chips (and, server-side, retrieval itself) to that slice of the corpus.
 4. Pick a persona — Baseline or Banter. Banter unlocks a humor slider; Baseline ignores it.
 5. Ask a question, or pick one of the suggested chips.
-6. Read the answer: a grounded response carries a confidence score and a source citation back to the passage it came from; an unmatched question gets an honest "no grounded answer" instead of a fabricated one.
+6. Read the answer: a grounded response carries a confidence score and a source citation back to the passage it came from; an unmatched question gets an honest "no grounded answer" instead of a fabricated one. The companion voices it too — with a distinct Speechify voice per persona when `SPEECHIFY_API_KEY` is configured, or the browser's own voice otherwise.
 7. Open **Past conversations** to browse and resume earlier conversations from this device, or **Conversation history** for the current one.
 
 ## Demo
@@ -40,7 +40,7 @@ NASA SMD Q&A benchmark passages are chunked and embedded — with IBM's Granite 
 
 ### API surface
 
-`GET /health` — reports whether the required watsonx/Zilliz credentials are actually configured, not just that the process is running. `POST /ingest` — chunk, embed, and upsert documents into Zilliz. `POST /query` — retrieval only, for inspecting the actual source passages a question matches. `POST /ask` — the main Q&A endpoint described above. `GET /conversation/history` — the transcript for one conversation, for the console's Conversation History panel.
+`GET /health` — reports whether the required watsonx/Zilliz credentials are actually configured, not just that the process is running. `POST /ingest` — chunk, embed, and upsert documents into Zilliz. `POST /query` — retrieval only, for inspecting the actual source passages a question matches. `POST /ask` — the main Q&A endpoint described above. `GET /conversation/history` — the transcript for one conversation, for the console's Conversation History panel. `POST /speak` — voices a companion answer via Speechify (a distinct voice per persona, held server-side so the API key never reaches the frontend), falling back silently to the browser's own voice when unconfigured or unavailable — an additive feature, not a required credential.
 
 ### Mission-based domains
 
@@ -57,7 +57,7 @@ git clone https://github.com/HenryKhoo/IBMBobAugust.git
 cd IBMBobAugust/backend
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cp ../.env.example .env   # fill in WATSONX_* and ZILLIZ_* credentials
+cp ../.env.example .env   # fill in WATSONX_* and ZILLIZ_* credentials (SPEECHIFY_* is optional)
 uvicorn app.main:app --reload --port 8000
 ```
 
