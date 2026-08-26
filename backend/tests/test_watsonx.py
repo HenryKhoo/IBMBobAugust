@@ -61,6 +61,7 @@ def test_instruct_model_is_the_bare_primary_when_no_fallback_id_is_set(monkeypat
     _stub_chat_watsonx(monkeypatch)
     monkeypatch.setattr(watsonx.settings, "WATSONX_INSTRUCT_MODEL_ID", "granite-primary")
     monkeypatch.setattr(watsonx.settings, "WATSONX_INSTRUCT_MODEL_FALLBACK_ID", "")
+    monkeypatch.setattr(watsonx.settings, "GEMINI_API_KEY", "")
 
     model = watsonx.get_instruct_model()
 
@@ -72,6 +73,7 @@ def test_instruct_model_falls_back_to_the_second_watsonx_model_when_configured(m
     _stub_chat_watsonx(monkeypatch)
     monkeypatch.setattr(watsonx.settings, "WATSONX_INSTRUCT_MODEL_ID", "granite-primary")
     monkeypatch.setattr(watsonx.settings, "WATSONX_INSTRUCT_MODEL_FALLBACK_ID", "llama-fallback")
+    monkeypatch.setattr(watsonx.settings, "GEMINI_API_KEY", "")
 
     model = watsonx.get_instruct_model()
 

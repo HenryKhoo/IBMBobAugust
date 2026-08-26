@@ -249,12 +249,14 @@ def test_ask_falls_back_to_the_whole_corpus_when_a_domain_has_nothing_indexed(mo
     assert "domain ==" not in fake_store.calls[1]["expr"]
 
 
-def test_ask_does_not_fall_back_when_a_domain_search_finds_only_a_weak_match(monkeypatch):
-    # A domain-scoped search that finds *something*, just below the
-    # confidence threshold, must be treated as a real "no grounded answer
-    # in this domain" — not retried against the whole corpus, even though a
-    # stronger match exists elsewhere. The empty-domain fallback exists for
-    # "nothing indexed here at all," not for "weak match in this domain."
+def test_ask_falls_back_to_the_whole_corpus_when_a_domain_search_finds_only_a_weak_match(
+    monkeypatch,
+):
+    # A domain-scoped search that finds *something*, but only below the
+    # confidence threshold — e.g. a stale domain filter pointing retrieval
+    # at the wrong slice of the corpus — must retry against the whole
+    # corpus, exactly like the empty-hits case, so the stronger match
+    # elsewhere isn't hidden behind a false "no grounded answer here".
     weak_hit = (_FakeDocument(REFERENCE_TEXT, dict(REFERENCE_METADATA)), 0.1)
     strong_hit_elsewhere = (_FakeDocument(REFERENCE_TEXT, dict(REFERENCE_METADATA)), 0.95)
     fake_store = _DomainAwareFakeVectorStore(hits=[strong_hit_elsewhere], domain_hits=[weak_hit])
@@ -269,9 +271,36 @@ def test_ask_does_not_fall_back_when_a_domain_search_finds_only_a_weak_match(mon
         domain=Domain.CLIMATE_RECONSTRUCTION,
     )
 
+    assert response.grounded is True
+    assert response.answer == STUBBED_ANSWER
+    # two retrieval calls: the domain-scoped one that came back weak, then
+    # the domain-less retry that found the real match.
+    assert len(fake_store.calls) == 2
+    assert "domain ==" in fake_store.calls[0]["expr"]
+    assert "domain ==" not in fake_store.calls[1]["expr"]
+
+
+def test_ask_falls_back_honestly_when_the_whole_corpus_retry_is_also_weak(monkeypatch):
+    # The domain-scoped hit is weak, and the domain-less retry doesn't do
+    # any better — this must still land on the honest "no grounded answer"
+    # fallback rather than answering off a match everyone agrees is weak.
+    weak_hit = (_FakeDocument(REFERENCE_TEXT, dict(REFERENCE_METADATA)), 0.1)
+    also_weak_hit = (_FakeDocument(REFERENCE_TEXT, dict(REFERENCE_METADATA)), 0.2)
+    fake_store = _DomainAwareFakeVectorStore(hits=[also_weak_hit], domain_hits=[weak_hit])
+    fake_model = _FakeInstructModel(STUBBED_ANSWER)
+    monkeypatch.setattr(chortlechat, "get_vector_store", lambda: fake_store)
+    monkeypatch.setattr(chortlechat, "get_instruct_model", lambda: fake_model)
+
+    response = chortlechat.ask_chortlechat(
+        "anything",
+        chortlechat.AskPersona.BASELINE,
+        humor=50,
+        domain=Domain.CLIMATE_RECONSTRUCTION,
+    )
+
     assert response.grounded is False
-    assert response.confidence == 0.1
-    assert len(fake_store.calls) == 1
+    assert response.confidence == 0.2
+    assert len(fake_store.calls) == 2
     assert fake_model.invoked_with == []
 
 
@@ -649,7 +678,6 @@ def test_conversation_history_endpoint_requires_session_id():
 # tests can't silently drift from the actual preset content.
 
 CACHED_QUESTION = "What ocean heat conditions favor tropical cyclone intensification?"
-NO_MATCH_CACHED_QUESTION = "What atmospheric conditions influence tropical cyclone formation?"
 _CACHED_ENTRY = chortlechat._PRESET_CACHE[CACHED_QUESTION.strip().lower()]
 
 
@@ -717,22 +745,32 @@ def test_ask_serves_a_cached_answer_even_when_the_vector_store_would_fail(monkey
     assert response.answer == _CACHED_ENTRY["baseline_answer"]
 
 
-def test_ask_serves_the_honest_fallback_for_the_cached_no_match_question(monkeypatch, fake_hit):
-    """tc-formation-conditions is cached too, but with grounded: false — a
-    hit routes straight to the same honest fallback any other unanswerable
-    question gets, still without touching retrieval or the model, for
-    either persona.
+def test_ask_serves_the_honest_fallback_for_a_cached_no_match_question(monkeypatch, fake_hit):
+    """A preset entry can be cached with grounded: false (no passage in the
+    corpus actually answers it) — a hit routes straight to the same honest
+    fallback any other unanswerable question gets, still without touching
+    retrieval or the model, for either persona.
+
+    Injects a synthetic `grounded: false` entry into `_PRESET_CACHE`
+    rather than relying on one existing in `preset_qa.json` — every real
+    entry has since been given a genuine grounded answer (see
+    `docs/preset-qa-draft.md`), and this behavior needs coverage
+    regardless of what the current curated data happens to contain.
     """
+    no_match_question = "a preset question the corpus does not actually answer"
+    monkeypatch.setitem(
+        chortlechat._PRESET_CACHE, no_match_question, {"grounded": False, "use_cache": True}
+    )
     fake_store = _FakeVectorStore([fake_hit])
     fake_model = _FakeInstructModel(STUBBED_ANSWER)
     monkeypatch.setattr(chortlechat, "get_vector_store", lambda: fake_store)
     monkeypatch.setattr(chortlechat, "get_instruct_model", lambda: fake_model)
 
     baseline_response = chortlechat.ask_chortlechat(
-        NO_MATCH_CACHED_QUESTION, chortlechat.AskPersona.BASELINE, humor=50
+        no_match_question, chortlechat.AskPersona.BASELINE, humor=50
     )
     banter_response = chortlechat.ask_chortlechat(
-        NO_MATCH_CACHED_QUESTION, chortlechat.AskPersona.BANTER, humor=50
+        no_match_question, chortlechat.AskPersona.BANTER, humor=50
     )
 
     assert baseline_response.grounded is False

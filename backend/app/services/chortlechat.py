@@ -141,8 +141,8 @@ _FALLBACK_BANTER = (
 # entirely — for *both* personas — so all 15 known chip questions always
 # answer instantly and consistently in a live demo, with zero dependency on
 # a live vector store or instruct model. Baseline and Banter each read
-# their own pre-drafted field (`baseline_answer` / `banter_answer`); the
-# one entry with `grounded: false` (no passage in the corpus actually
+# their own pre-drafted field (`baseline_answer` / `banter_answer`); any
+# entry with `grounded: false` (no passage in the corpus actually
 # answers it) is cached too, and routes to the exact same honest fallback
 # `_fallback_response` gives any other unanswerable question — see
 # `_preset_response`. `confidence` is always `None` on a cache hit — same
@@ -307,7 +307,7 @@ def _preset_response(
 
     No retrieval, no confidence gate, no generation call — for either
     persona — see `_PRESET_CACHE` for why. `preset["grounded"]` is `False`
-    for the one chip question the corpus genuinely doesn't answer; that
+    for a chip question the corpus genuinely doesn't answer; that
     case is routed to the same honest, hardcoded fallback text
     `_fallback_response` gives any other unanswerable question, still
     without touching retrieval. Otherwise, Baseline and Banter each read
@@ -379,12 +379,14 @@ def ask_chortlechat(
     `domain` restricts the main-answer retrieval to that `Domain` tag —
     conversational-history recall (above) is unaffected, since it's scoped
     by `session_id`, not subject matter. If the domain-scoped search comes
-    back with literally nothing (an empty or misconfigured domain, not
-    just a weak match), retrieval retries once against the whole corpus
-    rather than surfacing a false "no grounded answer" that would really
-    just mean "nothing tagged for this domain" — see `_retrieval_expr`.
-    `None` searches the whole corpus directly, exactly as this function
-    behaved before `domain` existed.
+    back with literally nothing, or with a hit below
+    `_CONFIDENCE_THRESHOLD` (an empty/misconfigured domain, or a stale
+    domain filter pointing retrieval at the wrong slice of the corpus),
+    retrieval retries once against the whole corpus rather than surfacing
+    a false "no grounded answer" that would really just mean "nothing
+    good tagged for this domain" — see `_retrieval_expr`. `None` searches
+    the whole corpus directly, exactly as this function behaved before
+    `domain` existed.
     """
     store = get_vector_store()
     session = get_or_create_session(session_id)
@@ -416,8 +418,11 @@ def ask_chortlechat(
         return _preset_response(store, preset, persona, session, question, history_source)
 
     hits = relevance_score_hits_or_empty(store, question, k=1, expr=_retrieval_expr(domain))
-    if not hits and domain is not None:
-        hits = relevance_score_hits_or_empty(store, question, k=1, expr=_retrieval_expr(None))
+    if domain is not None:
+        if not hits:
+            hits = relevance_score_hits_or_empty(store, question, k=1, expr=_retrieval_expr(None))
+        elif _retrieval_strength(hits[0][1]) < _CONFIDENCE_THRESHOLD:
+            hits = relevance_score_hits_or_empty(store, question, k=1, expr=_retrieval_expr(None))
     if not hits:
         response = _fallback_response(
             persona, confidence=None, session_id=session.session_id, history_source=history_source
