@@ -123,8 +123,9 @@
     font-weight: 600;
     cursor: pointer;
   }
-  .sidebar-toggle-btn:hover { color: var(--ink); border-color: var(--ink-dim); }
+  .sidebar-toggle-btn:hover:not(:disabled) { color: var(--ink); border-color: var(--ink-dim); }
   .sidebar-toggle-btn:focus-visible { outline: 2px solid var(--accent-baseline-text); outline-offset: 2px; }
+  .sidebar-toggle-btn:disabled { opacity: 0.35; cursor: default; }
 
   /* Hidden on wide screens (overlay is a narrow-viewport-only concept) —
      see the max-width: 768px block below where it's switched on. */
@@ -696,49 +697,6 @@
     overflow-y: auto;
     padding-right: var(--space-1);
   }
-  /* Past-conversations list — each row is a real <button> (not a div with a
-     click handler) so the whole row is keyboard-focusable and reachable
-     without extra tabindex plumbing. The per-row delete control is a nested
-     button; its click handler stops propagation so deleting never also
-     opens the row it just removed. */
-  .past-conv-entry {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-3);
-    width: 100%;
-    background: var(--panel-2);
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    padding: var(--space-3);
-    text-align: left;
-    cursor: pointer;
-    font: inherit;
-    color: inherit;
-  }
-  .past-conv-entry:hover { border-color: var(--ink-dim); }
-  .past-conv-entry:focus-visible { outline: 2px solid var(--accent-baseline-text); outline-offset: 1px; }
-  .past-conv-entry-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-  .past-conv-entry-title {
-    font-weight: 600;
-    font-size: var(--text-sm);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .past-conv-entry-meta { font-size: var(--text-xs); color: var(--ink-faint); display: flex; gap: var(--space-2); }
-  .past-conv-delete-btn {
-    flex-shrink: 0;
-    background: transparent;
-    border: 1px solid var(--line);
-    color: var(--ink-faint);
-    border-radius: 999px;
-    width: 24px;
-    height: 24px;
-    line-height: 1;
-    cursor: pointer;
-  }
-  .past-conv-delete-btn:hover { color: var(--ink); border-color: var(--ink-dim); }
   .recalled-tag {
     display: inline-block;
     padding: 1px var(--space-2);
@@ -862,17 +820,26 @@
          block) — clicking it closes the overlay sidebar. -->
     <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
 
-    <!-- Persistent sidebar — session switcher for the device-local
-         conversation index already maintained below (STORAGE_KEY_CONVERSATIONS).
-         Built alongside #pastConvPanel rather than replacing it (see
-         docs/chat-session-sidebar-plan.md); both read/write the same storage
-         key and are kept in sync. -->
+    <!-- Persistent sidebar — the one session switcher for the device-local
+         conversation index (STORAGE_KEY_CONVERSATIONS). This used to be
+         duplicated by a second "Past conversations" panel reading/writing
+         the same storage key with a different (and incomplete) set of
+         actions — see docs/chat-session-sidebar-plan.md — which left users
+         guessing which of two lists had the feature they wanted (e.g.
+         rename only existed here). That panel has been folded into this
+         sidebar; "Clear all" below is the one part of it that had no
+         sidebar equivalent. -->
     <aside class="sidebar" id="sidebar" aria-label="Chat sessions">
       <div class="sidebar-header">
         <h2>Sessions</h2>
+        <button type="button" class="sidebar-toggle-btn" id="sidebarClearAllBtn">Clear all</button>
       </div>
       <button type="button" class="sidebar-new-btn" id="sidebarNewBtn">+ New conversation</button>
-      <div class="sidebar-list" id="sidebarList" aria-live="polite"></div>
+      <!-- Not aria-live: renderSidebarList() rebuilds every row from scratch
+           on each new message, so a live region here would re-announce the
+           entire past-conversation list to screen reader users after every
+           single answer. -->
+      <div class="sidebar-list" id="sidebarList"></div>
     </aside>
 
     <div class="shell">
@@ -944,7 +911,6 @@
           <output id="humorVal">50</output>
         </div>
         <button type="button" class="clear-btn" id="historyBtn" disabled aria-expanded="false">Conversation history</button>
-        <button type="button" class="clear-btn" id="pastConvBtn" aria-expanded="false">Past conversations</button>
         <button type="button" class="clear-btn" id="clearBtn" disabled>Clear conversation</button>
       </div>
 
@@ -960,36 +926,6 @@
           <button type="button" class="history-close-btn" id="closeHistoryBtn">Close</button>
         </div>
         <div class="history-log" id="historyLog" aria-live="polite"></div>
-      </div>
-
-      <!-- Personal conversation list — a device-local index of past sessions
-           (see STORAGE_KEY_CONVERSATIONS below), not a server-side feature:
-           there's no auth here, so a global "all sessions" list would leak
-           across visitors. This only ever lists session ids this browser
-           itself received from a prior /ask response. Two sub-views inside
-           one panel: a list, and a read-only transcript for whichever entry
-           was opened (loaded via the same GET /conversation/history the
-           "Conversation history" panel already uses). -->
-      <div class="history-panel" id="pastConvPanel" hidden>
-        <div class="history-panel-header">
-          <h2>Past conversations</h2>
-          <div class="history-panel-actions">
-            <button type="button" class="history-close-btn" id="clearAllConvBtn">Clear all</button>
-            <button type="button" class="history-close-btn" id="closePastConvBtn">Close</button>
-          </div>
-        </div>
-        <div id="pastConvListView">
-          <div class="history-log past-conv-list" id="pastConvList"></div>
-        </div>
-        <div id="pastConvDetailView" hidden>
-          <div class="history-panel-actions" style="margin-bottom: var(--space-3); flex-wrap: wrap;">
-            <button type="button" class="history-close-btn" id="backToConvListBtn">&larr; Back to list</button>
-            <button type="button" class="history-close-btn" id="resumeConvBtn">Resume this conversation</button>
-            <button type="button" class="history-close-btn" id="deleteConvBtn">Delete</button>
-          </div>
-          <span class="history-source-tag" id="pastConvSourceTag"></span>
-          <div class="history-log" id="pastConvDetailLog" aria-live="polite"></div>
-        </div>
       </div>
 
       <!-- aria-atomic="false" + aria-relevant="additions" makes explicit what
@@ -1186,19 +1122,7 @@
   const sidebarEl = document.getElementById("sidebar");
   const sidebarNewBtn = document.getElementById("sidebarNewBtn");
   const sidebarList = document.getElementById("sidebarList");
-
-  const pastConvBtn = document.getElementById("pastConvBtn");
-  const pastConvPanel = document.getElementById("pastConvPanel");
-  const pastConvListView = document.getElementById("pastConvListView");
-  const pastConvList = document.getElementById("pastConvList");
-  const pastConvDetailView = document.getElementById("pastConvDetailView");
-  const pastConvDetailLog = document.getElementById("pastConvDetailLog");
-  const pastConvSourceTag = document.getElementById("pastConvSourceTag");
-  const closePastConvBtn = document.getElementById("closePastConvBtn");
-  const clearAllConvBtn = document.getElementById("clearAllConvBtn");
-  const backToConvListBtn = document.getElementById("backToConvListBtn");
-  const resumeConvBtn = document.getElementById("resumeConvBtn");
-  const deleteConvBtn = document.getElementById("deleteConvBtn");
+  const sidebarClearAllBtn = document.getElementById("sidebarClearAllBtn");
 
   const HISTORY_SOURCE_LABELS = {
     session_memory: "Live session",
@@ -1218,12 +1142,6 @@
   // list forever.
   const STORAGE_KEY_CONVERSATIONS = "chortlechat:conversations";
   const MAX_STORED_CONVERSATIONS = 20;
-
-  // sessionId of whichever past conversation is currently open in the
-  // detail sub-view — null while the list view is showing. Used by
-  // "Resume" and "Delete" so they act on the entry actually on screen
-  // rather than needing it passed through every call.
-  let activePastConvId = null;
 
   function loadConversationIndex() {
     try {
@@ -1296,99 +1214,6 @@
     }
   }
 
-  function renderPastConvList() {
-    const entries = loadConversationIndex();
-    pastConvList.innerHTML = "";
-
-    if (entries.length === 0) {
-      clearAllConvBtn.disabled = true;
-      const empty = document.createElement("div");
-      empty.className = "empty-state";
-      const icon = document.createElement("span");
-      icon.className = "empty-state-icon";
-      icon.setAttribute("aria-hidden", "true");
-      icon.textContent = "∅";
-      const text = document.createElement("span");
-      text.className = "empty-state-text";
-      text.textContent = "No past conversations on this device yet.";
-      empty.append(icon, text);
-      pastConvList.appendChild(empty);
-      return;
-    }
-
-    clearAllConvBtn.disabled = false;
-    entries.forEach((entry) => {
-      const row = document.createElement("button");
-      row.type = "button";
-      row.className = "past-conv-entry";
-
-      const main = document.createElement("span");
-      main.className = "past-conv-entry-main";
-      const title = document.createElement("span");
-      title.className = "past-conv-entry-title";
-      title.textContent = entry.title || "Untitled conversation";
-      const meta = document.createElement("span");
-      meta.className = "past-conv-entry-meta";
-      const time = document.createElement("span");
-      time.textContent = formatConversationTimestamp(entry.startedAt);
-      const persona = document.createElement("span");
-      persona.textContent = entry.persona === "banter" ? "Banter" : "Baseline";
-      meta.append(time, persona);
-      main.append(title, meta);
-
-      const deleteBtn = document.createElement("button");
-      deleteBtn.type = "button";
-      deleteBtn.className = "past-conv-delete-btn";
-      deleteBtn.setAttribute("aria-label", `Delete conversation: ${entry.title || "Untitled conversation"}`);
-      deleteBtn.textContent = "×";
-      // Deleting is nested inside the row it deletes, so this has to stop
-      // the click from also bubbling up into the row's own "open" handler —
-      // otherwise removing an entry would immediately reopen the one that
-      // used to be underneath it at the same list position.
-      deleteBtn.addEventListener("click", (event) => {
-        event.stopPropagation();
-        removeStoredConversation(entry.sessionId);
-        renderPastConvList();
-      });
-
-      row.append(main, deleteBtn);
-      row.addEventListener("click", () => openPastConversation(entry));
-      pastConvList.appendChild(row);
-    });
-  }
-
-  function showPastConvListView() {
-    activePastConvId = null;
-    pastConvDetailView.hidden = true;
-    pastConvListView.hidden = false;
-    renderPastConvList();
-  }
-
-  async function openPastConversation(entry) {
-    activePastConvId = entry.sessionId;
-    pastConvListView.hidden = true;
-    pastConvDetailView.hidden = false;
-    pastConvSourceTag.textContent = "";
-    pastConvDetailLog.innerHTML = "";
-    const loading = document.createElement("p");
-    loading.className = "empty-state-text";
-    loading.textContent = "Loading…";
-    pastConvDetailLog.appendChild(loading);
-
-    try {
-      const data = await loadConversationHistory(entry.sessionId);
-      pastConvSourceTag.textContent = HISTORY_SOURCE_LABELS[data.source] || data.source;
-      renderHistoryTurns(data.turns, pastConvDetailLog);
-    } catch (err) {
-      pastConvDetailLog.innerHTML = "";
-      const errEl = document.createElement("p");
-      errEl.className = "empty-state-text";
-      errEl.textContent = "Couldn't load this conversation.";
-      pastConvDetailLog.appendChild(errEl);
-      console.error(err);
-    }
-  }
-
   // --- Sidebar: open/closed state -----------------------------------------
   // One boolean drives two different visual mechanics (see the CSS): a plain
   // collapse on wide screens, an off-canvas overlay on narrow ones. Persisted
@@ -1427,14 +1252,14 @@
   }
 
   // --- Sidebar: session list ------------------------------------------------
-  // sessionId of whichever sidebar row is currently mid-rename — mirrors
-  // activePastConvId's role for the old panel's detail view. Only one row
+  // sessionId of whichever sidebar row is currently mid-rename. Only one row
   // can be renaming at a time.
   let renamingSessionId = null;
 
   function renderSidebarList() {
     const entries = loadConversationIndex();
     sidebarList.innerHTML = "";
+    sidebarClearAllBtn.disabled = entries.length === 0;
 
     if (entries.length === 0) {
       const empty = document.createElement("div");
@@ -1545,8 +1370,9 @@
       deleteBtn.addEventListener("click", (event) => {
         event.stopPropagation();
         removeStoredConversation(entry.sessionId);
-        // Deleting the live conversation ends it client-side too — same
-        // reasoning as the old panel's deleteConvBtn handler.
+        // Deleting the live conversation ends it client-side too, so the
+        // log on screen never keeps showing a conversation that's just
+        // been removed from the index.
         if (state.sessionId === entry.sessionId) {
           state.sessionId = null;
           updateClearButtonState();
@@ -1671,8 +1497,23 @@
   // asked under that scope — the same reasoning that makes "Clear
   // conversation" the one deliberate way to end a conversation. Cheapest
   // safe behavior: changing domains starts fresh, exactly like Clear.
+  // A confirm() gate guards this: without it, clicking a domain pill mid-
+  // conversation wiped the visible log with no warning, which read as data
+  // loss even though the conversation is still recoverable from the
+  // sidebar. Bailing out on cancel leaves state.domain and the pill's
+  // aria-pressed untouched, since nothing has changed yet at that point.
   function selectDomain(domainId) {
     if (domainId === state.domain) return;
+    const hasActiveConversation = Boolean(state.sessionId) || logEl.children.length > 0;
+    if (
+      hasActiveConversation &&
+      !window.confirm(
+        "Switching domains starts a new conversation. The current one will be saved and can be reopened from the sidebar. Continue?"
+      )
+    ) {
+      return;
+    }
+
     state.domain = domainId;
     persistSettings();
     document.querySelectorAll("#domainPicker button").forEach((b) => {
@@ -1680,7 +1521,7 @@
     });
     renderChipsForCurrentDomain();
 
-    if (state.sessionId || logEl.children.length > 0) {
+    if (hasActiveConversation) {
       logEl.innerHTML = "";
       state.sessionId = null;
       updateClearButtonState();
@@ -1797,10 +1638,9 @@
   });
 
   // `target` defaults to the "Conversation history" panel's own log, but is
-  // passed explicitly by the past-conversations detail view (and by
-  // "Resume", which replays a past transcript into the live `#log`) so all
-  // three surfaces render a transcript identically instead of maintaining
-  // three copies of this markup.
+  // passed explicitly when the sidebar loads a transcript into the live
+  // `#log` (see selectSidebarConversation) so both surfaces render a
+  // transcript identically instead of maintaining two copies of this markup.
   function renderHistoryTurns(turns, target = historyLog) {
     target.innerHTML = "";
     if (turns.length === 0) {
@@ -1852,11 +1692,6 @@
       return;
     }
 
-    // Only one browse surface open at a time — closing this one's counterpart
-    // avoids two panels stacked in the same narrow column.
-    pastConvPanel.hidden = true;
-    pastConvBtn.setAttribute("aria-expanded", "false");
-
     historyPanel.hidden = false;
     historyBtn.setAttribute("aria-expanded", "true");
     historySourceTag.textContent = "";
@@ -1885,73 +1720,12 @@
     historyBtn.setAttribute("aria-expanded", "false");
   });
 
-  pastConvBtn.addEventListener("click", () => {
-    if (!pastConvPanel.hidden) {
-      pastConvPanel.hidden = true;
-      pastConvBtn.setAttribute("aria-expanded", "false");
-      return;
-    }
-
-    // Only one browse surface open at a time — see the matching close in
-    // the historyBtn handler above.
-    historyPanel.hidden = true;
-    historyBtn.setAttribute("aria-expanded", "false");
-
-    pastConvPanel.hidden = false;
-    pastConvBtn.setAttribute("aria-expanded", "true");
-    showPastConvListView();
-  });
-
-  closePastConvBtn.addEventListener("click", () => {
-    pastConvPanel.hidden = true;
-    pastConvBtn.setAttribute("aria-expanded", "false");
-  });
-
-  clearAllConvBtn.addEventListener("click", () => {
+  // Replaces the old "Past conversations" panel's own Clear-all button —
+  // wipes the index, then reuses startNewConversation's reset so the live
+  // log doesn't keep showing a transcript whose entry no longer exists.
+  sidebarClearAllBtn.addEventListener("click", () => {
     saveConversationIndex([]);
-    renderPastConvList();
-    renderSidebarList();
-  });
-
-  backToConvListBtn.addEventListener("click", showPastConvListView);
-
-  // Loads the selected past conversation's real transcript into the live
-  // `#log` (same rendering `renderHistoryTurns` already does for the
-  // read-only panels) before handing its session_id to `state.sessionId`,
-  // so the next question the user actually asks continues that
-  // conversation's server-side memory instead of quietly starting a new one
-  // under a stale-looking log. If the transcript fails to load, resuming
-  // still proceeds — the backend's own memory doesn't depend on what the
-  // browser could redisplay.
-  resumeConvBtn.addEventListener("click", async () => {
-    if (!activePastConvId) return;
-    try {
-      const data = await loadConversationHistory(activePastConvId);
-      renderHistoryTurns(data.turns, logEl);
-    } catch (err) {
-      console.error(err);
-    }
-    state.sessionId = activePastConvId;
-    updateClearButtonState();
-    updateHistoryButtonState();
-    pastConvPanel.hidden = true;
-    pastConvBtn.setAttribute("aria-expanded", "false");
-    renderSidebarList();
-    questionInput.focus();
-  });
-
-  deleteConvBtn.addEventListener("click", () => {
-    if (!activePastConvId) return;
-    removeStoredConversation(activePastConvId);
-    // Deleting the conversation that's also the live one ends it client-side
-    // too — matches "Clear conversation" — otherwise the next question would
-    // silently resurrect the same entry this delete just removed.
-    if (state.sessionId === activePastConvId) {
-      state.sessionId = null;
-      updateHistoryButtonState();
-    }
-    showPastConvListView();
-    renderSidebarList();
+    startNewConversation();
   });
 
   // Companion lip sync — a two-frame puppet ported from the companion-python
@@ -2087,6 +1861,22 @@
   let companionResumeIndex = 0; // where a future resume should start from
   let companionSuppressEnd = false; // true while we cancel() on purpose, so onend/onerror don't reset the UI
 
+  // Keeps the pause/resume button's visible label and accessible name in
+  // sync — they used to be set independently, which left the aria-label
+  // permanently reading "Pause the companion's voice" even once the button
+  // had flipped to "Resume", telling screen reader users the opposite of
+  // what the control would actually do. `dataset.paused` replaces the old
+  // `textContent === "Resume"` checks so pause-state logic doesn't depend
+  // on the display string either.
+  function setCompanionPauseState(paused) {
+    companionPauseBtn.textContent = paused ? "Resume" : "Pause";
+    companionPauseBtn.setAttribute(
+      "aria-label",
+      paused ? "Resume the companion's voice" : "Pause the companion's voice"
+    );
+    companionPauseBtn.dataset.paused = String(paused);
+  }
+
   function speakCompanionFrom(charIndex) {
     const utterance = new SpeechSynthesisUtterance(companionSpeechText.slice(charIndex));
     if (companionSpeechVoice) utterance.voice = companionSpeechVoice;
@@ -2101,7 +1891,7 @@
     utterance.onstart = () => {
       companionCaption.textContent = "Speaking";
       companionPauseBtn.disabled = false;
-      companionPauseBtn.textContent = "Pause";
+      setCompanionPauseState(false);
       startCompanionLipSync();
     };
     const restCompanion = () => {
@@ -2115,7 +1905,7 @@
       syncCompanionAvatarFrame();
       companionCaption.textContent = "Standing by";
       companionPauseBtn.disabled = true;
-      companionPauseBtn.textContent = "Pause";
+      setCompanionPauseState(false);
     };
     utterance.onend = restCompanion;
     utterance.onerror = restCompanion;
@@ -2159,7 +1949,7 @@
     syncCompanionAvatarFrame();
     companionCaption.textContent = "Standing by";
     companionPauseBtn.disabled = true;
-    companionPauseBtn.textContent = "Pause";
+    setCompanionPauseState(false);
   }
   companionAudio.addEventListener("ended", restCompanionAudio);
   // Distinct from "ended": this is Speechify's *audio itself* failing to
@@ -2178,7 +1968,7 @@
     companionAudio.src = audioUrl;
     companionCaption.textContent = "Speaking";
     companionPauseBtn.disabled = false;
-    companionPauseBtn.textContent = "Pause";
+    setCompanionPauseState(false);
     // No marks came back (e.g. Speechify's response omitted them) — flap on
     // the fixed timer instead of leaving the mouth frozen for the whole
     // answer; updateCompanionLipSyncFromMarks no-ops in this case.
@@ -2212,7 +2002,7 @@
     clearInterval(companionLipSyncInterval);
     companionUsingSpeechify = false;
     companionSpeechMarks = [];
-    companionPauseBtn.textContent = "Pause";
+    setCompanionPauseState(false);
     companionSpeechText = text;
 
     fetch(`${API_BASE_URL}/speak`, {
@@ -2242,19 +2032,19 @@
   // boundary; see the note above speakCompanionFrom for why.
   companionPauseBtn.addEventListener("click", () => {
     if (companionUsingSpeechify) {
-      if (companionPauseBtn.textContent === "Resume") {
+      if (companionPauseBtn.dataset.paused === "true") {
         companionAudio.play().catch(() => {});
         companionCaption.textContent = "Speaking";
-        companionPauseBtn.textContent = "Pause";
+        setCompanionPauseState(false);
       } else {
         companionAudio.pause();
         companionCaption.textContent = "Paused";
-        companionPauseBtn.textContent = "Resume";
+        setCompanionPauseState(true);
       }
       return;
     }
     if (!window.speechSynthesis) return;
-    if (companionPauseBtn.textContent === "Resume") {
+    if (companionPauseBtn.dataset.paused === "true") {
       clearInterval(companionLipSyncInterval);
       speakCompanionFrom(companionResumeIndex);
     } else {
@@ -2264,7 +2054,7 @@
       clearInterval(companionLipSyncInterval);
       syncCompanionAvatarFrame();
       companionCaption.textContent = "Paused";
-      companionPauseBtn.textContent = "Resume";
+      setCompanionPauseState(true);
     }
   });
 
