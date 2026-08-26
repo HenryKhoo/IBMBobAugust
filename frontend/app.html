@@ -2109,28 +2109,19 @@
 
   // --- Speechify (server-side TTS) branch ---------------------------------
   //
-  // POST /speak holds SPEECHIFY_API_KEY server-side and returns base64
-  // audio + word-level speech_marks (see backend/app/services/speechify.py
-  // and speechify-voice-plan.md). speakCompanionAnswer below tries this
-  // first and falls back to the Web Speech path above on ANY failure —
-  // network error, 503 "not configured", 502 "Speechify itself failed" —
-  // so the companion never goes silent just because Speechify is
-  // unavailable or its free tier is exhausted for the month.
+  // POST /speak holds SPEECHIFY_API_KEY server-side and returns a real
+  // audio URL (served by GET /speak/audio/{filename}, see
+  // backend/app/services/audio_cache.py) plus word-level speech_marks.
+  // It used to return embedded base64/blob audio, but this app's CSP
+  // (media-src 'self' https: *) rejects both data: and blob: schemes --
+  // only a genuine HTTP resource satisfies it, hence the dedicated
+  // endpoint. speakCompanionAnswer below tries this first and falls back
+  // to the Web Speech path above on ANY failure — network error, 503 "not
+  // configured", 502 "Speechify itself failed" — so the companion never
+  // goes silent just because Speechify is unavailable or its free tier is
+  // exhausted for the month.
   let companionUsingSpeechify = false;
   let companionSpeechMarks = [];
-  // Tracks the object URL currently assigned to companionAudio.src so it
-  // can be revoked before the next one replaces it -- otherwise each
-  // answer leaks a Blob for the life of the page.
-  let companionAudioObjectUrl = null;
-
-  // A `data:audio/...;base64,...` URL is blocked by this app's CSP
-  // (media-src doesn't list the data: scheme), so the base64 Speechify
-  // returns is decoded into a Blob and played via a blob: URL instead --
-  // blob: satisfies media-src 'self'.
-  function base64ToObjectUrl(base64, mimeType) {
-    const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
-    return URL.createObjectURL(new Blob([bytes], { type: mimeType }));
-  }
 
   // Marks-driven lip sync: on every <audio> timeupdate, the mouth is open
   // exactly while currentTime falls inside some mark's [start_time,
@@ -2165,12 +2156,10 @@
     fallBackToWebSpeech();
   });
 
-  function playCompanionSpeechifyAudio(audioData, audioFormat, speechMarks) {
+  function playCompanionSpeechifyAudio(audioUrl, speechMarks) {
     companionUsingSpeechify = true;
     companionSpeechMarks = speechMarks || [];
-    if (companionAudioObjectUrl) URL.revokeObjectURL(companionAudioObjectUrl);
-    companionAudioObjectUrl = base64ToObjectUrl(audioData, `audio/${audioFormat || "mp3"}`);
-    companionAudio.src = companionAudioObjectUrl;
+    companionAudio.src = audioUrl;
     companionCaption.textContent = "Speaking";
     companionPauseBtn.disabled = false;
     companionPauseBtn.textContent = "Pause";
@@ -2219,8 +2208,10 @@
         if (!response.ok) throw new Error(`POST /speak failed: ${response.status}`);
         return response.json();
       })
-      .then(({ audio_data, audio_format, speech_marks }) => {
-        playCompanionSpeechifyAudio(audio_data, audio_format, speech_marks);
+      .then(({ audio_url, speech_marks }) => {
+        // audio_url is relative to the backend's own origin, not the
+        // frontend's -- see SpeakResponse's docstring in backend/app/schemas.py.
+        playCompanionSpeechifyAudio(`${API_BASE_URL}${audio_url}`, speech_marks);
       })
       .catch(() => {
         // Speechify not configured, its free tier exhausted, or a network

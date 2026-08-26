@@ -4,7 +4,7 @@ import logging
 
 from fastapi import FastAPI, HTTPException, Response, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 
@@ -21,7 +21,7 @@ from app.schemas import (
     SpeakRequest,
     SpeakResponse,
 )
-from app.services import memory, speechify
+from app.services import audio_cache, memory, speechify
 from app.services.ingestion import ingest_and_upsert
 from app.services.query import run_query
 from app.services.chortlechat import ask_chortlechat
@@ -199,6 +199,25 @@ def speak(request: SpeakRequest) -> SpeakResponse:
             detail=f"Speechify not configured: missing {', '.join(missing)}",
         )
     try:
-        return speechify.synthesize_speech(request.text, request.gender, request.persona.value)
+        result = speechify.synthesize_speech(request.text, request.gender, request.persona.value)
     except speechify.SpeechifySynthesisError as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+    audio_url = audio_cache.store(result.audio_data, result.audio_format)
+    return SpeakResponse(audio_url=audio_url, audio_format=result.audio_format, speech_marks=result.speech_marks)
+
+
+@app.get("/speak/audio/{filename}")
+def speak_audio(filename: str) -> FileResponse:
+    """Serve a clip cached by a prior `POST /speak` call.
+
+    A real HTTP resource, not embedded base64/blob data -- see
+    `SpeakResponse.audio_url`'s docstring and `app.services.audio_cache`
+    for why. `FileResponse` (not a bare byte `Response`) so Range requests
+    work, which some browsers' media engines expect even without seeking.
+    """
+    try:
+        path = audio_cache.resolve(filename)
+    except (ValueError, FileNotFoundError):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Audio clip not found or expired")
+    return FileResponse(path, media_type=f"audio/{path.suffix.lstrip('.')}")

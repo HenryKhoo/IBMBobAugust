@@ -239,16 +239,22 @@ def test_speak_endpoint_happy_path(monkeypatch):
     monkeypatch.setattr(
         speechify.httpx,
         "post",
-        lambda *a, **k: _FakeResponse(200, {"audio_data": "abc", "audio_format": "mp3", "speech_marks": []}),
+        lambda *a, **k: _FakeResponse(200, {"audio_data": "YWJj", "audio_format": "mp3", "speech_marks": []}),
     )
 
     response = client.post("/speak", json={"text": "hello", "gender": "female", "persona": "banter"})
 
     assert response.status_code == 200
     body = response.json()
-    assert body["audio_data"] == "abc"
+    assert body["audio_url"].startswith("/speak/audio/")
+    assert body["audio_url"].endswith(".mp3")
     assert body["audio_format"] == "mp3"
     assert body["speech_marks"] == []
+
+    # The returned URL is a real, servable resource -- not embedded data.
+    audio_response = client.get(body["audio_url"])
+    assert audio_response.status_code == 200
+    assert audio_response.content == b"abc"
 
 
 def test_speak_endpoint_returns_502_when_speechify_fails(monkeypatch):
@@ -267,7 +273,7 @@ def test_speak_endpoint_defaults_gender_and_persona(monkeypatch):
         speechify.httpx,
         "post",
         lambda url, json, headers, timeout: captured.update(json=json) or _FakeResponse(
-            200, {"audio_data": "abc", "audio_format": "mp3"}
+            200, {"audio_data": "YWJj", "audio_format": "mp3"}
         ),
     )
 

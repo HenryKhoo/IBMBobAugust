@@ -205,7 +205,7 @@ different (see "Companion voice" below).
 **Response — HTTP 200**
 ```json
 {
-  "audio_data": "string",
+  "audio_url": "/speak/audio/<id>.mp3",
   "audio_format": "mp3",
   "speech_marks": [
     { "start_time": 0, "end_time": 200, "start": 0, "end": 4, "value": "string" }
@@ -213,11 +213,15 @@ different (see "Companion voice" below).
 }
 ```
 
-`audio_data` is base64-encoded audio in `audio_format`, relayed from
-Speechify as-is. `speech_marks` is word-level timing (milliseconds) used
-to drive the companion's mouth puppet off real word boundaries instead of
-a fixed timer; it's an empty list when Speechify's response didn't include
-usable timing data.
+`audio_url` is a path on this same backend (`GET /speak/audio/{filename}`)
+serving the generated clip, cached on disk for a short time — a real HTTP
+resource rather than embedded base64/blob data, since a `data:`/`blob:`
+URL is rejected by the deployed frontend's CSP (`media-src 'self' https:
+*`). Prefix it with the backend's base URL before assigning it to an
+`<audio>` element on a different origin. `speech_marks` is word-level
+timing (milliseconds) used to drive the companion's mouth puppet off real
+word boundaries instead of a fixed timer; it's an empty list when
+Speechify's response didn't include usable timing data.
 
 **Response — not configured (HTTP 503)** or **Speechify failed (HTTP 502)**
 ```json

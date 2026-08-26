@@ -356,13 +356,18 @@ class SpeechMarkChunk(BaseModel):
 class SpeakResponse(BaseModel):
     """Response body for POST /speak.
 
-    `audio_data` is base64-encoded audio in `audio_format`, passed through
-    from Speechify as-is — the backend never decodes/re-encodes it, only
-    relays it. `speech_marks` is empty when Speechify's response didn't
-    include usable timing data; the frontend degrades to its flap-timer
-    lip sync in that case rather than failing to speak at all.
+    `audio_url` points at `GET /speak/audio/{filename}` on this same
+    backend, not embedded base64/blob data — the deployed frontend's CSP
+    (`media-src 'self' https: *`) rejects both `data:` and `blob:` URIs,
+    so the frontend has to point `<audio>` at a real HTTP resource instead
+    (see `app.services.audio_cache`). It's a path relative to the
+    backend's own origin; a caller on a different origin (the frontend) is
+    responsible for prefixing it with the backend's base URL. `speech_marks`
+    is empty when Speechify's response didn't include usable timing data;
+    the frontend degrades to its flap-timer lip sync in that case rather
+    than failing to speak at all.
     """
 
-    audio_data: str
+    audio_url: str
     audio_format: str
     speech_marks: list[SpeechMarkChunk] = Field(default_factory=list)

@@ -25,17 +25,34 @@ does the cloning. See speechify-voice-plan.md §5.
 """
 
 import logging
+from dataclasses import dataclass, field
 from typing import Literal
 
 import httpx
 
 from app.config import settings
-from app.schemas import SpeakResponse, SpeechMarkChunk
+from app.schemas import SpeechMarkChunk
 
 logger = logging.getLogger(__name__)
 
 _SPEECH_ENDPOINT = "https://api.speechify.ai/v1/audio/speech"
 _REQUEST_TIMEOUT = 30
+
+
+@dataclass
+class SynthesizedSpeech:
+    """Raw result of a Speechify call: base64 audio plus word-level marks.
+
+    Deliberately not `SpeakResponse` itself -- that's the `/speak`
+    endpoint's HTTP response shape (`audio_url`, a servable path built by
+    `app.services.audio_cache.store`), one layer above what this module
+    knows about. `app.main.speak` turns one of these into a `SpeakResponse`
+    by caching `audio_data` and getting a URL back.
+    """
+
+    audio_data: str
+    audio_format: str
+    speech_marks: list[SpeechMarkChunk] = field(default_factory=list)
 
 # Speechify's actual per-request character cap for this endpoint was not
 # confirmed against live docs while building this (the API reference page
@@ -140,7 +157,7 @@ def synthesize_speech(
     text: str,
     gender: Literal["male", "female"],
     persona: Literal["baseline", "banter"],
-) -> SpeakResponse:
+) -> SynthesizedSpeech:
     """Call Speechify's /v1/audio/speech and return audio + word-level marks.
 
     Raises `SpeechifySynthesisError` on any failure reaching or talking to
@@ -178,7 +195,7 @@ def synthesize_speech(
         raise SpeechifySynthesisError(f"Could not reach Speechify: {exc}") from exc
 
     body = response.json()
-    return SpeakResponse(
+    return SynthesizedSpeech(
         audio_data=body["audio_data"],
         audio_format=body.get("audio_format", "mp3"),
         speech_marks=_parse_speech_marks(body),
