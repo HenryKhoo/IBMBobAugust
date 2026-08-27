@@ -30,7 +30,7 @@
       "use_cache": true,
       "grounded": true,
       "baseline_answer": "According to nasa-smd-50#chunk0, tropical cyclone intensification in the central Bay of Bengal is favored by a barrier layer thickness of 10-30 meters combined with a tropical cyclone heat potential of 40-80 kJ/cm². As storm intensity increases, the right-rear sector shows the largest heat-potential anomalies, and sea-surface cooling beneath the strongest, slowest-moving storms reaches 0.5-1.2°C in the inner core.",
-      "banter_answer": "Why did the cyclone love the ocean? It was looking for a deeper relationship. According to nasa-smd-50#chunk0, tropical cyclone intensification in the central Bay of Bengal is favored by a 10-30 meter barrier layer combined with a tropical cyclone heat potential of 40-80 kJ/cm². As storm intensity increases, the right-rear sector shows the largest heat-potential anomalies, while sea-surface cooling beneath the strongest, slowest-moving storms reaches 0.5-1.2°C in the inner core.",
+      "banter_answer": "Why do cyclones get bad grades? Because they're always in a spin! According to nasa-smd-50#chunk0, intensification in the central Bay of Bengal is favored by a 10-30m barrier layer and 40-80 kJ/cm² heat potential. The right-rear sector shows the largest heat-potential anomalies, and sea-surface cooling under the strongest, slowest storms reaches 0.5-1.2°C in the inner core.",
       "caveat": null,
       "source": [
         "science_reference:nasa-smd-50#chunk0"
@@ -48,7 +48,7 @@
       "use_cache": true,
       "grounded": true,
       "baseline_answer": "Based on nasa-smd-10#chunk0, eyewall mesovortices in Hurricane Ike showed a consistent structure of vorticity and vertical-velocity maxima wherever they formed. These mesovortices continued forming after the storm moved inland, though their structure altered as the storm interacted with the coastline and weakened. The source documents structural dynamics rather than quantifying net impacts on peak intensity.",
-      "banter_answer": "Why did the mesovortex stay inside the eyewall? It liked having a spin on things. According to nasa-smd-10#chunk0, Hurricane Ike's eyewall mesovortices showed consistent vorticity and vertical-velocity maxima wherever they formed. They continued forming after the storm moved inland, although their structure changed as the storm interacted with the coastline and weakened. The source describes their structure and evolution, but does not quantify their net effect on peak intensity.",
+      "banter_answer": "What did the mesovortex say to the hurricane? \"You blow me away!\" Based on nasa-smd-10#chunk0, Hurricane Ike's eyewall mesovortices had consistent vorticity and vertical-velocity maxima. They kept forming inland, though their structure changed as they weakened, but the source doesn't quantify their net impact on peak intensity.",
       "caveat": "Source documents mesovortex structure and behavior, not a quantified link to intensity. Answer is scoped to say only that.",
       "source": [
         "science_reference:nasa-smd-10#chunk0"
@@ -66,7 +66,7 @@
       "use_cache": true,
       "grounded": true,
       "baseline_answer": "Tropical cyclone formation requires warm ocean surface temperatures (at least 26.5°C to a depth of ~50m), high mid-tropospheric humidity, atmospheric instability, low vertical wind shear, a pre-existing low-level disturbance, and sufficient Coriolis force (at least 5° away from the equator).",
-      "banter_answer": "What does a tropical cyclone need before it can get started? A very warm welcome. Tropical cyclone formation requires ocean surface temperatures of at least 26.5°C down to about 50m, high mid-tropospheric humidity, atmospheric instability, low vertical wind shear, a pre-existing low-level disturbance, and sufficient Coriolis force, at least 5° away from the equator.",
+      "banter_answer": "How does a hurricane see? With its eye! Tropical cyclone formation requires ocean temperatures of at least 26.5°C to a 50m depth, high mid-tropospheric humidity, instability, and low vertical wind shear. It also requires a pre-existing disturbance and sufficient Coriolis force at least 5° from the equator.",
       "caveat": null,
       "source": [
         "science_reference:nasa-smd-50#chunk0"
@@ -84,7 +84,7 @@
       "use_cache": true,
       "grounded": true,
       "baseline_answer": "According to nasa-smd-80#chunk0 and nasa-smd-90#chunk0, the Saharan Air Layer suppresses Atlantic tropical cyclones by introducing dry, stable air that increases vertical wind shear and lower-level temperature inversions. Concurrently, dust particles act as cloud condensation and ice nuclei, altering hydrometeor properties, diabatic heating, and thermodynamic structure (as observed in Hurricane Erin in 2001). The net balance between suppression and microphysical influence remains unresolved.",
-      "banter_answer": "Why did the hurricane dislike the Saharan Air Layer? It found the atmosphere a little too dry. According to nasa-smd-80#chunk0 and nasa-smd-90#chunk0, the Saharan Air Layer suppresses Atlantic tropical cyclones by introducing dry, stable air that increases vertical wind shear and lower-level temperature inversions. Dust particles also act as cloud condensation and ice nuclei, altering hydrometeor properties, diabatic heating, and thermodynamic structure, as observed in Hurricane Erin in 2001. The net balance between these effects remains unresolved.",
+      "banter_answer": "Why did the dust cloud break up with the storm? It needed space to clear its head! According to nasa-smd-80#chunk0 and nasa-smd-90#chunk0, the Saharan Air Layer suppresses cyclones with dry, stable air that increases vertical wind shear and lower-level inversions. Dust also acts as condensation and ice nuclei—altering hydrometeors, diabatic heating, and thermodynamic structure—but the net balance of these effects remains unresolved.",
       "caveat": null,
       "source": [
         "science_reference:nasa-smd-80#chunk0",
@@ -103,7 +103,7 @@
       "use_cache": true,
       "grounded": true,
       "baseline_answer": "As cited in nasa-smd-85#chunk0 and nasa-smd-86#chunk0, approximately 240 ± 80 million tons of Saharan dust cross the Atlantic annually. This dust impacts the Earth's radiative balance directly through sunlight absorption and scattering. Furthermore, dust coated with sulfur or soluble material functions as cloud condensation and ice nuclei, modifying cloud development.",
-      "banter_answer": "Why did the Saharan dust cross the Atlantic? It wanted to make a long-distance impression. According to nasa-smd-85#chunk0 and nasa-smd-86#chunk0, approximately 240 ± 80 million tons of Saharan dust cross the Atlantic annually. The dust affects Earth's radiative balance through sunlight absorption and scattering. Dust coated with sulfur or soluble material can also act as cloud condensation and ice nuclei, modifying cloud development.",
+      "banter_answer": "What did one speck of dust say to the other? \"I think I'm catching a draft!\" As cited in nasa-smd-85#chunk0 and nasa-smd-86#chunk0, 240 ± 80 million tons of Saharan dust cross the Atlantic annually, directly impacting Earth's radiative balance by absorbing and scattering sunlight. Dust coated with sulfur or soluble material also acts as cloud condensation and ice nuclei, modifying cloud development.",
       "caveat": null,
       "source": [
         "science_reference:nasa-smd-85#chunk0",
@@ -122,7 +122,7 @@
       "use_cache": true,
       "grounded": true,
       "baseline_answer": "According to nasa-smd-25#chunk0, dust storms are evaluated via MODIS spectral reflectance rather than direct physical particle sizing. Dust reflectance increases across wavelengths from 0.4 to 2.5 μm, reaching a minimum in MODIS band 3 and a maximum in band 7, establishing a spectral signature distinct from clouds in satellite imagery.",
-      "banter_answer": "How do satellites recognize a dust storm? By its signature look. According to nasa-smd-25#chunk0, dust storms are evaluated using MODIS spectral reflectance rather than direct physical particle sizing. Dust reflectance increases across wavelengths from 0.4 to 2.5 μm, reaching a minimum in MODIS band 3 and a maximum in band 7, producing a spectral signature distinct from clouds in satellite imagery.",
+      "banter_answer": "Why are dust storms terrible at keeping secrets? Because they always cloud the issue! According to nasa-smd-25#chunk0, dust storms are evaluated by MODIS spectral reflectance, not physical sizing. Dust reflectance increases across 0.4 to 2.5 μm wavelengths, hitting a minimum in band 3 and a maximum in band 7, creating a unique spectral signature distinct from clouds.",
       "caveat": "Source characterizes dust by spectral reflectance signature (via MODIS bands), not by a particle-size distribution as literally asked.",
       "source": [
         "science_reference:nasa-smd-25#chunk0"
@@ -140,7 +140,7 @@
       "use_cache": true,
       "grounded": true,
       "baseline_answer": "Based on nasa-smd-30#chunk0, historical drought reconstruction requires correcting precipitation records for non-climatic biases, such as snowfall-to-liquid conversion errors, wind-induced rain gauge collection losses, evaporation between readings, and instrumentation changes. Because undercounting is most severe during cold seasons, reconstructions are primarily restricted to warm months (April–August) using screened high-quality records.",
-      "banter_answer": "Why did the old rain gauges need a careful fact-check? Their measurements had a few things getting lost in translation. Based on nasa-smd-30#chunk0, historical drought reconstruction requires correcting precipitation records for non-climatic biases, including snowfall-to-liquid conversion errors, wind-induced rain-gauge collection losses, evaporation between readings, and instrumentation changes. Because undercounting is most severe during cold seasons, reconstructions are primarily restricted to warm months, April-August, using screened high-quality records.",
+      "banter_answer": "Why do weather stations make terrible comedians? Their delivery is always too dry! Based on nasa-smd-30#chunk0, reconstructing historical droughts means correcting precipitation records for biases like snowfall-to-liquid conversion errors, wind-induced rain gauge losses, evaporation, and instrument changes. Undercounting is worst in cold seasons, so reconstructions mostly use screened, high-quality records from April to August.",
       "caveat": null,
       "source": [
         "science_reference:nasa-smd-30#chunk0"
@@ -158,7 +158,7 @@
       "use_cache": true,
       "grounded": true,
       "baseline_answer": "According to nasa-smd-15#chunk0, GPM satellite precipitation estimates are validated by comparing radar and imager data against quality-controlled ground instruments (NPOL radar, high-resolution rain-rate radar, disdrometers, and rain gauges). To account for a 0–30 minute surface fall-delay lag following overpasses, retrievals in this study were evaluated against ground measurements averaged 2–8 minutes post-overpass.",
-      "banter_answer": "Why did the raindrop have to wait after the satellite passed? It hadn't landed yet. According to nasa-smd-15#chunk0, GPM satellite precipitation estimates are validated by comparing radar and imager data with quality-controlled ground instruments, including NPOL radar, high-resolution rain-rate radar, disdrometers, and rain gauges. Because surface fall-delay after an overpass can be 0-30 minutes, the study evaluated retrievals against ground measurements averaged 2-8 minutes after the overpass.",
+      "banter_answer": "Why did the satellite get grounded? It had its head in the clouds! According to nasa-smd-15#chunk0, GPM satellite precipitation is validated by comparing radar and imager data against quality-controlled ground instruments like NPOL radar, disdrometers, and rain gauges. To account for a 0–30 minute surface fall-delay, retrievals were evaluated against ground measurements averaged 2–8 minutes after the overpass.",
       "caveat": null,
       "source": [
         "science_reference:nasa-smd-15#chunk0"
@@ -176,7 +176,7 @@
       "use_cache": true,
       "grounded": true,
       "baseline_answer": "As demonstrated in nasa-smd-110#chunk0 and nasa-smd-111#chunk0, scientists utilize long-term statistical trend analysis, such as applying the Mann-Kendall test to decades of spring water metrics. This methodology enabled researchers to link decreasing spring discharge to declining precipitation trends while isolating water quality degradation caused by human activities like mining, agriculture, and urbanization.",
-      "banter_answer": "Why did the climate scientist bring a statistician to the spring? For a long-term relationship with the data. As demonstrated in nasa-smd-110#chunk0 and nasa-smd-111#chunk0, scientists use long-term statistical trend analysis, including the Mann-Kendall test, on decades of spring water metrics. This helped link decreasing spring discharge to declining precipitation trends while isolating water-quality degradation associated with human activities such as mining, agriculture, and urbanization.",
+      "banter_answer": "Why did the climate scientist bring a ladder to work? To check the high temperatures! As shown in nasa-smd-110#chunk0 and nasa-smd-111#chunk0, scientists use long-term statistical tools like the Mann-Kendall test on decades of spring-water data. This linked decreasing spring discharge to lower precipitation while isolating water-quality degradation caused by human activities like mining, agriculture, and urbanization.",
       "caveat": "Reused from a water-quality case study rather than a general treatment of climate-change evidence, since the corpus has no passage framed at that general level.",
       "source": [
         "science_reference:nasa-smd-110#chunk0",
@@ -195,7 +195,7 @@
       "use_cache": true,
       "grounded": true,
       "baseline_answer": "According to nasa-smd-35#chunk0, wildland fires contribute approximately 25% of primary PM2.5 emissions in the US. Regional ignition sources vary: prescribed and agricultural burns account for most ignitions in the southeastern US, whereas lightning ignites about 70% of burned area in the western US. Burned area extent in both regions remains strongly linked to atmospheric environmental conditions and climatic variability.",
-      "banter_answer": "Who starts the fire? It depends where you are. According to nasa-smd-35#chunk0, wildland fires contribute approximately 25% of primary PM2.5 emissions in the US. Prescribed and agricultural burns account for most ignitions in the southeastern US, while lightning ignites about 70% of burned area in the western US. In both regions, burned-area extent remains strongly linked to atmospheric environmental conditions and climatic variability.",
+      "banter_answer": "Why did the tree worry about the fire? It didn't want to get burnt out! According to nasa-smd-35#chunk0, wildland fires create about 25% of primary PM2.5 emissions in the US. In the southeast, prescribed and agricultural burns cause most ignitions, while lightning sparks about 70% of the burned area in the west, with both regions strongly linked to atmospheric and climatic conditions.",
       "caveat": null,
       "source": [
         "science_reference:nasa-smd-35#chunk0"
@@ -213,7 +213,7 @@
       "use_cache": true,
       "grounded": true,
       "baseline_answer": "Based on nasa-smd-0#chunk0 and nasa-smd-66#chunk0, pollution is the primary driver of environmental degradation. Primary sources include vehicle emissions, agricultural runoff, industrial chemical spills, and poorly managed natural resource harvesting, leading to resource depletion, ecosystem disruption, and wildlife population declines.",
-      "banter_answer": "Why did the environment complain about pollution? It was tired of cleaning up after everyone else. Based on nasa-smd-0#chunk0 and nasa-smd-66#chunk0, pollution is the primary driver of environmental degradation. Major sources include vehicle emissions, agricultural runoff, industrial chemical spills, and poorly managed natural-resource harvesting, leading to resource depletion, ecosystem disruption, and wildlife population declines.",
+      "banter_answer": "Why did the river refuse to talk to the factory? It felt totally polluted by the conversation! Based on nasa-smd-0#chunk0 and nasa-smd-66#chunk0, pollution is the primary driver of environmental degradation. Vehicle emissions, agricultural runoff, industrial chemical spills, and poorly managed natural-resource harvesting lead to resource depletion, ecosystem disruption, and wildlife population declines.",
       "caveat": null,
       "source": [
         "science_reference:nasa-smd-0#chunk0",
@@ -232,7 +232,7 @@
       "use_cache": true,
       "grounded": true,
       "baseline_answer": "As detailed in nasa-smd-110#chunk0 and nasa-smd-112#chunk0, long-term monitoring of a karst spring in China using the Mann-Kendall trend test showed that anthropogenic pollution—specifically coal mining, quarrying, agriculture, and urbanization—caused measurable water-quality degradation over decades. Concurrently, climate-linked precipitation declines reduced total spring discharge.",
-      "banter_answer": "Why did the spring fail its water-quality test? It had been dealing with a lot of human baggage. As detailed in nasa-smd-110#chunk0 and nasa-smd-112#chunk0, long-term monitoring of a karst spring in China using the Mann-Kendall trend test showed measurable water-quality degradation over decades associated with coal mining, quarrying, agriculture, and urbanization. At the same time, climate-linked precipitation declines reduced total spring discharge.",
+      "banter_answer": "What did the sink say to the water pipe? \"You're full of it!\" As detailed in nasa-smd-110#chunk0 and nasa-smd-112#chunk0, long-term monitoring of a Chinese karst spring using the Mann-Kendall trend test revealed decades of water-quality degradation from coal mining, quarrying, agriculture, and urbanization. Simultaneously, climate-linked precipitation declines reduced the total spring discharge.",
       "caveat": null,
       "source": [
         "science_reference:nasa-smd-110#chunk0",
@@ -251,7 +251,7 @@
       "use_cache": true,
       "grounded": true,
       "baseline_answer": "According to nasa-smd-5#chunk0, high-shear, low-CAPE (HSLC) severe convection accounts for most cool-season nocturnal tornadoes and damaging wind events. Regional mechanisms differ: western US HSLC systems typically involve lower-tropospheric dryness combined with surface triple points or terrain upslope forcing, whereas eastern systems develop along warm sectors or cold fronts with lower cloud bases despite similar upper-level forcing.",
-      "banter_answer": "Why do some severe storms prefer the night shift? They have a thing for dramatic entrances. According to nasa-smd-5#chunk0, high-shear, low-CAPE (HSLC) severe convection accounts for most cool-season nocturnal tornadoes and damaging wind events. In the western US, HSLC systems typically involve lower-tropospheric dryness with surface triple points or terrain upslope forcing. In the eastern US, systems develop along warm sectors or cold fronts with lower cloud bases despite similar upper-level forcing.",
+      "banter_answer": "Why do thunderstorms make terrible neighbors? They always make a big racket! According to nasa-smd-5#chunk0, high-shear, low-CAPE (HSLC) severe convection causes most cool-season nocturnal tornadoes and damaging wind events. Western US systems usually involve lower-tropospheric dryness with surface triple points or terrain upslope forcing, whereas eastern systems develop along warm sectors or cold fronts with lower cloud bases.",
       "caveat": "Source characterizes high-shear, low-CAPE (HSLC) severe convection regionally rather than stating a general causal mechanism for severe mesoscale thunderstorms.",
       "source": [
         "science_reference:nasa-smd-5#chunk0"
@@ -269,7 +269,7 @@
       "use_cache": true,
       "grounded": true,
       "baseline_answer": "Based on nasa-smd-130#chunk0, a dryline is a boundary separating dry air from a moist air mass. Drylines act as convective triggers for severe thunderstorms; in subtropical southern Africa (specifically eastern South Africa), they occur most frequently during early summer, coinciding with peak occurrences of large hail and damaging winds.",
-      "banter_answer": "What happens when dry air meets moist air? Things get stormy. Based on nasa-smd-130#chunk0, a dryline is a boundary separating dry air from a moist air mass and can act as a convective trigger for severe thunderstorms. In subtropical southern Africa, specifically eastern South Africa, drylines occur most frequently during early summer, coinciding with peak occurrences of large hail and damaging winds.",
+      "banter_answer": "What happens when dry air and moist air meet? A stormy relationship! Based on nasa-smd-130#chunk0, a dryline is a boundary separating dry air from a moist air mass that acts as a convective trigger for severe thunderstorms. In subtropical southern Africa, they hit peak frequency during early summer, bringing large hail and damaging winds.",
       "caveat": null,
       "source": [
         "science_reference:nasa-smd-130#chunk0"
@@ -287,7 +287,7 @@
       "use_cache": true,
       "grounded": true,
       "baseline_answer": "As described in nasa-smd-125#chunk0, cold-air damming occurs when cold, dense air banks against mountain slopes. A documented Appalachian case study showed a stationary surface anticyclone paired with a low-pressure system east of Jackson, Mississippi, intensifying the mountain-parallel pressure gradient. This setup produced increased ridging east of the crests (Virginia to Georgia) and troughing to the west (New York to Tennessee).",
-      "banter_answer": "Why did the cold air stop at the mountains? It had hit a pressure problem. As described in nasa-smd-125#chunk0, cold-air damming occurs when cold, dense air banks against mountain slopes. In a documented Appalachian case, a stationary surface anticyclone and a low-pressure system east of Jackson, Mississippi, intensified the mountain-parallel pressure gradient. This produced increased ridging east of the crests from Virginia to Georgia and troughing to the west from New York to Tennessee.",
+      "banter_answer": "Why couldn't the cold air climb the mountain? It got a little too dammed up! As described in nasa-smd-125#chunk0, cold-air damming happens when dense, cold air banks against mountain slopes. A documented Appalachian case study showed a stationary surface anticyclone and a low-pressure system east of Jackson, Mississippi, intensifying the pressure gradient, producing increased ridging east of the crests and troughing to the west.",
       "caveat": "Source is a specific case study (a March 22 synoptic event) rather than a textbook definition; the answer describes the phenomenon through that case.",
       "source": [
         "science_reference:nasa-smd-125#chunk0"
