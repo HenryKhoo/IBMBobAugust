@@ -1634,22 +1634,11 @@
   // asked under that scope — the same reasoning that makes "New
   // conversation" the one deliberate way to detach from a conversation.
   // Cheapest safe behavior: changing domains starts fresh, exactly like it.
-  // A confirm() gate guards this: without it, clicking a domain pill mid-
-  // conversation wiped the visible log with no warning, which read as data
-  // loss even though the conversation is still recoverable from the
-  // sidebar. Bailing out on cancel leaves state.domain and the pill's
-  // aria-pressed untouched, since nothing has changed yet at that point.
+  // The prior conversation is still recoverable from the sidebar, so this
+  // proceeds without a confirmation prompt.
   function selectDomain(domainId) {
     if (domainId === state.domain) return;
     const hasActiveConversation = Boolean(state.sessionId) || logEl.children.length > 0;
-    if (
-      hasActiveConversation &&
-      !window.confirm(
-        "Switching domains starts a new conversation. The current one will be saved and can be reopened from the sidebar. Continue?"
-      )
-    ) {
-      return;
-    }
 
     state.domain = domainId;
     persistSettings();
