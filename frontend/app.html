@@ -2130,34 +2130,51 @@
   // every 250ms" — too coarse and jittery to read as synced) walks a
   // pointer through companionSpeechMarks each frame and compares it
   // against audio.currentTime. Marks are time-ordered, so the pointer
-  // only ever advances forward: cheap enough to run at 60fps. The mouth
-  // is open exactly while currentTime falls inside the current mark's
-  // [start_time, end_time) window (both in milliseconds) and closed
-  // otherwise — real word boundaries and gaps, not a blind timer.
+  // only ever advances forward: cheap enough to run at 60fps.
+  //
+  // NOT "open while currentTime falls inside the current word's
+  // [start_time, end_time)" — verified against a live Speechify response
+  // (see speechify-voice-plan.md) that back-to-back words are contiguous,
+  // each one's end_time equal to the next one's start_time, with no silent
+  // gap between them at all. Under that rule the mouth opens on the first
+  // word and never sees a moment outside every mark's window until the
+  // entire answer finishes, i.e. it reads as permanently open — this was
+  // the actual "mouth stays wide open" bug for male/female (cat only
+  // looked fine because its Speechify voice isn't configured, so it was
+  // silently falling back to the old blind 150ms flap timer instead).
+  // Instead, flap once per word: open the instant we cross into a new
+  // word's start_time, then close ~150ms later (or at that word's own
+  // end_time if it's shorter), mirroring flapCompanionMouthOnBoundary's
+  // open-now/close-on-a-beat shape but sampled from audio.currentTime
+  // instead of a wall-clock setTimeout.
   let companionMarksRafId = null;
-  let companionMarksIndex = 0;
-  let companionMarksMouthOpen = null; // null forces the first frame to paint
+  let companionMarksIndex = -1; // -1 = before the first word starts
+  let companionMarksMouthOpen = false;
+  let companionMarksCloseAt = 0;
   function tickCompanionLipSyncFromMarks() {
     const ms = companionAudio.currentTime * 1000;
     while (
       companionMarksIndex < companionSpeechMarks.length - 1 &&
-      ms >= companionSpeechMarks[companionMarksIndex].end_time
+      ms >= companionSpeechMarks[companionMarksIndex + 1].start_time
     ) {
       companionMarksIndex++;
+      const mark = companionSpeechMarks[companionMarksIndex];
+      companionMarksMouthOpen = true;
+      companionMarksCloseAt = Math.min(mark.end_time, mark.start_time + 150);
+      companionAvatar.src = COMPANION_FRAMES[state.companionGender].open;
     }
-    const mark = companionSpeechMarks[companionMarksIndex];
-    const speaking = !!mark && ms >= mark.start_time && ms < mark.end_time;
-    if (speaking !== companionMarksMouthOpen) {
-      companionMarksMouthOpen = speaking;
-      const frames = COMPANION_FRAMES[state.companionGender];
-      companionAvatar.src = speaking ? frames.open : frames.closed;
+    if (companionMarksMouthOpen && ms >= companionMarksCloseAt) {
+      companionMarksMouthOpen = false;
+      companionAvatar.src = COMPANION_FRAMES[state.companionGender].closed;
     }
     companionMarksRafId = requestAnimationFrame(tickCompanionLipSyncFromMarks);
   }
   function startCompanionMarksLipSync() {
     cancelAnimationFrame(companionMarksRafId);
-    companionMarksIndex = 0;
-    companionMarksMouthOpen = null;
+    companionMarksIndex = -1;
+    companionMarksMouthOpen = false;
+    companionMarksCloseAt = 0;
+    companionAvatar.src = COMPANION_FRAMES[state.companionGender].closed;
     tickCompanionLipSyncFromMarks();
   }
   function stopCompanionMarksLipSync() {
