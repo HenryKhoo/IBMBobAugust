@@ -4,6 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>The North Star — grounded AI for a crew in crisis</title>
+<meta name="description" content="C.O.S.M.O.S. grounds a crew's mission-critical questions in cited NASA and IBM watsonx.ai sources instead of guessing — no hallucinated answers in a crisis." />
 <link rel="icon" type="image/png" href="/public/north-star.png" />
 <style>
   :root {
@@ -19,6 +20,11 @@
     --footer-ink-dim: #9aa4b8;
     --accent-baseline: #5fb0c9;
     --accent-banter: #e0a458;
+    /* Darkened variants of the accents above, used wherever they sit on text
+       instead of a shape/graphic — #5fb0c9 and #e0a458 fall below WCAG AA
+       (4.5:1) against the light panel/background colors. */
+    --accent-baseline-text: #266b7a;
+    --accent-banter-text: #9c6318;
     --radius: 18px;
     --space-1: 4px;  --space-2: 8px;  --space-3: 12px; --space-4: 16px;
     --space-6: 24px; --space-8: 32px; --space-10: 40px; --space-16: 64px; --space-20: 80px;
@@ -165,7 +171,7 @@
     font-weight: 700;
     letter-spacing: 0.12em;
     text-transform: uppercase;
-    color: var(--accent-baseline);
+    color: var(--accent-baseline-text);
     margin: 0 0 var(--space-3);
   }
   .content-section h2 {
@@ -189,14 +195,14 @@
   .tech-card h3 small { display: block; margin-top: var(--space-1); font-size: 0.72rem; font-weight: 600; letter-spacing: 0.02em; color: var(--ink-dim); text-transform: none; }
   .tech-card p { margin: 0 0 var(--space-3); color: var(--ink-dim); font-size: 0.92rem; line-height: 1.6; }
   .tech-card p:last-child { margin-bottom: 0; }
-  .tech-card a { color: var(--accent-baseline); }
+  .tech-card a { color: var(--accent-baseline-text); }
   .tech-card .tag {
     display: inline-block;
     font-size: 0.7rem;
     font-weight: 700;
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: var(--accent-banter);
+    color: var(--accent-banter-text);
     margin-bottom: var(--space-2);
   }
 
@@ -239,7 +245,7 @@
     font-size: 0.85rem;
     font-weight: 600;
   }
-  .team-social a:hover { color: var(--accent-baseline); }
+  .team-social a:hover { color: var(--accent-baseline-text); }
   .team-social svg { width: 22px; height: 22px; flex-shrink: 0; }
 
   .ref-list { margin: 0; padding: 0; list-style: none; }
@@ -251,7 +257,7 @@
     line-height: 1.6;
   }
   .ref-list li:first-child { border-top: none; padding-top: 0; }
-  .ref-list a { color: var(--accent-baseline); word-break: break-word; }
+  .ref-list a { color: var(--accent-baseline-text); word-break: break-word; }
 
   @media (max-width: 900px) {
     .hero { grid-template-columns: 1fr; }
@@ -277,6 +283,7 @@
       <a class="nav-cta" href="app.html">Launch C.O.S.M.O.S.</a>
     </nav>
 
+    <main>
     <section class="hero">
       <div class="hero-copy">
         <h1>Motivation</h1>
@@ -404,7 +411,7 @@
             BSc in Computer Science, Asia Pacific University, Malaysia
           </p>
           <p class="team-social">
-            <a href="https://www.linkedin.com/in/henry-khoo/" target="_blank" rel="noopener noreferrer">
+            <a href="https://www.linkedin.com/in/henry-khoo/" target="_blank" rel="noopener noreferrer" aria-label="Henry Shien Chen Khoo on LinkedIn">
               <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                 <circle cx="12" cy="12" r="12" fill="#0A66C2"/>
                 <path fill="#fff" d="M8.34 9.75H5.62V18h2.72V9.75zM6.98 8.6a1.58 1.58 0 1 0 0-3.16 1.58 1.58 0 0 0 0 3.16zM18.75 18h-2.72v-4.36c0-1.04-.02-2.38-1.45-2.38-1.45 0-1.67 1.13-1.67 2.3V18H10.2V9.75h2.61v1.13h.04c.36-.68 1.25-1.4 2.57-1.4 2.75 0 3.26 1.81 3.26 4.16V18z"/>
@@ -420,7 +427,7 @@
             BSc in Computer Science, Asia Pacific University, Malaysia
           </p>
           <p class="team-social">
-            <a href="https://www.linkedin.com/in/laurajiayinglai/" target="_blank" rel="noopener noreferrer">
+            <a href="https://www.linkedin.com/in/laurajiayinglai/" target="_blank" rel="noopener noreferrer" aria-label="Laura Lai on LinkedIn">
               <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                 <circle cx="12" cy="12" r="12" fill="#0A66C2"/>
                 <path fill="#fff" d="M8.34 9.75H5.62V18h2.72V9.75zM6.98 8.6a1.58 1.58 0 1 0 0-3.16 1.58 1.58 0 0 0 0 3.16zM18.75 18h-2.72v-4.36c0-1.04-.02-2.38-1.45-2.38-1.45 0-1.67 1.13-1.67 2.3V18H10.2V9.75h2.61v1.13h.04c.36-.68 1.25-1.4 2.57-1.4 2.75 0 3.26 1.81 3.26 4.16V18z"/>
@@ -450,6 +457,7 @@
         traceable back to the source it came from.
       </p>
     </section>
+    </main>
   </div>
 </body>
 </html>
