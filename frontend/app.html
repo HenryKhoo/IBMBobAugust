@@ -2001,13 +2001,36 @@
   // freezing mid-answer.
   let companionLipSyncInterval = null;
   let companionMouthOpen = true;
+  // Pending "close the mouth" timeout from flapCompanionMouthOnBoundary
+  // below — cleared here too since starting/restarting the blind flap
+  // timer is the reset point for every fresh utterance (see
+  // speakCompanionFrom's onstart).
+  let companionBoundaryCloseTimeout = null;
   function startCompanionLipSync() {
     clearInterval(companionLipSyncInterval);
+    clearTimeout(companionBoundaryCloseTimeout);
     companionMouthOpen = true;
     companionLipSyncInterval = setInterval(() => {
       const frames = COMPANION_FRAMES[state.companionGender];
       companionAvatar.src = companionMouthOpen ? frames.open : frames.closed;
       companionMouthOpen = !companionMouthOpen;
+    }, 150);
+  }
+
+  // Word-boundary-driven flap for Web Speech: `onboundary` gives a start
+  // offset per word but no duration, so this approximates by opening the
+  // mouth immediately on each boundary and closing it a fixed beat later
+  // — still a blind guess at word *length*, but now at least anchored to
+  // real word boundaries instead of a timer with no relationship to the
+  // speech at all. Takes over from (and cancels) the blind flap timer the
+  // first time it fires; see speakCompanionFrom's onstart/onboundary.
+  function flapCompanionMouthOnBoundary() {
+    clearInterval(companionLipSyncInterval);
+    clearTimeout(companionBoundaryCloseTimeout);
+    const frames = COMPANION_FRAMES[state.companionGender];
+    companionAvatar.src = frames.open;
+    companionBoundaryCloseTimeout = setTimeout(() => {
+      companionAvatar.src = frames.closed;
     }, 150);
   }
 
@@ -2055,15 +2078,20 @@
       if (typeof event.charIndex === "number") {
         companionResumeIndex = companionBoundaryOffset + event.charIndex;
       }
+      flapCompanionMouthOnBoundary();
     };
     utterance.onstart = () => {
       companionCaption.textContent = "Speaking";
       companionPauseBtn.disabled = false;
       setCompanionPauseState(false);
+      // Blind flap timer until (if) the first onboundary event above takes
+      // over — some Web Speech implementations never fire onboundary at
+      // all, so the mouth still needs to move in that case.
       startCompanionLipSync();
     };
     const restCompanion = () => {
       clearInterval(companionLipSyncInterval);
+      clearTimeout(companionBoundaryCloseTimeout);
       if (companionSuppressEnd) {
         // We cancelled this utterance ourselves to pause it — the "resting"
         // UI state (caption/button) belongs to the pause handler, not here.
@@ -2097,23 +2125,58 @@
   let companionUsingSpeechify = false;
   let companionSpeechMarks = [];
 
-  // Marks-driven lip sync: on every <audio> timeupdate, the mouth is open
-  // exactly while currentTime falls inside some mark's [start_time,
-  // end_time) window (both in milliseconds) and closed otherwise — real
-  // word boundaries and gaps, not a blind timer. No-ops (leaves the flap
-  // timer running instead) when companionSpeechMarks is empty; see
-  // startCompanionLipSync's comment above.
-  function updateCompanionLipSyncFromMarks() {
-    if (!companionUsingSpeechify || !companionSpeechMarks.length) return;
+  // Marks-driven lip sync: a requestAnimationFrame loop (not `timeupdate`,
+  // which the HTML spec only requires to fire "no more frequently than
+  // every 250ms" — too coarse and jittery to read as synced) walks a
+  // pointer through companionSpeechMarks each frame and compares it
+  // against audio.currentTime. Marks are time-ordered, so the pointer
+  // only ever advances forward: cheap enough to run at 60fps. The mouth
+  // is open exactly while currentTime falls inside the current mark's
+  // [start_time, end_time) window (both in milliseconds) and closed
+  // otherwise — real word boundaries and gaps, not a blind timer.
+  let companionMarksRafId = null;
+  let companionMarksIndex = 0;
+  let companionMarksMouthOpen = null; // null forces the first frame to paint
+  function tickCompanionLipSyncFromMarks() {
     const ms = companionAudio.currentTime * 1000;
-    const frames = COMPANION_FRAMES[state.companionGender];
-    const speaking = companionSpeechMarks.some((mark) => ms >= mark.start_time && ms < mark.end_time);
-    companionAvatar.src = speaking ? frames.open : frames.closed;
+    while (
+      companionMarksIndex < companionSpeechMarks.length - 1 &&
+      ms >= companionSpeechMarks[companionMarksIndex].end_time
+    ) {
+      companionMarksIndex++;
+    }
+    const mark = companionSpeechMarks[companionMarksIndex];
+    const speaking = !!mark && ms >= mark.start_time && ms < mark.end_time;
+    if (speaking !== companionMarksMouthOpen) {
+      companionMarksMouthOpen = speaking;
+      const frames = COMPANION_FRAMES[state.companionGender];
+      companionAvatar.src = speaking ? frames.open : frames.closed;
+    }
+    companionMarksRafId = requestAnimationFrame(tickCompanionLipSyncFromMarks);
   }
-  companionAudio.addEventListener("timeupdate", updateCompanionLipSyncFromMarks);
+  function startCompanionMarksLipSync() {
+    cancelAnimationFrame(companionMarksRafId);
+    companionMarksIndex = 0;
+    companionMarksMouthOpen = null;
+    tickCompanionLipSyncFromMarks();
+  }
+  function stopCompanionMarksLipSync() {
+    cancelAnimationFrame(companionMarksRafId);
+    companionMarksRafId = null;
+  }
+  // Tied to the <audio> element's own play/pause/ended state rather than
+  // called ad hoc from every place that starts or stops playback (the
+  // pause button, playCompanionSpeechifyAudio, the fallback paths below)
+  // — one source of truth for "is Speechify audio actually advancing right
+  // now" instead of duplicating that logic at each call site.
+  companionAudio.addEventListener("play", () => {
+    if (companionUsingSpeechify && companionSpeechMarks.length) startCompanionMarksLipSync();
+  });
+  companionAudio.addEventListener("pause", stopCompanionMarksLipSync);
 
   function restCompanionAudio() {
     clearInterval(companionLipSyncInterval);
+    stopCompanionMarksLipSync();
     syncCompanionAvatarFrame();
     companionCaption.textContent = "Standing by";
     companionPauseBtn.disabled = true;
@@ -2127,6 +2190,7 @@
   // fallBackToWebSpeech below.
   companionAudio.addEventListener("error", () => {
     clearInterval(companionLipSyncInterval);
+    stopCompanionMarksLipSync();
     fallBackToWebSpeech();
   });
 
@@ -2139,7 +2203,8 @@
     setCompanionPauseState(false);
     // No marks came back (e.g. Speechify's response omitted them) — flap on
     // the fixed timer instead of leaving the mouth frozen for the whole
-    // answer; updateCompanionLipSyncFromMarks no-ops in this case.
+    // answer; the "play" listener above only starts the marks-driven loop
+    // when marks actually exist.
     if (!companionSpeechMarks.length) startCompanionLipSync();
     // play() returns a Promise that rejects on a bad/unsupported source or
     // a blocked autoplay -- the <audio> element's own "error" listener
@@ -2214,12 +2279,14 @@
     if (!window.speechSynthesis) return;
     if (companionPauseBtn.dataset.paused === "true") {
       clearInterval(companionLipSyncInterval);
+      clearTimeout(companionBoundaryCloseTimeout);
       speakCompanionFrom(companionResumeIndex);
     } else {
       if (!speechSynthesis.speaking) return;
       companionSuppressEnd = true;
       speechSynthesis.cancel();
       clearInterval(companionLipSyncInterval);
+      clearTimeout(companionBoundaryCloseTimeout);
       syncCompanionAvatarFrame();
       companionCaption.textContent = "Paused";
       setCompanionPauseState(true);
