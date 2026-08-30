@@ -23,8 +23,8 @@ The North Star is a web application for C.O.S.M.O.S. as a grounded NASA Earth-sc
 
 Demo video Youtube/Canva:
 
-https://www.youtube.com/watch?v=BE3CKr1vojY
-https://canva.link/thenorthstarcosmos
+- Youtube: https://www.youtube.com/watch?v=BE3CKr1vojY
+- Canva: https://canva.link/thenorthstarcosmos
 
 ![Landing Page](docs/landing-page.png)
 ![Application Page](docs/app-page.png)
