@@ -1,0 +1,382 @@
+<title>C.O.S.M.O.S. Architecture</title>
+
+<style>
+  :root {
+    --bg: #17181c;
+    --bg-raised: #1c1e22;
+    --panel: #212328;
+    --line: rgba(255, 255, 255, 0.07);
+    --line-strong: rgba(255, 255, 255, 0.16);
+    --ink: #e6e6e9;
+    --ink-dim: #a3a3ab;
+    --ink-faint: #8c8d96;
+    --accent-baseline: #9aa4ab;
+    --accent-banter: #ab9f93;
+    --accent-ibm: #3d72d0;
+    --star: #eef0f2;
+    --radius: 14px;
+    --space-1: 4px;  --space-2: 8px;  --space-3: 12px; --space-4: 16px;
+    --space-6: 24px; --space-8: 32px; --space-10: 40px; --space-16: 64px;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, "Segoe UI", "Helvetica Neue", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    padding: var(--space-10) clamp(16px, 4vw, 56px) var(--space-16);
+  }
+
+  .eyebrow {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 0 0 var(--space-2);
+  }
+  .eyebrow b { color: var(--accent-baseline); font-weight: 700; margin-right: var(--space-2); }
+
+  header.page {
+    max-width: 1560px;
+    margin: 0 auto var(--space-8);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: var(--space-4);
+    border-bottom: 1px solid var(--line);
+    padding-bottom: var(--space-6);
+  }
+  header.page h1 {
+    margin: 0 0 var(--space-2);
+    font-size: 1.9rem;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+  header.page p.sub {
+    margin: 0;
+    color: var(--ink-dim);
+    font-size: 0.92rem;
+    max-width: 62ch;
+    line-height: 1.5;
+  }
+  .meta {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    font-size: 0.8rem;
+    color: var(--ink-faint);
+    letter-spacing: 0.02em;
+  }
+  .chip {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: #0a0c10;
+    background: var(--star);
+    border-radius: 999px;
+    padding: 5px 14px;
+  }
+
+  .scroller {
+    max-width: 1560px;
+    margin: 0 auto;
+    overflow-x: auto;
+    padding-bottom: var(--space-2);
+  }
+
+  .canvas {
+    position: relative;
+    width: 1560px;
+    height: 900px;
+  }
+
+  .cluster {
+    position: absolute;
+    border: 1.5px dashed var(--line-strong);
+    border-radius: 18px;
+    background: transparent;
+  }
+  .cluster > .cluster-label {
+    position: absolute;
+    top: -11px;
+    left: 20px;
+    background: var(--bg);
+    padding: 0 8px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    color: var(--ink-faint);
+    text-transform: uppercase;
+  }
+  .cluster.tint-ibm {
+    border-color: rgba(61, 114, 208, 0.55);
+    background: linear-gradient(180deg, rgba(61, 114, 208, 0.12), transparent 70%);
+  }
+  .cluster.tint-ibm > .cluster-label { color: var(--accent-ibm); }
+
+  .inner {
+    position: absolute;
+    border: 1.5px dashed var(--line);
+    border-radius: 14px;
+  }
+  .inner > .cluster-label {
+    position: absolute;
+    top: -10px;
+    left: 16px;
+    background: var(--bg);
+    padding: 0 7px;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    color: var(--ink-faint);
+    text-transform: uppercase;
+  }
+
+  .grid {
+    position: absolute;
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line-strong);
+    border-radius: 12px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+  .card .badge {
+    flex: none;
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.72rem;
+    background: var(--bg-raised);
+    color: var(--ink-dim);
+  }
+  .card .txt { min-width: 0; }
+  .card .txt .t {
+    font-size: 0.82rem;
+    font-weight: 600;
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .card .txt .c {
+    font-size: 0.68rem;
+    color: var(--ink-faint);
+    line-height: 1.3;
+  }
+  .card.ibm { border-color: rgba(61, 114, 208, 0.45); }
+  .card.ibm .badge { background: rgba(61, 114, 208, 0.18); color: var(--accent-ibm); }
+  .card.banter { border-color: rgba(171, 159, 147, 0.35); }
+  .card.banter .badge { background: rgba(171, 159, 147, 0.16); color: var(--accent-banter); }
+
+  .banner {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: var(--panel);
+    border: 1px solid rgba(61, 114, 208, 0.5);
+    border-radius: 12px;
+    padding: 12px 18px;
+  }
+  .banner .badge {
+    flex: none;
+    width: 46px;
+    height: 46px;
+    border-radius: 10px;
+    background: var(--accent-ibm);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 0.85rem;
+    letter-spacing: 0.01em;
+  }
+  .banner .t { font-size: 1rem; font-weight: 700; color: var(--accent-ibm); }
+  .banner .c { font-size: 0.76rem; color: var(--ink-dim); margin-top: 2px; }
+  .banner.neutral { border-color: var(--line-strong); }
+  .banner.neutral .badge { background: var(--bg-raised); color: var(--ink); }
+  .banner.neutral .t { color: var(--ink); }
+
+  .free-caption {
+    position: absolute;
+    font-size: 0.7rem;
+    color: var(--ink-faint);
+    max-width: 540px;
+    line-height: 1.45;
+  }
+
+  svg.wires { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
+  .edge-label {
+    position: absolute;
+    font-size: 0.68rem;
+    letter-spacing: 0.01em;
+    color: var(--ink-dim);
+    background: var(--bg);
+    padding: 1px 6px;
+    border-radius: 6px;
+    white-space: nowrap;
+  }
+
+  footer.legend {
+    max-width: 1560px;
+    margin: var(--space-6) auto 0;
+    display: flex;
+    gap: var(--space-8);
+    flex-wrap: wrap;
+    align-items: center;
+    font-size: 0.76rem;
+    color: var(--ink-dim);
+  }
+  footer.legend .item { display: flex; align-items: center; gap: 8px; }
+  footer.legend .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+  footer.legend .note {
+    font-size: 0.72rem;
+    color: var(--ink-faint);
+    max-width: 640px;
+    line-height: 1.5;
+  }
+</style>
+
+<header class="page">
+  <div>
+    <span class="eyebrow"><b>C.O.S.M.O.S.</b>The North Star</span>
+    <h1>Architecture</h1>
+    <p class="sub">A grounded NASA Earth-science Q&amp;A console: FastAPI backend, retrieval via Zilliz Cloud (managed Milvus), and grounded generation on IBM watsonx.ai.</p>
+  </div>
+  <div class="meta">
+    <span class="chip">v1.1</span>
+  </div>
+</header>
+
+<div class="scroller">
+<div class="canvas">
+
+  <svg class="wires" width="1560" height="900" aria-hidden="true">
+    <defs>
+      <marker id="ah-neutral" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="var(--ink-dim)"/></marker>
+      <marker id="ah-ibm" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="var(--accent-ibm)"/></marker>
+      <marker id="ah-banter" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="var(--accent-banter)"/></marker>
+    </defs>
+
+    <!-- 1. Frontend -> Backend -->
+    <path d="M 334,318 L 334,340" fill="none" stroke="var(--ink-dim)" stroke-width="1.6" marker-end="url(#ah-neutral)"/>
+
+    <!-- 2. Backend -> Speechify -->
+    <path d="M 620,535 C 662,535 662,535 700,535" fill="none" stroke="var(--accent-banter)" stroke-width="1.6" marker-end="url(#ah-banter)"/>
+
+    <!-- 3. Backend -> IBM AI (primary prompts/completions) -->
+    <path d="M 622,392 C 800,392 780,220 952,232" fill="none" stroke="var(--accent-ibm)" stroke-width="2" marker-end="url(#ah-ibm)"/>
+
+    <!-- 4. Backend -> Retrieval/Storage (upsert / vector search) -->
+    <path d="M 590,742 C 740,800 850,650 952,568" fill="none" stroke="var(--ink-dim)" stroke-width="1.6" marker-end="url(#ah-neutral)"/>
+
+    <!-- 5. IBM AI -> Retrieval/Storage -->
+    <path d="M 1245,420 L 1245,468" fill="none" stroke="var(--accent-ibm)" stroke-width="1.6" marker-end="url(#ah-ibm)"/>
+  </svg>
+
+  <div class="edge-label" style="left:346px; top:322px;">REST / JSON</div>
+  <div class="edge-label" style="left:640px; top:508px; color:var(--accent-banter);">text → speech</div>
+  <div class="edge-label" style="left:735px; top:250px; color:var(--accent-ibm);">prompts / completions&nbsp;(primary)</div>
+  <div class="edge-label" style="left:700px; top:786px;">upsert / vector search</div>
+  <div class="edge-label" style="left:1256px; top:436px; color:var(--accent-ibm);">Granite embeddings</div>
+
+  <!-- DEPLOYMENT -->
+  <div class="cluster" style="left:24px; top:88px; width:620px; height:780px;">
+    <div class="cluster-label">Deployment</div>
+  </div>
+
+  <!-- FRONTEND -->
+  <div class="inner" style="left:48px; top:128px; width:572px; height:190px;">
+    <div class="cluster-label">Frontend</div>
+    <div class="grid" style="left:16px; top:16px; width:540px; grid-template-columns:1fr 1fr; grid-auto-rows:64px;">
+      <div class="card"><div class="badge">H5</div><div class="txt"><div class="t">HTML5</div><div class="c">index.html + app.html, static pages</div></div></div>
+      <div class="card"><div class="badge">CSS</div><div class="txt"><div class="t">CSS custom properties</div><div class="c">hand-rolled deep-space theme</div></div></div>
+      <div class="card"><div class="badge">JS</div><div class="txt"><div class="t">Vanilla JavaScript</div><div class="c">inline &lt;script&gt;, no framework</div></div></div>
+      <div class="card"><div class="badge">WS</div><div class="txt"><div class="t">Web Speech API</div><div class="c">browser TTS fallback voice</div></div></div>
+    </div>
+    <div class="free-caption" style="left:16px; top:170px;">no framework · no bundler · no npm build — two static pages served as-is</div>
+  </div>
+
+  <!-- BACKEND -->
+  <div class="inner" style="left:48px; top:340px; width:572px; height:400px;">
+    <div class="cluster-label">Backend</div>
+    <div class="grid" style="left:16px; top:16px; width:540px; grid-template-columns:1fr 1fr 1fr; grid-auto-rows:64px;">
+      <div class="card"><div class="badge">Py</div><div class="txt"><div class="t">Python 3.11+</div><div class="c">runtime</div></div></div>
+      <div class="card"><div class="badge">FA</div><div class="txt"><div class="t">FastAPI</div><div class="c">REST API framework</div></div></div>
+      <div class="card"><div class="badge">Uv</div><div class="txt"><div class="t">Uvicorn</div><div class="c">ASGI server</div></div></div>
+      <div class="card"><div class="badge">Pd</div><div class="txt"><div class="t">Pydantic v2</div><div class="c">schema validation</div></div></div>
+      <div class="card"><div class="badge">Hx</div><div class="txt"><div class="t">httpx</div><div class="c">HTTP client</div></div></div>
+      <div class="card"><div class="badge">Dv</div><div class="txt"><div class="t">python-dotenv</div><div class="c">config from .env</div></div></div>
+      <div class="card"><div class="badge">Pt</div><div class="txt"><div class="t">pytest</div><div class="c">test suite</div></div></div>
+      <div class="card"><div class="badge">Mv</div><div class="txt"><div class="t">langchain-milvus</div><div class="c">pymilvus · Zilliz client</div></div></div>
+    </div>
+  </div>
+
+  <!-- infra row -->
+  <div class="grid" style="left:48px; top:770px; width:572px; grid-template-columns:1fr 1fr 1fr; grid-auto-rows:64px;">
+    <div class="card"><div class="badge">Rw</div><div class="txt"><div class="t">Railway</div><div class="c">hosts backend + frontend</div></div></div>
+    <div class="card"><div class="badge">pip</div><div class="txt"><div class="t">pip</div><div class="c">requirements.txt</div></div></div>
+    <div class="card"><div class="badge">Git</div><div class="txt"><div class="t">Git / GitHub</div><div class="c">version control</div></div></div>
+  </div>
+
+  <!-- EXTERNAL -->
+  <div class="cluster" style="left:700px; top:450px; width:200px; height:170px;">
+    <div class="cluster-label">External</div>
+    <div class="card banter" style="position:absolute; left:16px; top:36px; width:168px;"><div class="badge">Sp</div><div class="txt"><div class="t">Speechify</div><div class="c">companion voice</div></div></div>
+  </div>
+
+  <!-- IBM AI -->
+  <div class="cluster tint-ibm" style="left:952px; top:88px; width:584px; height:332px;">
+    <div class="cluster-label">IBM AI</div>
+    <div class="banner" style="left:16px; top:18px; width:552px;">
+      <div class="badge">IBM</div>
+      <div>
+        <div class="t">IBM watsonx.ai</div>
+        <div class="c">model hosting platform — primary embeddings + generation for /ask and /ingest</div>
+      </div>
+    </div>
+    <div class="grid" style="left:16px; top:96px; width:552px; grid-template-columns:1fr 1fr; grid-auto-rows:76px;">
+      <div class="card ibm"><div class="badge">Gr</div><div class="txt"><div class="t">Granite Embedding 278M</div><div class="c">ibm/granite-embedding-278m-multilingual</div></div></div>
+      <div class="card ibm"><div class="badge">G4</div><div class="txt"><div class="t">Granite 4-H-Small</div><div class="c">ibm/granite-4-h-small · primary instruct</div></div></div>
+      <div class="card ibm"><div class="badge">Ll</div><div class="txt"><div class="t">Llama 3.3 70B Instruct</div><div class="c">watsonx 2nd-tier fallback</div></div></div>
+      <div class="card ibm"><div class="badge">Lc</div><div class="txt"><div class="t">langchain-ibm</div><div class="c">LangChain client for watsonx</div></div></div>
+    </div>
+  </div>
+
+  <!-- RETRIEVAL / STORAGE -->
+  <div class="cluster" style="left:952px; top:468px; width:584px; height:200px;">
+    <div class="cluster-label">Retrieval / Storage</div>
+    <div class="banner neutral" style="left:16px; top:65px; width:552px;">
+      <div class="badge">Zi</div>
+      <div>
+        <div class="t">Zilliz Cloud</div>
+        <div class="c">managed Milvus · cosine similarity · science_reference chunks</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<footer class="legend">
+  <span class="item"><span class="dot" style="background:var(--accent-banter);"></span> companion voice (Speechify)</span>
+</footer>
