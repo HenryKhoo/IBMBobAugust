@@ -176,41 +176,17 @@
 
   .source-line { font-size: 0.78rem; color: var(--ink-faint); margin-top: var(--space-2); word-break: break-word; }
 
-  .gate {
-    max-width: 480px;
-    margin: 22vh auto 0;
-    text-align: center;
-    color: var(--ink-faint);
-    font-size: 0.9rem;
-    padding: 0 var(--space-6);
-  }
-
   [hidden] { display: none !important; }
 </style>
 </head>
 <body>
 
-  <div id="gate" class="gate" hidden>
-    <p class="eyebrow">C.O.S.M.O.S.</p>
-    <p>Not found.</p>
-  </div>
-
-  <main id="app" class="wrap" hidden>
+  <main id="app" class="wrap">
     <p class="eyebrow">C.O.S.M.O.S. · Internal</p>
-    <h1>Preset Q&amp;A admin</h1>
+    <h1>Upload Question and Generate Answer</h1>
     <p class="sub">
-      Append a new curated question to <code>preset_qa.json</code>. Generate
-      drafts a Baseline answer from the live corpus, then a Banter restyle
-      of it — both editable before saving. Not linked from the public site.
+      Append a new curated question. Generate Baseline answer, then a Banter answer.
     </p>
-
-    <div class="panel">
-      <div class="field">
-        <label for="admin-token">Admin token</label>
-        <input type="password" id="admin-token" placeholder="Only needed if ADMIN_TOKEN is set on the backend" autocomplete="off" />
-        <p class="hint">Sent as X-Admin-Token on every request below. Stored only in this browser.</p>
-      </div>
-    </div>
 
     <form id="entry-form">
       <div class="panel">
@@ -231,8 +207,12 @@
             <label for="baseline-answer">Baseline answer</label>
             <button type="button" class="btn baseline" id="gen-baseline">Generate</button>
           </div>
-          <textarea id="baseline-answer" required placeholder="Direct, source-grounded answer, two to four sentences."></textarea>
+          <textarea id="baseline-answer" required placeholder="Direct answer, two to four sentences."></textarea>
           <div id="baseline-status"></div>
+          <label class="check" id="ack-row" hidden style="margin-top: var(--space-3);">
+            <input type="checkbox" id="ack-general-knowledge" />
+            I've reviewed this AI-drafted answer (no corpus citation) and confirm it's accurate.
+          </label>
         </div>
 
         <div class="field">
@@ -277,18 +257,7 @@
     { id: "other", label: "Other" },
   ];
 
-  const STORAGE_KEY_TOKEN = "cosmos:adminToken";
-
-  // ?admin=true gate. Client-side only — hides the page from casual nav,
-  // does not by itself protect the write endpoints (see ADMIN_TOKEN below
-  // and backend/app/main.py's _require_admin_token).
-  const isAdmin = new URLSearchParams(location.search).get("admin") === "true";
-  document.getElementById(isAdmin ? "app" : "gate").hidden = false;
-  if (!isAdmin) {
-    document.title = "Not found";
-  } else {
-    init();
-  }
+  init();
 
   function init() {
     const domainsEl = document.getElementById("domains");
@@ -297,12 +266,6 @@
       label.className = "check";
       label.innerHTML = `<input type="checkbox" value="${d.id}" /> ${d.label}`;
       domainsEl.appendChild(label);
-    });
-
-    const tokenEl = document.getElementById("admin-token");
-    tokenEl.value = localStorage.getItem(STORAGE_KEY_TOKEN) || "";
-    tokenEl.addEventListener("input", () => {
-      localStorage.setItem(STORAGE_KEY_TOKEN, tokenEl.value);
     });
 
     const questionEl = document.getElementById("question");
@@ -314,6 +277,18 @@
     const baselineStatus = document.getElementById("baseline-status");
     const banterStatus = document.getElementById("banter-status");
     const submitStatus = document.getElementById("submit-status");
+    const ackRow = document.getElementById("ack-row");
+    const ackCheckbox = document.getElementById("ack-general-knowledge");
+
+    // "manual" until a successful Generate sets it to "corpus" or
+    // "general_knowledge" — echoed back on Save so the backend can record
+    // which kind of entry this is (see AdminAppendPresetRequest.source_type
+    // and app.services.preset_admin.append_preset_entry). Stays whatever
+    // the last Generate call returned even if the admin hand-edits the
+    // drafted text afterward — an edited AI draft still isn't a corpus
+    // citation, so a "general_knowledge" draft keeps requiring the
+    // acknowledgment checkbox until the admin generates again or clears it.
+    let baselineSourceType = "manual";
 
     banterEl.addEventListener("input", updateBanterButtonState);
     baselineEl.addEventListener("input", updateBanterButtonState);
@@ -323,15 +298,14 @@
       genBanterBtn.disabled = baselineEl.value.trim().length === 0;
     }
 
-    function selectedDomains() {
-      return Array.from(domainsEl.querySelectorAll("input:checked")).map((el) => el.value);
+    function setBaselineSourceType(sourceType) {
+      baselineSourceType = sourceType;
+      ackRow.hidden = sourceType !== "general_knowledge";
+      if (ackRow.hidden) ackCheckbox.checked = false;
     }
 
-    function adminHeaders() {
-      const headers = { "Content-Type": "application/json" };
-      const token = tokenEl.value.trim();
-      if (token) headers["X-Admin-Token"] = token;
-      return headers;
+    function selectedDomains() {
+      return Array.from(domainsEl.querySelectorAll("input:checked")).map((el) => el.value);
     }
 
     function renderStatus(el, kind, message) {
@@ -346,7 +320,7 @@
     async function adminFetch(path, body) {
       const response = await fetch(`${API_BASE_URL}${path}`, {
         method: "POST",
-        headers: adminHeaders(),
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
       let data = null;
@@ -377,15 +351,16 @@
           question,
           domain: domains[0] || null,
         });
-        if (!result.grounded) {
+        baselineEl.value = result.baseline_answer;
+        updateBanterButtonState();
+        setBaselineSourceType(result.source_type);
+        if (result.source_type === "general_knowledge") {
           renderStatus(
             baselineStatus,
-            "err",
-            "Nothing in the corpus was confident enough for this question — write the Baseline answer by hand."
+            "info",
+            "No corpus citation for this question — AI general-knowledge draft. Review carefully, then check the box below before saving."
           );
         } else {
-          baselineEl.value = result.baseline_answer;
-          updateBanterButtonState();
           const conf = result.confidence != null ? ` · confidence ${result.confidence}` : "";
           renderStatus(baselineStatus, "ok", `Drafted from ${result.source}${conf}. Review before saving.`);
         }
@@ -429,6 +404,14 @@
         renderStatus(submitStatus, "err", "Question, at least one domain, and both answers are required.");
         return;
       }
+      if (baselineSourceType === "general_knowledge" && !ackCheckbox.checked) {
+        renderStatus(
+          submitStatus,
+          "err",
+          "This Baseline answer has no corpus citation — check the acknowledgment box above before saving."
+        );
+        return;
+      }
 
       submitBtn.disabled = true;
       submitBtn.textContent = "Saving…";
@@ -439,12 +422,14 @@
           domains,
           baseline_answer: baseline,
           banter_answer: banter,
+          source_type: baselineSourceType,
         });
         renderStatus(submitStatus, "ok", `Saved as "${result.id}". Answerable by /ask immediately.`);
         questionEl.value = "";
         domainsEl.querySelectorAll("input").forEach((el) => (el.checked = false));
         baselineEl.value = "";
         banterEl.value = "";
+        setBaselineSourceType("manual");
         renderStatus(baselineStatus, "info", "");
         renderStatus(banterStatus, "info", "");
         updateBanterButtonState();

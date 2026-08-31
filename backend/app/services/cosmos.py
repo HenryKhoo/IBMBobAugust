@@ -473,39 +473,63 @@ def ask_cosmos(
     )
 
 
+_ADMIN_GENERAL_KNOWLEDGE_PROMPT = """You are Baseline, a factual research assistant answering real \
+questions about space science and NASA missions. No passage from the corpus was \
+retrieved for this question, so answer from your own general knowledge instead. \
+Be plain and direct, and be honest about uncertainty rather than guessing with \
+false confidence. Two to four sentences, no commentary or humor.
+
+Question: {question}
+
+Answer:"""
+
+
 def generate_baseline_draft(question: str, domain: Domain | None = None) -> dict:
     """Draft a Baseline answer for a new preset-cache entry — admin tool only.
 
-    Runs the exact same retrieval + `_BASELINE_PROMPT` + `get_instruct_model()`
-    path `ask_cosmos` uses for a live question (single best-matching
+    Tries the exact same retrieval + `_BASELINE_PROMPT` + `get_instruct_model()`
+    path `ask_cosmos` uses for a live question first (single best-matching
     `science_reference` chunk, same `_CONFIDENCE_THRESHOLD` gate, same
-    domain-scoped-then-whole-corpus retry), so a drafted preset entry is
-    grounded exactly as strictly as a live answer would be — including
-    `get_instruct_model()`'s Granite -> watsonx-fallback -> Gemini-fallback
-    chain. Carries no session/conversational-memory state, since a preset
-    entry being drafted has no conversation. Returns `grounded: False` (with
-    no `baseline_answer`/`source`) rather than raising when nothing clears
-    the confidence bar, so the admin page can show that honestly and fall
-    back to a hand-written answer instead.
+    domain-scoped-then-whole-corpus retry) — a `source_type: "corpus"` draft
+    is grounded exactly as strictly as a live answer would be. Only when
+    nothing clears the confidence bar does this fall through to a second,
+    unconstrained prompt answered from the model's general knowledge
+    (`source_type: "general_knowledge"`), rather than leaving the admin with
+    a blank textarea — both tiers go through `get_instruct_model()`'s same
+    Granite -> watsonx-fallback -> Gemini-fallback chain. Carries no
+    session/conversational-memory state, since a preset entry being drafted
+    has no conversation.
+
+    A `general_knowledge` draft is NOT a corpus citation — the caller
+    (`app.main.admin_generate_baseline`) surfaces `source_type` so the admin
+    page can visibly warn about that and require explicit review before the
+    entry can be saved; see `frontend/admin.html`'s acknowledgment checkbox.
     """
     store = get_vector_store()
     hits = relevance_score_hits_or_empty(store, question, k=1, expr=_retrieval_expr(domain))
     if domain is not None and (not hits or _retrieval_strength(hits[0][1]) < _CONFIDENCE_THRESHOLD):
         hits = relevance_score_hits_or_empty(store, question, k=1, expr=_retrieval_expr(None))
-    if not hits:
-        return {"grounded": False, "baseline_answer": None, "source": None, "confidence": None}
 
-    chunk, relevance_score = hits[0]
-    confidence = _retrieval_strength(relevance_score)
-    if confidence < _CONFIDENCE_THRESHOLD:
-        return {"grounded": False, "baseline_answer": None, "source": None, "confidence": confidence}
+    confidence = _retrieval_strength(hits[0][1]) if hits else None
+    if hits and confidence >= _CONFIDENCE_THRESHOLD:
+        chunk, _ = hits[0]
+        baseline_prompt = _BASELINE_PROMPT.format(history="", passage=chunk.page_content, question=question)
+        baseline_answer = _message_text(get_instruct_model().invoke(baseline_prompt))
+        return {
+            "grounded": True,
+            "source_type": "corpus",
+            "baseline_answer": baseline_answer,
+            "source": _source_line(chunk.metadata),
+            "confidence": confidence,
+        }
 
-    baseline_prompt = _BASELINE_PROMPT.format(history="", passage=chunk.page_content, question=question)
-    baseline_answer = _message_text(get_instruct_model().invoke(baseline_prompt))
+    general_prompt = _ADMIN_GENERAL_KNOWLEDGE_PROMPT.format(question=question)
+    baseline_answer = _message_text(get_instruct_model().invoke(general_prompt))
     return {
-        "grounded": True,
+        "grounded": False,
+        "source_type": "general_knowledge",
         "baseline_answer": baseline_answer,
-        "source": _source_line(chunk.metadata),
+        "source": None,
         "confidence": confidence,
     }
 

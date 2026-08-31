@@ -291,7 +291,11 @@ def admin_append_preset(request: AdminAppendPresetRequest) -> AdminAppendPresetR
     """
     try:
         entry = append_preset_entry(
-            request.question, request.domains, request.baseline_answer, request.banter_answer
+            request.question,
+            request.domains,
+            request.baseline_answer,
+            request.banter_answer,
+            request.source_type,
         )
     except DuplicateQuestionError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc

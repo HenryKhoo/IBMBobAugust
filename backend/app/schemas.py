@@ -338,14 +338,21 @@ class AdminGenerateBaselineRequest(BaseModel):
 class AdminGenerateBaselineResponse(BaseModel):
     """Response body for POST /admin/preset-qa/generate-baseline.
 
-    `grounded=False` means retrieval found nothing in the corpus confident
-    enough to answer from — `baseline_answer`, `source`, and `confidence`
-    are then all `None`/absent, and the admin page should ask for a
-    hand-written answer rather than mistake this for a generated draft.
+    `baseline_answer` is always populated — see
+    `app.services.cosmos.generate_baseline_draft`. `source_type` is the
+    load-bearing field: `"corpus"` means `baseline_answer` is grounded in a
+    real retrieved passage (`source`/`grounded` describe that passage, the
+    same as a live `/ask` answer would); `"general_knowledge"` means
+    retrieval found nothing confident enough, so the model answered from
+    its own general knowledge instead — `source` is then `None` and
+    `grounded` is `False`. The admin page must not silently treat a
+    `general_knowledge` draft the same as a `corpus` one — see
+    `frontend/admin.html`'s acknowledgment checkbox.
     """
 
     grounded: bool
-    baseline_answer: str | None = None
+    source_type: Literal["corpus", "general_knowledge"]
+    baseline_answer: str
     source: str | None = None
     confidence: float | None = None
 
@@ -376,12 +383,22 @@ class AdminAppendPresetRequest(BaseModel):
     shape `app.services.cosmos._load_preset_cache` already expects, so it's
     answerable by `POST /ask` immediately — see
     `app.services.preset_admin.append_preset_entry`.
+
+    `source_type` should echo whatever `AdminGenerateBaselineResponse.source_type`
+    returned for this entry's Baseline answer (`"manual"` if the admin never
+    called generate-baseline, e.g. because they typed both answers by hand).
+    It controls the saved entry's `caveat`/`match_quality` fields, not
+    whether the entry gets saved at all — the admin page is expected to
+    gate the Save action itself for a `"general_knowledge"` draft (its
+    acknowledgment checkbox), same as it always could for a manually typed
+    answer the admin simply got wrong.
     """
 
     question: str = Field(min_length=1)
     domains: list[Domain] = Field(min_length=1)
     baseline_answer: str = Field(min_length=1)
     banter_answer: str = Field(min_length=1)
+    source_type: Literal["corpus", "general_knowledge", "manual"] = "manual"
 
 
 class AdminAppendPresetResponse(BaseModel):

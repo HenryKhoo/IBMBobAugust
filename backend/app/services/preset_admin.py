@@ -41,11 +41,18 @@ def _unique_id(base_slug: str, existing_ids: set[str]) -> str:
     return f"{base_slug}-{suffix}"
 
 
+_GENERAL_KNOWLEDGE_CAVEAT = (
+    "AI-drafted from general knowledge, not a corpus citation — reviewed and "
+    "confirmed accurate by an admin before saving."
+)
+
+
 def append_preset_entry(
     question: str,
     domains: list[Domain],
     baseline_answer: str,
     banter_answer: str,
+    source_type: str = "manual",
 ) -> dict:
     """Append one admin-authored entry to preset_qa.json and reload the live cache.
 
@@ -56,11 +63,19 @@ def append_preset_entry(
     Raises `DuplicateQuestionError` if `question` (stripped/lowercased)
     already exists.
 
-    New entries default to `match_quality: "strong"`, `use_cache: True`,
-    `grounded: True`, `caveat: None`, `source: []`, `confidence: None` —
-    the admin page supplies only question/domains/baseline_answer/
-    banter_answer, so everything else is filled in to match the shape of
-    every other entry in the file.
+    `source_type` (`"corpus"` / `"general_knowledge"` / `"manual"`, mirrors
+    `AdminGenerateBaselineResponse.source_type`) is saved as `True` for
+    every entry regardless — a `general_knowledge` draft only reaches here
+    after the admin page's acknowledgment checkbox, i.e. a human has
+    already reviewed and vouched for it, the same trust level a `manual`
+    entry always had — but it still has no real passage behind it, so it
+    gets `match_quality: "no_match"` and an explanatory `caveat` instead of
+    the `"strong"`/`None` a corpus-backed entry gets, and the `no_match`
+    (not `strong_match`) summary counter is incremented. `use_cache: True`,
+    `source: []`, `confidence: None` either way — the admin page supplies
+    only question/domains/baseline_answer/banter_answer/source_type, so
+    everything else here is filled in to match the shape of every other
+    entry in the file.
     """
     key = question.strip().lower()
 
@@ -74,23 +89,26 @@ def append_preset_entry(
     existing_ids = {entry["id"] for entry in data["entries"]}
     entry_id = _unique_id(_slugify(question), existing_ids)
 
+    is_general_knowledge = source_type == "general_knowledge"
+
     entry = {
         "id": entry_id,
         "question": question,
         "domains": [d.value for d in domains],
         "appears_in_all_chip": False,
-        "match_quality": "strong",
+        "match_quality": "no_match" if is_general_knowledge else "strong",
         "use_cache": True,
         "grounded": True,
         "baseline_answer": baseline_answer,
         "banter_answer": banter_answer,
-        "caveat": None,
+        "caveat": _GENERAL_KNOWLEDGE_CAVEAT if is_general_knowledge else None,
         "source": [],
         "confidence": None,
     }
     data["entries"].append(entry)
     data["summary"]["total_questions"] = data["summary"].get("total_questions", 0) + 1
-    data["summary"]["strong_match"] = data["summary"].get("strong_match", 0) + 1
+    summary_counter = "no_match" if is_general_knowledge else "strong_match"
+    data["summary"][summary_counter] = data["summary"].get(summary_counter, 0) + 1
 
     with _PRESET_QA_PATH.open("w") as f:
         json.dump(data, f, indent=2)
