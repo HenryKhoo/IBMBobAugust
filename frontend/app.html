@@ -791,11 +791,6 @@
     background: var(--accent-banter-wash);
     color: var(--accent-banter-text);
   }
-  .humor-row { display: flex; align-items: center; gap: var(--space-2); }
-  .humor-row label { font-size: var(--text-sm); color: var(--ink-dim); white-space: nowrap; }
-  .humor-row input[type="range"] { flex: 1; accent-color: var(--accent-banter); min-width: 0; }
-  .humor-row output { font-size: var(--text-sm); color: var(--ink-dim); width: 30px; text-align: right; }
-  .humor-row[data-disabled="true"] { opacity: 0.35; pointer-events: none; }
 
   .clear-btn {
     margin-left: 0;
@@ -1051,11 +1046,6 @@
             Banter
           </button>
         </div>
-        <div class="humor-row" data-disabled="true" id="humorRow">
-          <label for="humor" id="humorLabel">Humor</label>
-          <input type="range" id="humor" min="0" max="100" value="50" />
-          <output id="humorVal">50</output>
-        </div>
         <button type="button" class="clear-btn" id="historyBtn" disabled aria-expanded="false">Conversation history</button>
         <button type="button" class="clear-btn" id="clearBtn" disabled>New conversation</button>
       </div>
@@ -1160,7 +1150,6 @@
   ];
 
   const STORAGE_KEY_PERSONA = "cosmos:persona";
-  const STORAGE_KEY_HUMOR = "cosmos:humor";
   const STORAGE_KEY_DOMAIN = "cosmos:domain";
   const STORAGE_KEY_COMPANION_GENDER = "cosmos:companionGender";
   const STORAGE_KEY_COMPANION_MUTED = "cosmos:companionMuted";
@@ -1179,6 +1168,8 @@
   // companionGender defaults to "male" — the original companion avatar
   // (companion-mouth-*.jpg) and voice pairing, so a user who never touches
   // the new toggle sees no change at all.
+  // humor is fixed at the API's mid-range default — there is no UI control
+  // for it, so it is never read from or written to localStorage.
   const state = {
     persona: "baseline",
     humor: 50,
@@ -1217,10 +1208,6 @@
   const form = document.getElementById("askForm");
   const questionInput = document.getElementById("question");
   const sendBtn = document.getElementById("sendBtn");
-  const humorRow = document.getElementById("humorRow");
-  const humorLabel = document.getElementById("humorLabel");
-  const humorInput = document.getElementById("humor");
-  const humorVal = document.getElementById("humorVal");
   const chipsEl = document.getElementById("chips");
   const clearBtn = document.getElementById("clearBtn");
   const historyBtn = document.getElementById("historyBtn");
@@ -1548,15 +1535,11 @@
   function loadPersistedSettings() {
     try {
       const storedPersona = localStorage.getItem(STORAGE_KEY_PERSONA);
-      const storedHumor = localStorage.getItem(STORAGE_KEY_HUMOR);
       const storedDomain = localStorage.getItem(STORAGE_KEY_DOMAIN);
       const storedCompanionGender = localStorage.getItem(STORAGE_KEY_COMPANION_GENDER);
       const storedCompanionMuted = localStorage.getItem(STORAGE_KEY_COMPANION_MUTED);
       if (storedPersona === "baseline" || storedPersona === "banter") {
         state.persona = storedPersona;
-      }
-      if (storedHumor !== null && !Number.isNaN(Number(storedHumor))) {
-        state.humor = Number(storedHumor);
       }
       if (storedDomain !== null && DOMAINS.some((d) => d.id === storedDomain)) {
         state.domain = storedDomain;
@@ -1575,7 +1558,6 @@
   function persistSettings() {
     try {
       localStorage.setItem(STORAGE_KEY_PERSONA, state.persona);
-      localStorage.setItem(STORAGE_KEY_HUMOR, String(state.humor));
       localStorage.setItem(STORAGE_KEY_DOMAIN, state.domain);
       localStorage.setItem(STORAGE_KEY_COMPANION_GENDER, state.companionGender);
       localStorage.setItem(STORAGE_KEY_COMPANION_MUTED, state.companionMuted ? "1" : "0");
@@ -1645,16 +1627,6 @@
     }
   }
 
-  // Humor only does anything under the Banter persona; disabling the slider
-  // alone (opacity + pointer-events:none) left that unexplained, and since
-  // pointer-events:none also blocks the native hover tooltip, a `title`
-  // attribute wouldn't have helped — the label text itself has to say why.
-  function updateHumorAvailability() {
-    const disabled = state.persona === "baseline";
-    humorRow.dataset.disabled = String(disabled);
-    humorLabel.textContent = disabled ? "Humor (Banter only)" : "Humor";
-  }
-
   function updateCompanionMuteButton() {
     companionMuteBtn.setAttribute("aria-pressed", String(state.companionMuted));
     companionMuteBtn.textContent = state.companionMuted ? "Unmute voice" : "Mute voice";
@@ -1664,9 +1636,6 @@
     document.querySelectorAll(".persona-toggle button").forEach((b) => {
       b.setAttribute("aria-pressed", String(b.dataset.persona === state.persona));
     });
-    updateHumorAvailability();
-    humorInput.value = String(state.humor);
-    humorVal.textContent = String(state.humor);
     syncCompanionPersona();
     document.querySelectorAll(".companion-gender-toggle button").forEach((b) => {
       b.setAttribute("aria-pressed", String(b.dataset.gender === state.companionGender));
@@ -1703,7 +1672,6 @@
       document.querySelectorAll(".persona-toggle button").forEach((b) => {
         b.setAttribute("aria-pressed", String(b === btn));
       });
-      updateHumorAvailability();
       syncCompanionPersona();
       persistSettings();
     });
@@ -1737,12 +1705,6 @@
       syncCompanionAvatarFrame();
       persistSettings();
     });
-  });
-
-  humorInput.addEventListener("input", () => {
-    state.humor = Number(humorInput.value);
-    humorVal.textContent = String(state.humor);
-    persistSettings();
   });
 
   clearBtn.addEventListener("click", () => {

@@ -1,14 +1,14 @@
 # The North Star — IBM Bob August Challenge
-
-The North Star provides guidance and direction to find the true north when navigators are lost in the wilderness. It is the one star in the sky that does not move and pointing to north. C.O.S.M.O.S. (Companion Operating System for Mission Orbit Support) system is built based on this principle to provide one clear and grouned answer. 
+![Landing Page](docs/landing-page.png)
+The North Star provides guidance and direction to find the true north when navigators are lost in the wilderness. It is the one star in the sky that does not move and pointing to north. Companion Operating System for Mission Orbit Support (C.O.S.M.O.S.) platform is built based on this principle to provide a grounded answer. 
 
 Challenge theme: Reimagine Space Exploration with AI. 
 
 Link: https://thenorthstars.up.railway.app/
 
-## Motivation
+##  Turn a real question into one clear, grounded answer instead of a guess
 
-The North Star is a web application for C.O.S.M.O.S. as a grounded NASA Earth-science Q&A console. Ask questions about space events and C.O.S.M.O.S. answers from a real NASA source passage with citation. 
+The North Star is a web application for C.O.S.M.O.S. as a grounded NASA Earth-science Q&A console. Ask questions about space events and answers from a real NASA source passage with citation. 
 
 ## How to Use
 
@@ -17,21 +17,22 @@ The North Star is a web application for C.O.S.M.O.S. as a grounded NASA Earth-sc
 3. Select one of the 3 companions: male, female and cat
 4. Choose a persona either Baseline or Banter. Banter generates response with humor, while Baseline provide factual response
 5. Select one of the suggested questions from domain.
-6. The response will be shared both in text and speech format with a grounded response with a confidence score and a source citation. If there is an unmatched question, it will return "no grounded answer"
-
-## Demo
-
-Demo video Youtube/Canva:
-
-- Youtube: https://www.youtube.com/watch?v=BE3CKr1vojY
-- Canva: https://canva.link/thenorthstarcosmos
-
-![Landing Page](docs/landing-page.png)
-![Application Page](docs/app-page.png)
+6. The response will be shared both in text and speech format with a grounded response with a confidence score and a source citation. If there is an unmatched question, it will return "no grounded answer" found
 
 ## AI Approach and Architecture
-
+The architecture diagram is designed using Figma MCP server.
 ![C.O.S.M.O.S. architecture: development, ingestion, and runtime pipeline](docs/tech-stack-diagram-v1.png)
+
+| Layer | Technology |
+| --- | --- |
+| Frontend | Vanilla HTML, CSS, JavaScript (landing page + console) |
+| Backend API | FastAPI (Python), Uvicorn |
+| Embeddings | IBM Granite embedding model on watsonx.ai (`granite-embedding-278m-multilingual`) |
+| Vector store | Zilliz Cloud (managed Milvus) |
+| Grounded generation | IBM watsonx.ai — Granite instruct model |
+| Conversational memory | Session history persisted in Zilliz |
+| Text-to-speech | Speechify API |
+| Hosting | Railway |
 
 ### Retrieval-augmented generation — IBM Granite embeddings + Zilliz (or Gemini)
 
@@ -49,7 +50,6 @@ NASA SMD Q&A benchmark passages are embedded with IBM's Granite embedding model 
 ### Companion system
 
 1. Ingest to chunk, embed, and upsert documents into Zilliz.
-
 2. Query to retrieve the actual source passages a question matches
 3. Ask based on Q&A endpoint.
 4. Record the transcript for conversation and present in console's Conversation History
@@ -64,6 +64,24 @@ The mission based domains are categorize based on datasets such as Tropical Cycl
 A conversation is remembdered across calls that share a session id. Each session has its unique session id. Message exchanges are  persisted to Zilliz where the context survives a restart. Conversionational memory shapes based on a follow-up question, and every answer is still generated fresh from a retrieved passage. 
 
 
+## Demo
+
+Demo video Youtube/Canva:
+
+- Youtube: https://www.youtube.com/watch?v=BE3CKr1vojY
+- Canva: https://canva.link/thenorthstarcosmos
+
+The Companion Operating System for Mission Orbit Support platform (C.O.S.M.O.S.).  
+![Application Page](docs/app-page.png)
+
+## Screens
+
+| Screen | Function |
+| --- | --- |
+| Landing page | Motivation, Technology & Modules, Mission, Team, and **Launch C.O.S.M.O.S.** entry point into the console |
+| Console | Main Q&A interface to pick a domain and companion/persona, ask a question, and read a grounded answer with confidence score, source citation, and voice playback |
+| Sessions panel | Browse and resume past conversations |
+| Conversation history | View the transcript of the current session |
 
 ## How IBM Bob was used
-**IBM Bob** (Plan Mode) served as the project's core development engine for development workflow from initial blueprint to final code review. We leverage the Plan mode as a structured approach for architecting the FastAPI backend and console frontend. The product utilizes the watsonx.ai/Granite stack. The architecture diagram is designed using Figma MCP server.
+**IBM Bob** (Plan Mode) served as the project's core development engine for development workflow from initial blueprint to final code review. We leverage the Plan mode as a structured approach for architecting the FastAPI backend and console frontend. The platform utilizes the **watsonx.ai/Granite stack**. 
