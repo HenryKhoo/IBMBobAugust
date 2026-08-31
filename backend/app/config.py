@@ -92,5 +92,14 @@ class Settings:
     SPEECHIFY_VOICE_ID_BANTER_FEMALE: str = os.getenv("SPEECHIFY_VOICE_ID_BANTER_FEMALE", "")
     SPEECHIFY_VOICE_ID_CAT: str = os.getenv("SPEECHIFY_VOICE_ID_CAT", "")
 
+    # Shared-secret gate for the internal admin tool (frontend/admin.html)
+    # that appends entries to backend/data/preset_qa.json — see app.main's
+    # admin routes. Unset (default) leaves those routes open, matching this
+    # file's other optional-credential settings (e.g. SPEECHIFY_API_KEY);
+    # set it in any environment where that write endpoint is reachable by
+    # more than a trusted developer, and put the same value in the admin
+    # page so it can send it back via X-Admin-Token.
+    ADMIN_TOKEN: str = os.getenv("ADMIN_TOKEN", "")
+
 
 settings = Settings()

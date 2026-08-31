@@ -471,3 +471,67 @@ def ask_cosmos(
         session_id=session.session_id,
         history_source=history_source,
     )
+
+
+def generate_baseline_draft(question: str, domain: Domain | None = None) -> dict:
+    """Draft a Baseline answer for a new preset-cache entry — admin tool only.
+
+    Runs the exact same retrieval + `_BASELINE_PROMPT` + `get_instruct_model()`
+    path `ask_cosmos` uses for a live question (single best-matching
+    `science_reference` chunk, same `_CONFIDENCE_THRESHOLD` gate, same
+    domain-scoped-then-whole-corpus retry), so a drafted preset entry is
+    grounded exactly as strictly as a live answer would be — including
+    `get_instruct_model()`'s Granite -> watsonx-fallback -> Gemini-fallback
+    chain. Carries no session/conversational-memory state, since a preset
+    entry being drafted has no conversation. Returns `grounded: False` (with
+    no `baseline_answer`/`source`) rather than raising when nothing clears
+    the confidence bar, so the admin page can show that honestly and fall
+    back to a hand-written answer instead.
+    """
+    store = get_vector_store()
+    hits = relevance_score_hits_or_empty(store, question, k=1, expr=_retrieval_expr(domain))
+    if domain is not None and (not hits or _retrieval_strength(hits[0][1]) < _CONFIDENCE_THRESHOLD):
+        hits = relevance_score_hits_or_empty(store, question, k=1, expr=_retrieval_expr(None))
+    if not hits:
+        return {"grounded": False, "baseline_answer": None, "source": None, "confidence": None}
+
+    chunk, relevance_score = hits[0]
+    confidence = _retrieval_strength(relevance_score)
+    if confidence < _CONFIDENCE_THRESHOLD:
+        return {"grounded": False, "baseline_answer": None, "source": None, "confidence": confidence}
+
+    baseline_prompt = _BASELINE_PROMPT.format(history="", passage=chunk.page_content, question=question)
+    baseline_answer = _message_text(get_instruct_model().invoke(baseline_prompt))
+    return {
+        "grounded": True,
+        "baseline_answer": baseline_answer,
+        "source": _source_line(chunk.metadata),
+        "confidence": confidence,
+    }
+
+
+def generate_banter_draft(baseline_answer: str, humor: int = 50) -> str:
+    """Draft a Banter restyle of a (possibly hand-edited) Baseline answer.
+
+    Admin tool only — same `_BANTER_PROMPT` and "restate, never add a new
+    fact" contract `ask_cosmos` enforces live, including
+    `get_instruct_model()`'s failover chain. The caller supplies
+    `baseline_answer` directly (rather than this generating it from a fresh
+    retrieval), matching how `preset_qa.json`'s existing `banter_answer`
+    entries were hand-drafted as a restyle of their own `baseline_answer`.
+    """
+    banter_prompt = _BANTER_PROMPT.format(
+        humor=humor, humor_label=_humor_label(humor), baseline_answer=baseline_answer
+    )
+    return _message_text(get_instruct_model().invoke(banter_prompt))
+
+
+def reload_preset_cache() -> None:
+    """Re-read `preset_qa.json` from disk into `_PRESET_CACHE`.
+
+    Called by `app.services.preset_admin.append_preset_entry` after it
+    writes a new entry to the file, so that entry is answerable by
+    `POST /ask` immediately — no process restart needed.
+    """
+    global _PRESET_CACHE
+    _PRESET_CACHE = _load_preset_cache()

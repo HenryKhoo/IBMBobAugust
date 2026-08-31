@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<!-- Same deploy-config convention as app.html — see its <head> comment. -->
+<meta name="cosmos-api-base-url" content="https://thenorthstar.up.railway.app" />
+<title>C.O.S.M.O.S. — Preset Q&amp;A admin</title>
+<link rel="icon" type="image/png" href="/public/north-star.png" />
+<style>
+  /* Design system lifted from index.html/app.html so this reads as the same
+     product — same tokens, same hairline-ledger pattern instead of boxed
+     cards. Internal-only page: no starfield hero, no nav links, deliberately
+     unlinked from index.html/app.html. */
+  :root {
+    --bg: #17181c;
+    --bg-raised: #1c1e22;
+    --panel: #212328;
+    --panel-2: #26282e;
+    --line: rgba(255, 255, 255, 0.07);
+    --line-strong: rgba(255, 255, 255, 0.16);
+    --ink: #e6e6e9;
+    --ink-dim: #a3a3ab;
+    --ink-faint: #8c8d96;
+    --accent-baseline: #9aa4ab;
+    --accent-banter: #ab9f93;
+    --star: #eef0f2;
+    --good: #8fb996;
+    --bad: #c98a7a;
+    --radius: 14px;
+    --space-1: 4px;  --space-2: 8px;  --space-3: 12px; --space-4: 16px;
+    --space-6: 24px; --space-8: 32px; --space-10: 40px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", "Helvetica Neue", sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; padding: var(--space-10) var(--space-6) var(--space-10); }
+
+  .eyebrow {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 0 0 var(--space-3);
+  }
+  h1 {
+    font-size: clamp(1.6rem, 4vw, 2.1rem);
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    margin: 0 0 var(--space-2);
+  }
+  .sub { color: var(--ink-dim); font-size: 0.92rem; line-height: 1.6; margin: 0 0 var(--space-8); max-width: 60ch; }
+
+  .panel {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--panel);
+    padding: var(--space-6);
+    margin-bottom: var(--space-6);
+  }
+
+  label {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 0 0 var(--space-2);
+  }
+  .field { margin-bottom: var(--space-6); }
+  .field:last-child { margin-bottom: 0; }
+  .hint { font-size: 0.8rem; color: var(--ink-faint); margin: var(--space-2) 0 0; line-height: 1.5; }
+
+  input[type="text"], input[type="password"], textarea {
+    width: 100%;
+    background: var(--bg-raised);
+    border: 1px solid var(--line-strong);
+    border-radius: 10px;
+    color: var(--ink);
+    font-family: inherit;
+    font-size: 0.94rem;
+    padding: var(--space-3) var(--space-4);
+    outline: none;
+    transition: border-color 0.15s ease;
+  }
+  input[type="text"]:focus, input[type="password"]:focus, textarea:focus { border-color: var(--accent-baseline); }
+  textarea { min-height: 108px; line-height: 1.6; resize: vertical; }
+
+  .checks { display: flex; flex-wrap: wrap; gap: var(--space-4); }
+  .check {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: 0.88rem;
+    color: var(--ink-dim);
+  }
+  .check input { accent-color: var(--accent-baseline); }
+
+  .field-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+    margin-bottom: var(--space-2);
+  }
+  .field-head label { margin: 0; }
+
+  button {
+    font-family: inherit;
+    cursor: pointer;
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    background: transparent;
+    color: var(--ink-dim);
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    padding: var(--space-1) var(--space-3);
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    transition: color 0.15s ease, border-color 0.15s ease;
+  }
+  .btn:hover:not(:disabled) { color: var(--ink); border-color: var(--ink-dim); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn.baseline:hover:not(:disabled) { border-color: var(--accent-baseline); color: var(--accent-baseline); }
+  .btn.banter:hover:not(:disabled) { border-color: var(--accent-banter); color: var(--accent-banter); }
+
+  .submit-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-3);
+    background: var(--star);
+    color: #0a0c10;
+    border: none;
+    text-decoration: none;
+    font-size: 0.95rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    padding: var(--space-3) var(--space-8);
+    border-radius: 999px;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+  }
+  .submit-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 0 32px rgba(244, 247, 255, 0.18);
+  }
+  .submit-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; box-shadow: none; }
+
+  .status-row {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border-radius: 10px;
+    font-size: 0.85rem;
+    line-height: 1.6;
+    margin-bottom: var(--space-6);
+  }
+  .status-row.ok { background: rgba(143, 185, 150, 0.08); color: var(--good); border: 1px solid rgba(143, 185, 150, 0.25); }
+  .status-row.err { background: rgba(201, 138, 122, 0.08); color: var(--bad); border: 1px solid rgba(201, 138, 122, 0.25); }
+  .status-row.info { background: rgba(255,255,255,0.03); color: var(--ink-dim); border: 1px solid var(--line); }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; background: currentColor; }
+
+  .source-line { font-size: 0.78rem; color: var(--ink-faint); margin-top: var(--space-2); word-break: break-word; }
+
+  .gate {
+    max-width: 480px;
+    margin: 22vh auto 0;
+    text-align: center;
+    color: var(--ink-faint);
+    font-size: 0.9rem;
+    padding: 0 var(--space-6);
+  }
+
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+
+  <div id="gate" class="gate" hidden>
+    <p class="eyebrow">C.O.S.M.O.S.</p>
+    <p>Not found.</p>
+  </div>
+
+  <main id="app" class="wrap" hidden>
+    <p class="eyebrow">C.O.S.M.O.S. · Internal</p>
+    <h1>Preset Q&amp;A admin</h1>
+    <p class="sub">
+      Append a new curated question to <code>preset_qa.json</code>. Generate
+      drafts a Baseline answer from the live corpus, then a Banter restyle
+      of it — both editable before saving. Not linked from the public site.
+    </p>
+
+    <div class="panel">
+      <div class="field">
+        <label for="admin-token">Admin token</label>
+        <input type="password" id="admin-token" placeholder="Only needed if ADMIN_TOKEN is set on the backend" autocomplete="off" />
+        <p class="hint">Sent as X-Admin-Token on every request below. Stored only in this browser.</p>
+      </div>
+    </div>
+
+    <form id="entry-form">
+      <div class="panel">
+        <div class="field">
+          <label for="question">Question</label>
+          <input type="text" id="question" required placeholder="e.g. What causes a katabatic wind?" />
+        </div>
+
+        <div class="field">
+          <label>Domains</label>
+          <div class="checks" id="domains"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="field">
+          <div class="field-head">
+            <label for="baseline-answer">Baseline answer</label>
+            <button type="button" class="btn baseline" id="gen-baseline">Generate</button>
+          </div>
+          <textarea id="baseline-answer" required placeholder="Direct, source-grounded answer, two to four sentences."></textarea>
+          <div id="baseline-status"></div>
+        </div>
+
+        <div class="field">
+          <div class="field-head">
+            <label for="banter-answer">Banter answer</label>
+            <button type="button" class="btn banter" id="gen-banter" disabled>Generate</button>
+          </div>
+          <textarea id="banter-answer" required placeholder="Same facts as Baseline, restyled with a joke or aside."></textarea>
+          <div id="banter-status"></div>
+        </div>
+      </div>
+
+      <div id="submit-status"></div>
+      <button type="submit" class="submit-btn" id="submit-btn">Save entry</button>
+    </form>
+  </main>
+
+<script>
+  // Same resolution order as app.html's API_BASE_URL — see its comment.
+  const API_BASE_URL = (() => {
+    const { hostname, protocol, host } = window.location;
+    if (hostname === "localhost" || hostname === "127.0.0.1" || protocol === "file:") {
+      return "http://localhost:8000";
+    }
+    const configured = document
+      .querySelector('meta[name="cosmos-api-base-url"]')
+      ?.content?.trim();
+    if (configured) {
+      return configured.replace(/\/$/, "");
+    }
+    return `${protocol}//${host}`;
+  })();
+
+  // Mirrors backend/app/schemas.py's Domain enum exactly (minus the "All"
+  // ("") pseudo-domain app.html's picker has — every saved entry needs at
+  // least one real domain, so there's no blank/"All" checkbox here).
+  const DOMAINS = [
+    { id: "tropical_cyclone_dynamics", label: "Tropical Cyclone Dynamics" },
+    { id: "saharan_dust", label: "Saharan Dust" },
+    { id: "climate_reconstruction", label: "Climate Reconstruction" },
+    { id: "environmental_hazards", label: "Environmental Hazards" },
+    { id: "other", label: "Other" },
+  ];
+
+  const STORAGE_KEY_TOKEN = "cosmos:adminToken";
+
+  // ?admin=true gate. Client-side only — hides the page from casual nav,
+  // does not by itself protect the write endpoints (see ADMIN_TOKEN below
+  // and backend/app/main.py's _require_admin_token).
+  const isAdmin = new URLSearchParams(location.search).get("admin") === "true";
+  document.getElementById(isAdmin ? "app" : "gate").hidden = false;
+  if (!isAdmin) {
+    document.title = "Not found";
+  } else {
+    init();
+  }
+
+  function init() {
+    const domainsEl = document.getElementById("domains");
+    DOMAINS.forEach((d) => {
+      const label = document.createElement("label");
+      label.className = "check";
+      label.innerHTML = `<input type="checkbox" value="${d.id}" /> ${d.label}`;
+      domainsEl.appendChild(label);
+    });
+
+    const tokenEl = document.getElementById("admin-token");
+    tokenEl.value = localStorage.getItem(STORAGE_KEY_TOKEN) || "";
+    tokenEl.addEventListener("input", () => {
+      localStorage.setItem(STORAGE_KEY_TOKEN, tokenEl.value);
+    });
+
+    const questionEl = document.getElementById("question");
+    const baselineEl = document.getElementById("baseline-answer");
+    const banterEl = document.getElementById("banter-answer");
+    const genBaselineBtn = document.getElementById("gen-baseline");
+    const genBanterBtn = document.getElementById("gen-banter");
+    const submitBtn = document.getElementById("submit-btn");
+    const baselineStatus = document.getElementById("baseline-status");
+    const banterStatus = document.getElementById("banter-status");
+    const submitStatus = document.getElementById("submit-status");
+
+    banterEl.addEventListener("input", updateBanterButtonState);
+    baselineEl.addEventListener("input", updateBanterButtonState);
+    updateBanterButtonState();
+
+    function updateBanterButtonState() {
+      genBanterBtn.disabled = baselineEl.value.trim().length === 0;
+    }
+
+    function selectedDomains() {
+      return Array.from(domainsEl.querySelectorAll("input:checked")).map((el) => el.value);
+    }
+
+    function adminHeaders() {
+      const headers = { "Content-Type": "application/json" };
+      const token = tokenEl.value.trim();
+      if (token) headers["X-Admin-Token"] = token;
+      return headers;
+    }
+
+    function renderStatus(el, kind, message) {
+      el.innerHTML = "";
+      if (!message) return;
+      const row = document.createElement("div");
+      row.className = `status-row ${kind}`;
+      row.innerHTML = `<span class="status-dot"></span><span>${message}</span>`;
+      el.appendChild(row);
+    }
+
+    async function adminFetch(path, body) {
+      const response = await fetch(`${API_BASE_URL}${path}`, {
+        method: "POST",
+        headers: adminHeaders(),
+        body: JSON.stringify(body),
+      });
+      let data = null;
+      try {
+        data = await response.json();
+      } catch (_) {
+        // no body
+      }
+      if (!response.ok) {
+        const detail = data?.detail || `Request failed (${response.status})`;
+        throw new Error(detail);
+      }
+      return data;
+    }
+
+    genBaselineBtn.addEventListener("click", async () => {
+      const question = questionEl.value.trim();
+      if (!question) {
+        renderStatus(baselineStatus, "err", "Enter a question first.");
+        return;
+      }
+      genBaselineBtn.disabled = true;
+      genBaselineBtn.textContent = "Generating…";
+      renderStatus(baselineStatus, "info", "Retrieving from the corpus and drafting…");
+      try {
+        const domains = selectedDomains();
+        const result = await adminFetch("/admin/preset-qa/generate-baseline", {
+          question,
+          domain: domains[0] || null,
+        });
+        if (!result.grounded) {
+          renderStatus(
+            baselineStatus,
+            "err",
+            "Nothing in the corpus was confident enough for this question — write the Baseline answer by hand."
+          );
+        } else {
+          baselineEl.value = result.baseline_answer;
+          updateBanterButtonState();
+          const conf = result.confidence != null ? ` · confidence ${result.confidence}` : "";
+          renderStatus(baselineStatus, "ok", `Drafted from ${result.source}${conf}. Review before saving.`);
+        }
+      } catch (err) {
+        renderStatus(baselineStatus, "err", err.message);
+      } finally {
+        genBaselineBtn.disabled = false;
+        genBaselineBtn.textContent = "Generate";
+      }
+    });
+
+    genBanterBtn.addEventListener("click", async () => {
+      const baseline = baselineEl.value.trim();
+      if (!baseline) return;
+      genBanterBtn.disabled = true;
+      genBanterBtn.textContent = "Generating…";
+      renderStatus(banterStatus, "info", "Restyling the Baseline answer…");
+      try {
+        const result = await adminFetch("/admin/preset-qa/generate-banter", {
+          baseline_answer: baseline,
+          humor: 50,
+        });
+        banterEl.value = result.banter_answer;
+        renderStatus(banterStatus, "ok", "Drafted from the Baseline answer above. Review before saving.");
+      } catch (err) {
+        renderStatus(banterStatus, "err", err.message);
+      } finally {
+        genBanterBtn.disabled = false;
+        genBanterBtn.textContent = "Generate";
+      }
+    });
+
+    document.getElementById("entry-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const question = questionEl.value.trim();
+      const domains = selectedDomains();
+      const baseline = baselineEl.value.trim();
+      const banter = banterEl.value.trim();
+
+      if (!question || domains.length === 0 || !baseline || !banter) {
+        renderStatus(submitStatus, "err", "Question, at least one domain, and both answers are required.");
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Saving…";
+      renderStatus(submitStatus, "info", "");
+      try {
+        const result = await adminFetch("/admin/preset-qa", {
+          question,
+          domains,
+          baseline_answer: baseline,
+          banter_answer: banter,
+        });
+        renderStatus(submitStatus, "ok", `Saved as "${result.id}". Answerable by /ask immediately.`);
+        questionEl.value = "";
+        domainsEl.querySelectorAll("input").forEach((el) => (el.checked = false));
+        baselineEl.value = "";
+        banterEl.value = "";
+        renderStatus(baselineStatus, "info", "");
+        renderStatus(banterStatus, "info", "");
+        updateBanterButtonState();
+      } catch (err) {
+        renderStatus(submitStatus, "err", err.message);
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Save entry";
+      }
+    });
+  }
+</script>
+</body>
+</html>

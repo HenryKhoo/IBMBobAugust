@@ -322,6 +322,75 @@ class AskResponse(BaseModel):
     history_source: HistorySource = HistorySource.NONE
 
 
+class AdminGenerateBaselineRequest(BaseModel):
+    """Request body for POST /admin/preset-qa/generate-baseline.
+
+    Internal admin-tool endpoint (see `frontend/admin.html`), not part of
+    C.O.S.M.O.S.'s public product surface — drafts a Baseline answer for a
+    new curated preset-cache entry using the same retrieval path `POST
+    /ask` uses live. `domain` is optional the same way it is on `AskRequest`.
+    """
+
+    question: str = Field(min_length=1)
+    domain: Domain | None = None
+
+
+class AdminGenerateBaselineResponse(BaseModel):
+    """Response body for POST /admin/preset-qa/generate-baseline.
+
+    `grounded=False` means retrieval found nothing in the corpus confident
+    enough to answer from — `baseline_answer`, `source`, and `confidence`
+    are then all `None`/absent, and the admin page should ask for a
+    hand-written answer rather than mistake this for a generated draft.
+    """
+
+    grounded: bool
+    baseline_answer: str | None = None
+    source: str | None = None
+    confidence: float | None = None
+
+
+class AdminGenerateBanterRequest(BaseModel):
+    """Request body for POST /admin/preset-qa/generate-banter.
+
+    `baseline_answer` is the (possibly hand-edited) text from the
+    generate-baseline step — Banter is drafted as a restyle of it, never
+    generated independently, matching the "Banter never adds a new fact"
+    rule `POST /ask` enforces live. `humor` mirrors `AskRequest.humor`.
+    """
+
+    baseline_answer: str = Field(min_length=1)
+    humor: int = Field(default=50, ge=0, le=100)
+
+
+class AdminGenerateBanterResponse(BaseModel):
+    """Response body for POST /admin/preset-qa/generate-banter."""
+
+    banter_answer: str
+
+
+class AdminAppendPresetRequest(BaseModel):
+    """Request body for POST /admin/preset-qa.
+
+    Appends one curated entry to `backend/data/preset_qa.json` in the same
+    shape `app.services.cosmos._load_preset_cache` already expects, so it's
+    answerable by `POST /ask` immediately — see
+    `app.services.preset_admin.append_preset_entry`.
+    """
+
+    question: str = Field(min_length=1)
+    domains: list[Domain] = Field(min_length=1)
+    baseline_answer: str = Field(min_length=1)
+    banter_answer: str = Field(min_length=1)
+
+
+class AdminAppendPresetResponse(BaseModel):
+    """Response body for POST /admin/preset-qa."""
+
+    id: str
+    question: str
+
+
 class SpeakRequest(BaseModel):
     """Request body for POST /speak.
 

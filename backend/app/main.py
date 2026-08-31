@@ -2,7 +2,7 @@
 
 import logging
 
-from fastapi import FastAPI, HTTPException, Response, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -10,6 +10,12 @@ from starlette.requests import Request
 
 from app.config import settings
 from app.schemas import (
+    AdminAppendPresetRequest,
+    AdminAppendPresetResponse,
+    AdminGenerateBaselineRequest,
+    AdminGenerateBaselineResponse,
+    AdminGenerateBanterRequest,
+    AdminGenerateBanterResponse,
     AskRequest,
     AskResponse,
     ConversationHistoryResponse,
@@ -24,7 +30,8 @@ from app.schemas import (
 from app.services import audio_cache, memory, speechify
 from app.services.ingestion import ingest_and_upsert
 from app.services.query import run_query
-from app.services.cosmos import ask_cosmos
+from app.services.cosmos import ask_cosmos, generate_baseline_draft, generate_banter_draft
+from app.services.preset_admin import DuplicateQuestionError, append_preset_entry
 from app.services.vector_store import get_vector_store
 from app.services.vector_store import missing_credentials as zilliz_missing_credentials
 from app.services.watsonx import missing_credentials as watsonx_missing_credentials
@@ -221,3 +228,71 @@ def speak_audio(filename: str) -> FileResponse:
     except (ValueError, FileNotFoundError):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Audio clip not found or expired")
     return FileResponse(path, media_type=f"audio/{path.suffix.lstrip('.')}")
+
+
+def _require_admin_token(x_admin_token: str | None = Header(default=None)) -> None:
+    """Gate every /admin/* route behind `ADMIN_TOKEN`, when one is configured.
+
+    Mirrors this codebase's other optional-credential settings: an unset
+    `ADMIN_TOKEN` leaves these routes open, matching local/dev use where
+    `frontend/admin.html` is reached only by knowing its `?admin=true` URL.
+    Any environment that sets `ADMIN_TOKEN` requires every caller to echo
+    it back via the `X-Admin-Token` header — the `?admin=true` gate on the
+    page itself is client-side only and not real access control on its own.
+    """
+    if settings.ADMIN_TOKEN and x_admin_token != settings.ADMIN_TOKEN:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing or invalid admin token")
+
+
+@app.post(
+    "/admin/preset-qa/generate-baseline",
+    response_model=AdminGenerateBaselineResponse,
+    dependencies=[Depends(_require_admin_token)],
+)
+def admin_generate_baseline(request: AdminGenerateBaselineRequest) -> AdminGenerateBaselineResponse:
+    """Draft a Baseline answer for a new preset-cache entry — admin tool only.
+
+    Runs the same retrieval + `_BASELINE_PROMPT` + `get_instruct_model()`
+    path `POST /ask` uses live, including its Granite -> watsonx-fallback ->
+    Gemini-fallback failover chain — see
+    `app.services.cosmos.generate_baseline_draft`.
+    """
+    return AdminGenerateBaselineResponse(**generate_baseline_draft(request.question, request.domain))
+
+
+@app.post(
+    "/admin/preset-qa/generate-banter",
+    response_model=AdminGenerateBanterResponse,
+    dependencies=[Depends(_require_admin_token)],
+)
+def admin_generate_banter(request: AdminGenerateBanterRequest) -> AdminGenerateBanterResponse:
+    """Draft a Banter restyle of an admin-supplied Baseline answer.
+
+    Same `_BANTER_PROMPT` "restate, never add a new fact" contract
+    `POST /ask` enforces live, including the same failover chain — see
+    `app.services.cosmos.generate_banter_draft`.
+    """
+    banter_answer = generate_banter_draft(request.baseline_answer, request.humor)
+    return AdminGenerateBanterResponse(banter_answer=banter_answer)
+
+
+@app.post(
+    "/admin/preset-qa",
+    response_model=AdminAppendPresetResponse,
+    dependencies=[Depends(_require_admin_token)],
+)
+def admin_append_preset(request: AdminAppendPresetRequest) -> AdminAppendPresetResponse:
+    """Append one curated Q&A entry to `backend/data/preset_qa.json` — admin tool only.
+
+    Writes straight to disk and reloads the live preset cache, so the new
+    question is answerable by `POST /ask` immediately, with no restart.
+    409s if `question` already exists in the file — see
+    `app.services.preset_admin.append_preset_entry`.
+    """
+    try:
+        entry = append_preset_entry(
+            request.question, request.domains, request.baseline_answer, request.banter_answer
+        )
+    except DuplicateQuestionError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    return AdminAppendPresetResponse(id=entry["id"], question=entry["question"])
