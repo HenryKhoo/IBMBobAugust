@@ -63,6 +63,24 @@ The mission based domains are categorize based on datasets such as Tropical Cycl
 
 A conversation is remembdered across calls that share a session id. Each session has its unique session id. Message exchanges are  persisted to Zilliz where the context survives a restart. Conversionational memory shapes based on a follow-up question, and every answer is still generated fresh from a retrieved passage. 
 
+### Upload Question and Generate Answer
+
+An upload tool to extend the curated preset Q&A set. 
+The workflow: 
+1. Enter a question
+2. Select one or more domains
+3. Generate a Baseline answer and a Banter answer
+4. **Save entry**.
+
+- Baseline answers come from one of two sources: 
+1. corpus-grounded, drafted from a retrieved passage, or 
+2. a general-knowledge fallback when no confident corpus match exists 
+
+Note: User can review and check an acknowledgment box before saving.
+
+- Banter is a restyle of the reviewed Baseline answer and never introduces new facts.
+
+![Upload Question and Generate Answer — admin console](docs/question-page.png)
 
 ## Demo
 
@@ -82,6 +100,7 @@ The Companion Operating System for Mission Orbit Support platform (C.O.S.M.O.S.)
 | Console | Main Q&A interface to pick a domain and companion/persona, ask a question, and read a grounded answer with confidence score, source citation, and voice playback |
 | Sessions panel | Browse and resume past conversations |
 | Conversation history | View the transcript of the current session |
+| Upload Question and Generate Answer | Internal admin tool to append a new curated Q&A entry: draft a Baseline answer (corpus-grounded via retrieval, or a flagged general-knowledge fallback), restyle it into a Banter answer, then save both directly into the preset cache — answerable immediately, no restart needed |
 
 ## How IBM Bob was used
 **IBM Bob** (Plan Mode) served as the project's core development engine for development workflow from initial blueprint to final code review. We leverage the Plan mode as a structured approach for architecting the FastAPI backend and console frontend. The platform utilizes the **watsonx.ai/Granite stack**. 
