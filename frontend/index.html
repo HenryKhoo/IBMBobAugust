@@ -82,6 +82,15 @@
     transition: color 0.15s ease;
   }
   .nav-links a:hover { color: var(--ink); }
+  .nav-admin {
+    color: var(--ink-dim);
+    text-decoration: none;
+    font-size: 0.82rem;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    transition: color 0.15s ease;
+  }
+  .nav-admin:hover { color: var(--ink); }
   .nav-cta {
     background: var(--star);
     color: #0a0c10;
@@ -399,6 +408,7 @@
   @media (max-width: 820px) {
     nav { padding: var(--space-3) var(--space-4); }
     .nav-links { display: none; }
+    .nav-admin { display: none; }
     .logo { white-space: nowrap; }
     .logo span { display: none; }
     .m-section { grid-template-columns: 1fr; gap: var(--space-6); padding: var(--space-16) 0; }
@@ -420,6 +430,7 @@
       <li><a href="#team">Team</a></li>
       <li><a href="#references">References</a></li>
     </ul>
+    <a class="nav-admin" href="admin.html">Upload Question</a>
     <a class="nav-cta" href="app.html">Launch C.O.S.M.O.S.</a>
   </nav>
 

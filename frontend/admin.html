@@ -176,12 +176,24 @@
 
   .source-line { font-size: 0.78rem; color: var(--ink-faint); margin-top: var(--space-2); word-break: break-word; }
 
+  .back-link {
+    display: inline-block;
+    color: var(--ink-faint);
+    text-decoration: none;
+    font-size: 0.82rem;
+    letter-spacing: 0.02em;
+    margin-bottom: var(--space-6);
+    transition: color 0.15s ease;
+  }
+  .back-link:hover { color: var(--ink-dim); }
+
   [hidden] { display: none !important; }
 </style>
 </head>
 <body>
 
   <main id="app" class="wrap">
+    <a class="back-link" href="index.html">← Landing Page</a>
     <p class="eyebrow">C.O.S.M.O.S. · Internal</p>
     <h1>Upload Question and Generate Answer</h1>
     <p class="sub">
